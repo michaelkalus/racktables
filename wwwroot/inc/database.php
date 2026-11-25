@@ -1387,6 +1387,26 @@ function commitDeleteObject ($object_id)
 	$savepoint = beginAtomicChange ('commitDeleteObject');
 	try
 	{
+		// Racks, rows and locations keep their file links and tags under
+		// their own realm, commitResetObject() releases only realm 'object'.
+		$result = usePreparedSelectBlade ('SELECT objtype_id FROM Object WHERE id = ?', array ($object_id));
+		$objtype_id = $result->fetchColumn();
+		unset ($result);
+		switch ($objtype_id)
+		{
+			case 1560:
+				releaseFiles ('rack', $object_id);
+				destroyTagsForEntity ('rack', $object_id);
+				break;
+			case 1561:
+				// rows have no tags
+				releaseFiles ('row', $object_id);
+				break;
+			case 1562:
+				releaseFiles ('location', $object_id);
+				destroyTagsForEntity ('location', $object_id);
+				break;
+		}
 		// Reset most of stuff
 		commitResetObject ($object_id);
 		// Object itself
@@ -3528,9 +3548,21 @@ function commitDeleteUserAccount ($id)
 	if ($id == 1)
 		throw new InvalidArgException ('id', $id, 'belongs to the administrator account');
 	$userinfo = spotEntity ('user', $id);
-	destroyTagsForEntity ('user', $id);
-	usePreparedDeleteBlade ('UserConfig', array ('user' => $userinfo['user_name']));
-	usePreparedDeleteBlade ('UserAccount', array ('user_id' => $id));
+	// Do not release anything of the user if the deletion fails.
+	$savepoint = beginAtomicChange ('commitDeleteUserAccount');
+	try
+	{
+		releaseFiles ('user', $id);
+		destroyTagsForEntity ('user', $id);
+		usePreparedDeleteBlade ('UserConfig', array ('user' => $userinfo['user_name']));
+		usePreparedDeleteBlade ('UserAccount', array ('user_id' => $id));
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 // This function returns an array of all port type pairs from PortCompat table.

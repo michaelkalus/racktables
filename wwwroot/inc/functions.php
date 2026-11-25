@@ -7268,11 +7268,20 @@ function splitNetworkByMask ($netinfo, $dst_mask)
 // it stores given id in the static var, and returns the stored value is called without args
 // used in plugins to make additional work on created entity in the chained ophandler
 // returns an array of realm-ID pairs
-function lastCreated ($realm = NULL, $id = NULL)
+// with $forget = TRUE it removes the given entity, whose creation has been rolled back
+function lastCreated ($realm = NULL, $id = NULL, $forget = FALSE)
 {
 	static $last_ids = array();
 	if (isset ($realm) && isset ($id))
-		$last_ids[] = array('realm' => $realm, 'id' => $id);
+	{
+		if (! $forget)
+			$last_ids[] = array('realm' => $realm, 'id' => $id);
+		else
+			foreach ($last_ids as $key => $item)
+				if ($item['realm'] == $realm && $item['id'] == $id)
+					unset ($last_ids[$key]);
+		$last_ids = array_values ($last_ids);
+	}
 	return $last_ids;
 }
 

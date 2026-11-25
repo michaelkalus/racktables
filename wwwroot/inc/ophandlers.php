@@ -366,15 +366,6 @@ $opspec_list['8021q-vstlist-add'] = array
 		array ('fix_argname' => 'saved_by', 'fix_argvalue' => ""),
 	),
 );
-$opspec_list['8021q-vstlist-del'] = array
-(
-	'table' => 'VLANSwitchTemplate',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'vst_id', 'table_colname' => 'id', 'assertion' => 'natural'),
-	),
-);
 $opspec_list['8021q-vstlist-upd'] = array
 (
 	'table' => 'VLANSwitchTemplate',
@@ -2299,6 +2290,10 @@ function updateLocation ()
 	assertStringArg ('name');
 	if ($parent_id > 0)
 		spotEntity ('location', $parent_id);
+	// Only look at the descendants when a parent is being assigned, so that
+	// a location that already is in a circular reference can be detached.
+	if ($parent_id > 0 && ($parent_id == $location_id || in_array ($parent_id, getLocationChildrenList ($location_id))))
+		throw new InvalidRequestArgException ('parent_id', $parent_id, 'must not be the location itself or one of its sublocations');
 
 	$savepoint = beginAtomicChange ('updateLocation');
 	try
@@ -2477,15 +2472,34 @@ function addRack ()
 		assertStringArg ('names', TRUE);
 		foreach (textareaCooked ($_REQUEST['names']) as $cname)
 		{
-			$rack_id = commitAddObject ($cname, NULL, 1560, NULL, $taglist);
+			// Add each rack completely or not at all, report the failure
+			// and go on with the next one, as addLotOfObjects() does.
+			$savepoint = beginAtomicChange ('addRack');
+			$created = count (lastCreated());
+			try
+			{
+				$rack_id = commitAddObject ($cname, NULL, 1560, NULL, $taglist);
 
-			// Set the height and sort order
-			commitUpdateAttrValue ($rack_id, 27, $height);
-			commitUpdateAttrValue ($rack_id, 29, $sort_order);
+				// Set the height and sort order
+				commitUpdateAttrValue ($rack_id, 27, $height);
+				commitUpdateAttrValue ($rack_id, 29, $sort_order);
+
+				// Link it to the row
+				commitLinkEntities ('row', $row_id, 'rack', $rack_id);
+				endAtomicChange ($savepoint, TRUE);
+			}
+			catch (Exception $e)
+			{
+				endAtomicChange ($savepoint, FALSE);
+				// what was created has been rolled back
+				foreach (array_slice (lastCreated(), $created) as $item)
+					lastCreated ($item['realm'], $item['id'], TRUE);
+				if (! ($e instanceof RackTablesError) && ! ($e instanceof PDOException))
+					throw $e;
+				showError ('Failed to add rack ' . htmlspecialchars ("'{$cname}': " . $e->getMessage()));
+				continue;
+			}
 			$sort_order++;
-
-			// Link it to the row
-			commitLinkEntities ('row', $row_id, 'rack', $rack_id);
 			showSuccess ('added ' . mkCellA (spotEntity ('rack', $rack_id)));
 		}
 		break;
@@ -3127,6 +3141,25 @@ function update8021QPortList()
 		showSuccess ("enabled 802.1Q for {$enabled} port(s)");
 	if ($disabled)
 		showSuccess ("disabled 802.1Q for {$disabled} port(s)");
+}
+
+function deleteVST ()
+{
+	$vst_id = genericAssertion ('vst_id', 'natural');
+	// A template still in use is not deleted and keeps its tags.
+	$savepoint = beginAtomicChange ('deleteVST');
+	try
+	{
+		usePreparedDeleteBlade ('VLANSwitchTemplate', array ('id' => $vst_id));
+		destroyTagsForEntity ('vst', $vst_id);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
+	showOneLiner (49);
 }
 
 function cloneVST()
