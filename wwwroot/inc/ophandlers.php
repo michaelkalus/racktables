@@ -1161,7 +1161,8 @@ function processGridForm (&$rackData, $unchecked_state, $checked_state, $object_
 				)
 				{
 					showError ("{$rack_name}: Rack ID {$rack_id}, unit {$unit_no}, 'atom {$atom}', cannot change state from '{$state}' to '{$newstate}'");
-					$dbxlink->rollBack();
+					if ($dbxlink->inTransaction())
+						$dbxlink->rollBack();
 					return FALSE;
 				}
 				// This code uses an unconditional DELETE followed by a conditional INSERT
@@ -1193,7 +1194,8 @@ function processGridForm (&$rackData, $unchecked_state, $checked_state, $object_
 			$dbxlink->commit();
 			return TRUE;
 		}
-		$dbxlink->rollBack();
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
 	}
 	catch (Exception $e)
 	{
@@ -2099,9 +2101,9 @@ function createTriplet()
 
 	$vsinfo = spotEntity ('ipvs', $vs_id);
 	amplifyCell ($vsinfo);
+	$dbxlink->beginTransaction();
 	try
 	{
-		$dbxlink->beginTransaction();
 		foreach ($vsinfo['vips'] as $vip)
 			if (in_array (ip_format ($vip['vip']), $vips))
 				addSLBIPLink (array ('object_id' => $object_id, 'vs_id' => $vs_id, 'rspool_id' => $rspool_id, 'vip' => $vip['vip']));
@@ -2112,7 +2114,8 @@ function createTriplet()
 	}
 	catch (Exception $e)
 	{
-		$dbxlink->rollBack();
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
 		throw $e;
 	}
 	showSuccess ("SLB triplet created");
@@ -3355,13 +3358,15 @@ function importDPData()
 				}
 				else
 				{
-					$dbxlink->rollBack();
+					if ($dbxlink->inTransaction())
+						$dbxlink->rollBack();
 					$nignored++;
 				}
 			}
 			catch (RTDatabaseError $e)
 			{
-				$dbxlink->rollBack();
+				if ($dbxlink->inTransaction())
+					$dbxlink->rollBack();
 				$nignored++;
 			}
 			catch (Exception $e)
@@ -3707,7 +3712,8 @@ function doVSMigrate()
 		foreach ($tag_ids as $tid)
 			if (! isset ($taglist[$tid]))
 			{
-				$dbxlink->rollBack();
+				if ($dbxlink->inTransaction())
+					$dbxlink->rollBack();
 				showError ("Unknown tag id $tid");
 			}
 			else

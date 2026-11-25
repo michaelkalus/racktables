@@ -563,4 +563,236 @@ class TransactionRollbackTest extends RTTestCase
 		$this->assertEquals ($before, getStored8021QConfig ($object_id, 'desired'));
 		$this->assertEquals (array (5), $before['gi0/1']['allowed']);
 	}
+
+	// Replace the connection with one where the first statement that
+	// contains $fail_on makes the server end the whole transaction (as on a
+	// deadlock) and fails with the given error. Return the old connection.
+	protected function useServerRollbackOn ($fail_on, $sqlstate, $errno, $message)
+	{
+		global $dbxlink, $pdo_dsn, $db_username, $db_password;
+		$init_command = defined ('Pdo\Mysql::ATTR_INIT_COMMAND') ?
+			constant ('Pdo\Mysql::ATTR_INIT_COMMAND') :
+			constant ('PDO::MYSQL_ATTR_INIT_COMMAND');
+		$saved_dbxlink = $dbxlink;
+		$dbxlink = new TransactionRollbackTestPDO
+		(
+			$pdo_dsn,
+			$db_username,
+			$db_password,
+			array
+			(
+				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+				$init_command => 'SET NAMES "utf8", @@SQL_MODE = CONCAT("STRICT_ALL_TABLES,", REPLACE(@@SQL_MODE, "NO_ZERO_DATE", ""))',
+			)
+		);
+		$dbxlink->fail_on = $fail_on;
+		$dbxlink->failure = array ($sqlstate, $errno, $message);
+		return $saved_dbxlink;
+	}
+
+	protected function setOuterComment ($object_id, $comment)
+	{
+		usePreparedUpdateBlade ('Object', array ('comment' => $comment), array ('id' => $object_id));
+	}
+
+	protected function outerComment ($object_id)
+	{
+		$rows = $this->fetchRows ('SELECT comment FROM Object WHERE id = ?', array ($object_id));
+		return $rows[0]['comment'];
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testCreateTripletInOuterTransaction ()
+	{
+		global $dbxlink;
+		$lb_id = $this->addVS();
+		$args = $this->tripletKey ($lb_id) + array ('enabled_vips' => array ('192.0.2.10'), 'enabled_ports' => array ('TCP-80'));
+		$dbxlink->beginTransaction();
+		$this->setOuterComment ($lb_id, 'outer');
+		try
+		{
+			$this->runOp ('object', 'addLink', $args, 'createTriplet');
+			$this->fail ('the operation must fail');
+		}
+		catch (PDOException $e)
+		{
+			$this->assertStringContainsString ('already an active transaction', $e->getMessage());
+		}
+		// the transaction of the caller is neither committed nor rolled back
+		$this->assertTrue (isTransactionActive());
+		$this->assertEquals ('outer', $this->outerComment ($lb_id));
+		$dbxlink->rollBack();
+		$this->assertNull ($this->outerComment ($lb_id));
+		$this->assertEquals (array ('ports' => array(), 'ips' => array()), $this->tripletRows());
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testCreateTripletAfterServerRollback ()
+	{
+		$lb_id = $this->addVS();
+		$args = $this->tripletKey ($lb_id) + array ('enabled_vips' => array ('192.0.2.10'), 'enabled_ports' => array ('TCP-80'));
+		$message = 'Deadlock found when trying to get lock; try restarting transaction';
+		// the VIP is linked first, then the port fails
+		$saved_dbxlink = $this->useServerRollbackOn ('INSERT INTO `VSEnabledPorts`', '40001', 1213, $message);
+		try
+		{
+			$this->runOp ('object', 'addLink', $args, 'createTriplet');
+			$this->fail ('the operation must fail');
+		}
+		catch (PDOException $e)
+		{
+			$this->assertSame ($message, $e->getMessage(), 'the original error must reach the caller');
+			$this->assertFalse (isTransactionActive(), 'no transaction may be left open');
+		}
+		finally
+		{
+			$GLOBALS['dbxlink'] = $saved_dbxlink;
+		}
+		$this->assertEquals (array ('ports' => array(), 'ips' => array()), $this->tripletRows());
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testImportDPDataAfterServerRollback ()
+	{
+		$object_id = $this->addObject ('switch a', 8);
+		$remote_id = $this->addObject ('switch b', 8);
+		$port_a = commitAddPort ($object_id, 'a', '1-19', '', '');
+		$port_b = commitAddPort ($remote_id, 'b', '1-24', '', '');
+		$args = array
+		(
+			'object_id' => $object_id,
+			'nports' => 1,
+			'do_0' => 'on',
+			'ports_0' => "a_id:{$port_a},b_id:{$port_b},a_oif:24",
+		);
+		// the outer interface is changed first, then the link times out
+		// and the server rolls back the transaction (as with
+		// innodb_rollback_on_timeout), which the blade reports as
+		// RTDatabaseError
+		$saved_dbxlink = $this->useServerRollbackOn ('INSERT INTO `Link`', 'HY000', 1205, 'Lock wait timeout exceeded; try restarting transaction');
+		try
+		{
+			// the port pair is counted as ignored
+			$this->runOp ('object', 'importDPData', $args, 'importDPData');
+			$this->assertFalse (isTransactionActive());
+		}
+		finally
+		{
+			$GLOBALS['dbxlink'] = $saved_dbxlink;
+		}
+		$this->assertEquals (array (array ('c' => 44, 'a' => array (1, 0))), $GLOBALS['log_messages']);
+		$port = $this->portInfo ($port_a);
+		$this->assertEquals (19, $port['type']);
+	}
+
+	// A function that also works within a transaction of its caller undoes
+	// only its own changes when it fails there.
+	protected function assertFailureInOuterTransaction ($object_id, $callback)
+	{
+		global $dbxlink;
+		$dbxlink->beginTransaction();
+		$this->setOuterComment ($object_id, 'outer');
+		try
+		{
+			$callback();
+			$this->fail ('the change must fail');
+		}
+		catch (Exception $e)
+		{
+			$this->assertStringContainsString ('injected failure', $e->getMessage());
+		}
+		$this->assertTrue (isTransactionActive());
+		$dbxlink->commit();
+		$this->assertEquals ('outer', $this->outerComment ($object_id));
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testCommitUpdatePortCommentInOuterTransaction ()
+	{
+		$object_id = $this->addObject ('object');
+		$port_id = commitAddPort ($object_id, 'a', '1-24', '', '');
+		$this->failOn ('BEFORE INSERT', 'PortLog', "NEW.port_id = {$port_id}");
+		$this->assertFailureInOuterTransaction ($object_id, function () use ($port_id)
+		{
+			commitUpdatePortComment ($port_id, 'reserved');
+		});
+		$port = $this->portInfo ($port_id);
+		$this->assertNull ($port['reservation_comment']);
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testCommitUpdateVSTRulesInOuterTransaction ()
+	{
+		$this->addVST();
+		$object_id = $this->addObject ('object');
+		$before = $this->VSTState();
+		$this->failOn ('BEFORE INSERT', 'VLANSTRule', "NEW.vst_id = {$this->vst_id} AND NEW.rule_no = 200");
+		$vst_id = $this->vst_id;
+		$rules = $this->newVSTRules();
+		$this->assertFailureInOuterTransaction ($object_id, function () use ($vst_id, $rules)
+		{
+			commitUpdateVSTRules ($vst_id, 0, $rules);
+		});
+		$this->assertEquals ($before, $this->VSTState());
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testPatchCableAmountInOuterTransaction ()
+	{
+		$this->addHeap();
+		$object_id = $this->addObject ('object');
+		$heap_id = $this->heap_id;
+		$this->assertFailureInOuterTransaction ($object_id, function () use ($heap_id)
+		{
+			commitModifyPatchCableAmount ($heap_id, -1);
+		});
+		$this->assertFailureInOuterTransaction ($object_id, function () use ($heap_id)
+		{
+			commitSetPatchCableAmount ($heap_id, 5);
+		});
+		$this->assertEquals (array ('amount' => array (array ('amount' => 10)), 'log' => array()), $this->heapState());
+	}
+}
+
+// A connection on which the server ends the transaction of the session when
+// the first statement that contains $fail_on is prepared.
+class TransactionRollbackTestPDO extends PDO
+{
+	public $fail_on = NULL;
+	public $failure;
+
+	#[\ReturnTypeWillChange]
+	public function prepare ($query, $options = array())
+	{
+		if ($this->fail_on !== NULL && strpos ($query, $this->fail_on) !== FALSE)
+		{
+			$this->fail_on = NULL;
+			$this->exec ('ROLLBACK');
+			throw new TransactionRollbackTestPDOException ($this->failure[0], $this->failure[1], $this->failure[2]);
+		}
+		return parent::prepare ($query, $options);
+	}
+}
+
+// a PDOException as PDO throws it for a server error
+class TransactionRollbackTestPDOException extends PDOException
+{
+	public function __construct ($sqlstate, $errno, $server_message)
+	{
+		parent::__construct ($server_message);
+		$this->code = $sqlstate;
+		$this->errorInfo = array ($sqlstate, $errno, $server_message);
+	}
 }

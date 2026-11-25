@@ -4671,7 +4671,8 @@ function saveDownlinksReverb ($object_id, $requested_changes)
 	{
 		if (NULL === $vswitch = getVLANSwitchInfo ($object_id, 'FOR UPDATE')) // not configured, bail out
 		{
-			$dbxlink->rollBack();
+			if ($dbxlink->inTransaction())
+				$dbxlink->rollBack();
 			return;
 		}
 		$domain_vlanlist = getDomainVLANList ($vswitch['domain_id']);

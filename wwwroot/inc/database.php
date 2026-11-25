@@ -2009,8 +2009,7 @@ function commitDeletePorts ($object_id, $port_ids = NULL)
 
 function commitUpdatePortComment ($port_id, $port_reservation_comment)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
+	$savepoint = beginAtomicChange (__FUNCTION__);
 	try
 	{
 		$prev_comment = getPortReservationComment ($port_id, 'FOR UPDATE');
@@ -2029,12 +2028,11 @@ function commitUpdatePortComment ($port_id, $port_reservation_comment)
 		);
 		if ($prev_comment !== $reservation_comment)
 			addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $prev_comment, $reservation_comment));
-		$dbxlink->commit();
+		endAtomicChange ($savepoint, TRUE);
 	}
 	catch (Exception $e)
 	{
-		if ($dbxlink->inTransaction())
-			$dbxlink->rollBack();
+		endAtomicChange ($savepoint, FALSE);
 		throw $e;
 	}
 }
@@ -6027,8 +6025,8 @@ function replace8021QPorts ($instance, $object_id, $before, $changes)
 
 function commitUpdateVSTRules ($vst_id, $mutex_rev, $rules)
 {
-	global $dbxlink, $remote_username;
-	$dbxlink->beginTransaction();
+	global $remote_username;
+	$savepoint = beginAtomicChange (__FUNCTION__);
 	try
 	{
 		$result = usePreparedSelectBlade
@@ -6045,12 +6043,11 @@ function commitUpdateVSTRules ($vst_id, $mutex_rev, $rules)
 		foreach ($rules as $rule)
 			usePreparedInsertBlade ('VLANSTRule', array_merge (array ('vst_id' => $vst_id), $rule));
 		usePreparedExecuteBlade ('UPDATE VLANSwitchTemplate SET mutex_rev=mutex_rev+1, saved_by=? WHERE id=?', array ($remote_username, $vst_id));
-		$dbxlink->commit();
+		endAtomicChange ($savepoint, TRUE);
 	}
 	catch (Exception $e)
 	{
-		if ($dbxlink->inTransaction())
-			$dbxlink->rollBack();
+		endAtomicChange ($savepoint, FALSE);
 		throw $e;
 	}
 }
@@ -6420,8 +6417,7 @@ function getPatchCableOIFCompat()
 
 function commitModifyPatchCableAmount ($heap_id, $by_amount)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
+	$savepoint = beginAtomicChange (__FUNCTION__);
 	try
 	{
 		usePreparedExecuteBlade
@@ -6430,20 +6426,19 @@ function commitModifyPatchCableAmount ($heap_id, $by_amount)
 			array ($by_amount, $heap_id, $by_amount)
 		);
 		addPatchCableHeapLogEntry ($heap_id, "amount adjusted by {$by_amount}");
-		return $dbxlink->commit();
+		endAtomicChange ($savepoint, TRUE);
+		return TRUE;
 	}
 	catch (Exception $e)
 	{
-		if ($dbxlink->inTransaction())
-			$dbxlink->rollBack();
+		endAtomicChange ($savepoint, FALSE);
 		throw $e;
 	}
 }
 
 function commitSetPatchCableAmount ($heap_id, $new_amount)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
+	$savepoint = beginAtomicChange (__FUNCTION__);
 	try
 	{
 		usePreparedUpdateBlade
@@ -6453,12 +6448,12 @@ function commitSetPatchCableAmount ($heap_id, $new_amount)
 			array ('id' => $heap_id)
 		);
 		addPatchCableHeapLogEntry ($heap_id, "amount set to {$new_amount}");
-		return $dbxlink->commit();
+		endAtomicChange ($savepoint, TRUE);
+		return TRUE;
 	}
 	catch (Exception $e)
 	{
-		if ($dbxlink->inTransaction())
-			$dbxlink->rollBack();
+		endAtomicChange ($savepoint, FALSE);
 		throw $e;
 	}
 }
