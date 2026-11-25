@@ -19,6 +19,27 @@ class RenderReportsTest extends RTTestCase
 			$this->assertEquals ('No integrity violations found', strip_tags ($output));
 	}
 
+	/**
+	 * @group small
+	 */
+	public function testIntegrityRackWithoutRow ()
+	{
+		global $interface_requires;
+		requireExtraFiles ($interface_requires, 'reports', 'integrity');
+		$rack_name = $this->myString ('rack');
+		$rack_id = commitAddObject ($rack_name, NULL, 1560, NULL);
+		try
+		{
+			$output = getOutputOf ('renderDataIntegrityReport');
+		}
+		finally
+		{
+			commitDeleteObject ($rack_id);
+		}
+		$this->assertStringContainsString ('Racks without a row (1)', $output);
+		$this->assertStringContainsString ($rack_name, $output);
+	}
+
 	public function providerReportFunctions ()
 	{
 		$ret = array();

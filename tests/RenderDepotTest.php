@@ -5,6 +5,8 @@ class RenderDepotTest extends RTTestCase
 {
 	protected $shelf_id = NULL;
 	protected $modem_id = NULL;
+	protected $rack_id = NULL;
+	protected $server_id = NULL;
 
 	public function setUp () : void
 	{
@@ -20,6 +22,13 @@ class RenderDepotTest extends RTTestCase
 		// remove sample data
 		commitDeleteObject ($this->modem_id);
 		commitDeleteObject ($this->shelf_id);
+		if ($this->server_id !== NULL)
+			commitDeleteObject ($this->server_id);
+		if ($this->rack_id !== NULL)
+		{
+			usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $this->rack_id));
+			commitDeleteObject ($this->rack_id);
+		}
 	}
 
 	/**
@@ -28,5 +37,33 @@ class RenderDepotTest extends RTTestCase
 	public function testRenderDepot ()
 	{
 		$this->assertNotEquals ('', getOutputOf ('renderDepot'));
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testRenderDepotRackWithoutRow ()
+	{
+		// an object mounted in a rack that is not linked to any row
+		$rack_name = $this->myString ('rack');
+		$this->rack_id = commitAddObject ($rack_name, NULL, 1560, NULL);
+		$this->server_id = commitAddObject ($this->myString ('server'), NULL, 4, NULL);
+		usePreparedInsertBlade
+		(
+			'RackSpace',
+			array
+			(
+				'rack_id' => $this->rack_id,
+				'unit_no' => 1,
+				'atom' => 'front',
+				'state' => 'T',
+				'object_id' => $this->server_id,
+			)
+		);
+		// forget the object list cached by a previous renderDepot() call
+		global $entityCache;
+		$entityCache = array();
+		$output = getOutputOf ('renderDepot');
+		$this->assertStringContainsString ($rack_name, $output);
 	}
 }
