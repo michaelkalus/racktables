@@ -7,23 +7,79 @@ is to keep RackTables working on current PHP and MySQL/MariaDB releases and to
 fix reported bugs and security issues. Its releases are numbered
 `0.23.0-community` and later; version numbers 0.22.x are left to upstream.
 
+## How it came to be, and a word about AI
+I have been a happy RackTables user for years. Over those years I also watched
+the bugs and issues pile up in the original tracker, while the author
+understandably has no time left to work through them. Then came a night when I
+could not sleep, with an AI subscription whose unused quota was about to
+expire, and so I started fixing things, one issue after another.
+
+So, to be honest with you: most of the changes in this fork were written with
+the help of AI coding assistants, under my direction. To keep that from being
+a reason for worry rather than a convenience, every fix follows the same
+routine: the problem is reproduced first, the fix comes with a regression test
+where the suite has a place for one, the change gets a second, independent
+automated review, and the whole test suite has to pass on PHP 7.4 and 8.6 with
+MariaDB (the upgrade path on MySQL as well) before anything is merged. It is
+still software, and it can still be wrong. If something breaks for you,
+please tell me.
+
 Please report bugs in this fork via its
 [GitHub issues](https://github.com/michaelkalus/racktables/issues). Reports
 about the original project are kept at https://bugs.racktables.org.
 
-Changes compared to upstream:
-* installation on MySQL 8.4, and upgrading an older database through the 0.20.2 step on MySQL 8.4;
-* PHP 8.5 compatibility (`array_first()` and `array_last()` are no longer redeclared);
-* fewer deprecation messages on PHP 8.1 and later (no `"${var}"` string interpolation);
-* search terms are escaped on the search results page (CVE-2023-49453);
-* searching for a string with three dots that is not an IPv4 address no longer fails;
-* addresses of /32 and /128 networks are found in their network;
-* the Objects list no longer fails when a rack has no row;
-* autotags of user names may contain `@`, for user@REALM accounts;
-* passwords of local accounts are stored with `password_hash()` instead of unsalted SHA-1.
+## Changes compared to upstream 0.22.0
+The complete list is in the `0.23.0-community` section of `ChangeLog`, together
+with the `0.22.1` section below it: the changes upstream made after 0.22.0 but
+never released, which this fork includes. In short:
+
+**Current platforms**
+* runs on current PHP 8 releases without errors and without deprecation messages
+  (no `strptime()`/`strftime()`, no redeclared `array_first()`/`array_last()`);
+* installs on MySQL 8.4, and a database of any release since 0.20.0 upgrades
+  on current MariaDB and on MySQL 8.0 and 8.4;
+* the two legacy non-unique keys that MySQL 8.4 refuses are made unique, so
+  an upgraded database can be dumped and restored there.
+
+**Security**
+* stored and submitted text is escaped on the search results (CVE-2023-49453),
+  entity, IP address, SLB and NAT pages, in operation messages and in the
+  802.1Q popups; wiki links are restricted to safe schemes;
+* port link, object link, file link and RS pool operations are restricted to
+  the entity the user was authorised for;
+* passwords of local accounts are stored with `password_hash()` instead of
+  unsalted SHA-1, and existing hashes are replaced on login;
+* user names are escaped in LDAP search filters, and sshnokey credentials are
+  no longer sent as session input.
+
+**Data integrity**
+* rack, row, location and object changes, bulk object adds and the SNMP port
+  list sync are atomic, and a failed operation rolls back completely;
+* deleting an entity releases its file links and tags; a location cannot
+  become its own ancestor;
+* a rack without a row no longer breaks the Objects list, its own page or the
+  pages of its objects, and can be assigned a row again;
+* common database errors are reported in plain words.
+
+**Long-standing bugs**
+* search: addresses of /32 and /128 networks, strings with three dots that
+  are not IPv4 addresses, the matched value of object fields;
+* IP: stricter parsing of addresses, no Subnet-Router anycast reservation on
+  IPv6 /127 and /128, Live PTR import keeps away from reserved addresses, a
+  network that contains another network can be deleted;
+* accounts: a blank password field keeps the password, autotags accept
+  `user@REALM` and `DOMAIN\user`, LDAP group membership and cache fixes;
+* devices: SNMP sync looks up sysObjectID in numeric form, Cisco 2851 is
+  supported, ssh banners and FTOS 8 messages are no longer taken for errors,
+  802.1Q configuration follows a renamed port.
+
+**Tests**
+* the test suite no longer depends on test order or on MySQL, and the upgrade
+  from every release since 0.20.0 is tested automatically.
 
 Some of these changes were adopted from unmerged upstream pull requests and
-keep the authorship of their original authors. The licence is unchanged:
+keep the authorship of their original authors. Many others fix reports from
+the original bug tracker; the `ChangeLog` names them as Mantis#NNNN. The licence is unchanged:
 GPLv2, see `COPYING` and `LICENSE`.
 
 # Welcome!
