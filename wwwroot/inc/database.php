@@ -1940,7 +1940,6 @@ function commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_i
 // ports.
 function commitDeletePorts ($object_id, $port_ids = NULL)
 {
-	global $tablemap_8021q;
 	$where = 'object_id = ?';
 	$params = array ($object_id);
 	if ($port_ids !== NULL)
@@ -1963,38 +1962,7 @@ function commitDeletePorts ($object_id, $port_ids = NULL)
 		{
 			getVLANSwitchInfo ($object_id, 'FOR UPDATE');
 			$ret = usePreparedExecuteBlade ("DELETE FROM Port WHERE {$where}", $params);
-			foreach (array_unique ($names) as $name)
-			{
-				// The desired configuration of a port cannot exist without the
-				// cached one. The database compares the names with the collation
-				// of the column, which ignores letter case, so it finds the
-				// stored spelling of the name.
-				$result = usePreparedSelectBlade
-				(
-					'SELECT port_name FROM ' . $tablemap_8021q['cached']['pvm'] . ' WHERE object_id = ? AND port_name = ? FOR UPDATE',
-					array ($object_id, $name)
-				);
-				$stored_name = $result->fetchColumn();
-				unset ($result);
-				if ($stored_name === FALSE)
-					continue;
-				$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM Port WHERE object_id = ? AND name = ?', array ($object_id, $stored_name));
-				$found = $result->fetchColumn();
-				unset ($result);
-				if ($found)
-					continue;
-				// The allowed and native VLAN rows go by ON DELETE CASCADE.
-				foreach (array ('desired', 'cached') as $instance)
-					usePreparedDeleteBlade
-					(
-						$tablemap_8021q[$instance]['pvm'],
-						array ('object_id' => $object_id, 'port_name' => $stored_name)
-					);
-				$notices[] = array ($stored_name, NULL);
-			}
-			// An 802.1Q form opened before has the deleted port in it.
-			if (count ($notices))
-				usePreparedExecuteBlade ('UPDATE VLANSwitch SET mutex_rev = mutex_rev + 1 WHERE object_id = ?', array ($object_id));
+			$notices = delete8021QConfigOfDeletedPorts ($object_id, $names);
 		}
 	}
 	catch (Exception $e)
@@ -2005,6 +1973,49 @@ function commitDeletePorts ($object_id, $port_ids = NULL)
 	endAtomicChange ($savepoint, TRUE);
 	call8021QPortHooks ($object_id, $notices);
 	return $ret;
+}
+
+// Delete the 802.1Q configuration stored under the names of the given deleted
+// ports of the object, except for a name that a port of the object still has
+// (see commitDeletePorts()). The caller holds the locks and the transaction.
+// Returns the portConfChanged notifications for call8021QPortHooks().
+function delete8021QConfigOfDeletedPorts ($object_id, $names)
+{
+	global $tablemap_8021q;
+	$notices = array();
+	foreach (array_unique ($names) as $name)
+	{
+		// The desired configuration of a port cannot exist without the
+		// cached one. The database compares the names with the collation
+		// of the column, which ignores letter case, so it finds the
+		// stored spelling of the name.
+		$result = usePreparedSelectBlade
+		(
+			'SELECT port_name FROM ' . $tablemap_8021q['cached']['pvm'] . ' WHERE object_id = ? AND port_name = ? FOR UPDATE',
+			array ($object_id, $name)
+		);
+		$stored_name = $result->fetchColumn();
+		unset ($result);
+		if ($stored_name === FALSE)
+			continue;
+		$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM Port WHERE object_id = ? AND name = ?', array ($object_id, $stored_name));
+		$found = $result->fetchColumn();
+		unset ($result);
+		if ($found)
+			continue;
+		// The allowed and native VLAN rows go by ON DELETE CASCADE.
+		foreach (array ('desired', 'cached') as $instance)
+			usePreparedDeleteBlade
+			(
+				$tablemap_8021q[$instance]['pvm'],
+				array ('object_id' => $object_id, 'port_name' => $stored_name)
+			);
+		$notices[] = array ($stored_name, NULL);
+	}
+	// An 802.1Q form opened before has the deleted port in it.
+	if (count ($notices))
+		usePreparedExecuteBlade ('UPDATE VLANSwitch SET mutex_rev = mutex_rev + 1 WHERE object_id = ?', array ($object_id));
+	return $notices;
 }
 
 function commitUpdatePortComment ($port_id, $port_reservation_comment)
@@ -2874,7 +2885,7 @@ function updateAddress ($ip_bin, $name = '', $reserved = 'no', $comment = '')
 	{
 		if ($comment == '')
 			$messages[] = "comment '$old_comment' removed";
-		elseif ($old_name == '')
+		elseif ($old_comment == '')
 			$messages[] = "comment set to '$comment'";
 		else
 			$messages[] = "comment changed from '$old_comment' to '$comment'";

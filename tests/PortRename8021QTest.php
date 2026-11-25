@@ -3,7 +3,8 @@
 // The 802.1Q configuration of a port is stored by object ID and port name, so
 // renaming the port must move the configuration to the new name, and a rename
 // that does not take place must not change the configuration. Deleting the
-// port must delete the configuration as well.
+// port, also by a port list sync (replaceObjectPorts()), must delete the
+// configuration as well.
 class PortRename8021QTest extends RTTestCase
 {
 	protected $objects = array();
@@ -54,6 +55,7 @@ class PortRename8021QTest extends RTTestCase
 		$pageno = 'index';
 		$tabno = 'default';
 		$log_messages = array();
+		setMessageBuffering (FALSE);
 		$hook = $this->saved_hook;
 		$hooks_stack = $this->saved_hooks_stack;
 		if ($this->hidden_table !== NULL)
@@ -718,5 +720,226 @@ class PortRename8021QTest extends RTTestCase
 			$this->assertEquals (array(), self::$hook_calls, 'no hook must run');
 			$this->assertFalse (isTransactionActive());
 		}
+	}
+	// the desired port list of a sync, by name => (type, label, L2 address)
+	protected function desiredPorts ($ports)
+	{
+		$ret = array();
+		foreach ($ports as $name => $port)
+			addDesiredPort ($ret, $name, $port[0], $port[1], $port[2]);
+		return $ret;
+	}
+
+	protected function portRows ($object_id)
+	{
+		$result = usePreparedSelectBlade
+		(
+			'SELECT id, name, iif_id, type, label, l2address FROM Port WHERE object_id = ? ORDER BY id',
+			array ($object_id)
+		);
+		return $result->fetchAll (PDO::FETCH_ASSOC);
+	}
+
+	// A port the sync deletes loses its configuration, the other ports keep
+	// theirs, the hooks run after the commit and a 802.1Q form opened before
+	// is outdated.
+	/**
+	 * @group small
+	 */
+	public function testSyncDeletesConfig ()
+	{
+		$object_id = $this->addSwitch();
+		$port1_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		$port2_id = $this->addConfiguredPort ($object_id, 'gi0/2');
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$mutex_rev = $this->mutexRev ($object_id);
+		replaceObjectPorts
+		(
+			$object_id,
+			$this->desiredPorts (array ('gi0/1' => array ('1-24', '1X', '00:11:22:33:44:01'), 'gi0/3' => array ('1-24', '', '')))
+		);
+		$this->assertEquals ('gi0/1', $this->portName ($port1_id));
+		$this->assertFalse ($this->portName ($port2_id));
+		$names = array();
+		foreach ($this->portRows ($object_id) as $row)
+			$names[] = $row['name'];
+		$this->assertEquals (array ('gi0/1', 'gi0/3'), $names);
+		$this->assertEquals ($this->expected (array ('gi0/1')), $this->stored ($object_id));
+		$this->assertEquals (array ('gi0/2'), $this->hookedNames());
+		$this->assertEquals (array ('gi0/1'), self::$hook_calls[0]['committed']);
+		$this->assertEquals ($mutex_rev + 1, $this->mutexRev ($object_id));
+		$this->assertFalse (isTransactionActive());
+		$this->assertSessionReleased ($object_id);
+
+		// nothing to delete: no hooks and no new revision
+		self::$hook_calls = array();
+		replaceObjectPorts ($object_id, $this->desiredPorts (array ('gi0/1' => array ('1-24', '', ''), 'gi0/3' => array ('1-24', '', ''))));
+		$this->assertEquals (array(), self::$hook_calls);
+		$this->assertEquals ($mutex_rev + 1, $this->mutexRev ($object_id));
+		$this->assertEquals ($this->expected (array ('gi0/1')), $this->stored ($object_id));
+	}
+
+	// The configuration stays with a name another port of the object has
+	// after the sync: a port the sync replaces by a port of the same name
+	// and another type, a port that differs only in letter case, a port of
+	// the same name that the sync does not touch and a linked port that the
+	// sync does not delete.
+	/**
+	 * @group small
+	 */
+	public function testSyncKeepsConfigOfRemainingNames ()
+	{
+		$object_id = $this->addSwitch();
+		$other_id = $this->addSwitch (FALSE);
+		$this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		$this->addConfiguredPort ($object_id, 'gi0/3');
+		commitAddPort ($object_id, 'GI0/3', '1-19', '', '');
+		$linked_id = $this->addConfiguredPort ($object_id, 'gi0/4');
+		setMessageBuffering (TRUE);
+		$remote_id = commitAddPort ($other_id, 'eth0', '1-24', '', '');
+		linkPorts ($linked_id, $remote_id);
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$mutex_rev = $this->mutexRev ($object_id);
+		replaceObjectPorts
+		(
+			$object_id,
+			$this->desiredPorts
+			(
+				array
+				(
+					'gi0/1' => array ('4-1077', '', ''), // another inner interface
+					'GI0/2' => array ('1-24', '', ''), // another spelling
+					'GI0/3' => array ('1-19', '', ''),
+				)
+			)
+		);
+		$names = array();
+		foreach ($this->portRows ($object_id) as $row)
+			$names[] = $row['name'];
+		sort ($names);
+		$this->assertEquals (array ('GI0/2', 'GI0/3', 'gi0/1', 'gi0/4'), $names);
+		$this->assertEquals ($this->expected (array ('gi0/1', 'gi0/2', 'gi0/3', 'gi0/4')), $this->stored ($object_id));
+		$this->assertEquals (array(), self::$hook_calls);
+		$this->assertEquals ($mutex_rev, $this->mutexRev ($object_id));
+		$this->assertFalse (isTransactionActive());
+		$this->assertSessionReleased ($object_id);
+	}
+
+	// An object that is not in a VLAN domain has no configuration to lose.
+	/**
+	 * @group small
+	 */
+	public function testSyncNotInVLANDomain ()
+	{
+		$object_id = $this->addSwitch (FALSE);
+		commitAddPort ($object_id, 'gi0/1', '1-24', '', '');
+		commitAddPort ($object_id, 'gi0/2', '1-24', '', '');
+		replaceObjectPorts ($object_id, $this->desiredPorts (array ('gi0/2' => array ('1-24', '2X', ''))));
+		$rows = $this->portRows ($object_id);
+		$this->assertCount (1, $rows);
+		$this->assertEquals ('gi0/2', $rows[0]['name']);
+		$this->assertEquals ('2X', $rows[0]['label']);
+		$this->assertFalse (isTransactionActive());
+		$this->assertSessionReleased ($object_id);
+	}
+
+	// If a step of the sync fails, none of its changes stays: here the
+	// sync deletes a port, updates another one and fails to add the last one
+	// or to delete the configuration of the deleted port.
+	/**
+	 * @group small
+	 */
+	public function testSyncFailing ()
+	{
+		global $dbxlink;
+		$object_id = $this->addSwitch();
+		$this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		$this->trigger = 'PortRename8021QTest_' . getmypid();
+		$desired = $this->desiredPorts
+		(
+			array
+			(
+				'gi0/1' => array ('1-24', 'new label', '00:11:22:33:44:01'),
+				'gi0/3' => array ('1-24', '', ''),
+				'fail' => array ('1-24', '', ''),
+			)
+		);
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$before_ports = $this->portRows ($object_id);
+		$before_conf = $this->stored ($object_id);
+		$mutex_rev = $this->mutexRev ($object_id);
+		$triggers = array
+		(
+			"BEFORE INSERT ON Port FOR EACH ROW BEGIN IF NEW.name = 'fail' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected'; END IF; END",
+			"BEFORE DELETE ON CachedPVM FOR EACH ROW BEGIN IF OLD.port_name = 'gi0/2' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected'; END IF; END",
+		);
+		foreach ($triggers as $i => $trigger)
+		{
+			try
+			{
+				$dbxlink->exec ("CREATE TRIGGER {$this->trigger} {$trigger}");
+			}
+			catch (PDOException $e)
+			{
+				$this->trigger = NULL;
+				$this->markTestSkipped ('cannot create a trigger: ' . $e->getMessage());
+			}
+			if ($i == 1)
+				unset ($desired['fail-1']);
+			$created = lastCreated();
+			try
+			{
+				replaceObjectPorts ($object_id, $desired);
+				$this->fail ('the sync must fail');
+			}
+			catch (PDOException $e)
+			{
+				$this->assertStringContainsString ('injected', $e->getMessage());
+			}
+			$dbxlink->exec ("DROP TRIGGER {$this->trigger}");
+			// the ports added before the failure are not reported as created
+			$this->assertEquals ($created, lastCreated(), "trigger {$i}");
+			$last_port_id = getLastCreatedId ('port');
+			if ($last_port_id !== NULL)
+				$this->assertNotFalse ($this->portName ($last_port_id), "trigger {$i}");
+			$this->assertEquals ($before_ports, $this->portRows ($object_id), "trigger {$i}");
+			$this->assertEquals ($before_conf, $this->stored ($object_id), "trigger {$i}");
+			$this->assertEquals ($mutex_rev, $this->mutexRev ($object_id), "trigger {$i}");
+			$this->assertEquals (array(), self::$hook_calls, 'no hook must run');
+			$this->assertFalse (isTransactionActive());
+			$this->assertSessionReleased ($object_id);
+		}
+		$this->trigger = NULL;
+	}
+
+	// A sync that fails a check after the tables have been locked releases
+	// the session as well.
+	/**
+	 * @group small
+	 */
+	public function testSyncDuplicateL2Address ()
+	{
+		$object_id = $this->addSwitch();
+		$other_id = $this->addSwitch (FALSE);
+		$this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		commitAddPort ($other_id, 'eth0', '1-24', '', '00:11:22:33:44:55');
+		$before_ports = $this->portRows ($object_id);
+		$before_conf = $this->stored ($object_id);
+		try
+		{
+			replaceObjectPorts ($object_id, $this->desiredPorts (array ('gi0/1' => array ('1-24', '', ''), 'gi0/5' => array ('1-24', '', '00:11:22:33:44:55'))));
+			$this->fail ('the sync must fail');
+		}
+		catch (InvalidArgException $e)
+		{
+			$this->assertStringContainsString ('already used', $e->getMessage());
+		}
+		$this->assertEquals ($before_ports, $this->portRows ($object_id));
+		$this->assertEquals ($before_conf, $this->stored ($object_id));
+		$this->assertFalse (isTransactionActive());
+		$this->assertSessionReleased ($object_id);
 	}
 }
