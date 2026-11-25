@@ -927,6 +927,31 @@ class PureFunctionTest extends RTTestCase
 			// already normalized
 			array ('normalizeSysObjectID', '9.1.634', '9.1.634'),
 			array ('normalizeSysObjectID', '2011.2.23.95', '2011.2.23.95'),
+
+			// The group name is the unescaped value of the first RDN (RFC 4514).
+			array ('getLDAPGroupNameFromDN', 'CN=admins,OU=Groups,DC=example,DC=org', 'admins'),
+			array ('getLDAPGroupNameFromDN', 'cn=Net Admins,ou=Groups,dc=example,dc=org', 'Net Admins'),
+			array ('getLDAPGroupNameFromDN', 'Cn=admins', 'admins'),
+			array ('getLDAPGroupNameFromDN', 'CN=Smith\\, John,OU=Groups,DC=example,DC=org', 'Smith, John'),
+			array ('getLDAPGroupNameFromDN', 'cn=Smith\\2C John,ou=Groups,dc=example,dc=org', 'Smith, John'),
+			array ('getLDAPGroupNameFromDN', 'CN=a\\+b,OU=Groups,DC=example,DC=org', 'a+b'),
+			array ('getLDAPGroupNameFromDN', 'cn=a\\2bb,ou=Groups,dc=example,dc=org', 'a+b'),
+			array ('getLDAPGroupNameFromDN', "CN=Spr\u{e1}vci s\u{ed}t\u{11b},OU=Groups,DC=example,DC=org", "Spr\u{e1}vci s\u{ed}t\u{11b}"),
+			array ('getLDAPGroupNameFromDN', 'cn=Spr\\C3\\A1vci,ou=Groups', "Spr\u{e1}vci"),
+			array ('getLDAPGroupNameFromDN', 'CN=a\\\\b,OU=Groups', 'a\\b'),
+			array ('getLDAPGroupNameFromDN', 'CN=\\"q\\" \\<a\\> \\; \\=,OU=Groups', '"q" <a> ; ='),
+			array ('getLDAPGroupNameFromDN', 'CN=\\#lead,OU=Groups', '#lead'),
+			array ('getLDAPGroupNameFromDN', 'CN=\\ lead and trail\\ ,OU=Groups', ' lead and trail '),
+			array ('getLDAPGroupNameFromDN', 'CN=a+OU=b,DC=example', 'a'),
+			array ('getLDAPGroupNameFromDN', 'OU=Groups,DC=example,DC=org', NULL),
+			array ('getLDAPGroupNameFromDN', 'uid=jdoe,CN=admins', NULL),
+			array ('getLDAPGroupNameFromDN', 'CNAME=admins', NULL),
+			array ('getLDAPGroupNameFromDN', 'CN=,OU=Groups', NULL),
+			array ('getLDAPGroupNameFromDN', 'CN=#04066164', NULL),
+			array ('getLDAPGroupNameFromDN', 'CN=bad\\x,OU=Groups', NULL),
+			array ('getLDAPGroupNameFromDN', 'CN=bad\\4', NULL),
+			array ('getLDAPGroupNameFromDN', 'CN=bad\\', NULL),
+			array ('getLDAPGroupNameFromDN', '', NULL),
 		);
 	}
 
