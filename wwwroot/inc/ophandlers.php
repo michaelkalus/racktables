@@ -2591,10 +2591,22 @@ function replaceFile ()
 	showFuncMessage (__FUNCTION__, 'OK', array (htmlspecialchars ($shortInfo['name'])));
 }
 
+// On the files tab of an entity remove a link of a file to that entity (the
+// one the permissions have been checked for) only. The file manager page
+// has no entity and may remove any link.
 function unlinkFile ()
 {
+	global $pageno;
 	setFuncMessages (__FUNCTION__, array ('OK' => 72));
-	commitUnlinkFile (genericAssertion ('link_id', 'natural'));
+	$link_id = genericAssertion ('link_id', 'natural');
+	$columns = array ('id' => $link_id);
+	if ($pageno != 'files')
+	{
+		$columns['entity_type'] = etypeByPageno();
+		$columns['entity_id'] = getBypassValue();
+	}
+	if (usePreparedDeleteBlade ('FileLink', $columns) != 1)
+		throw new InvalidRequestArgException ('link_id', $link_id, 'not a file link of this entity');
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 
