@@ -121,6 +121,24 @@ class PureFunctionTest extends RTTestCase
 		treeApplyFunc ($forest_byref, $func, $stopfunc);
 	}
 
+	// A user name such as "user@REALM" (Kerberos, other external authentication)
+	// must produce a $username_ autotag that RackCode can refer to.
+	/**
+	 * @group small
+	 */
+	public function testUsernameAutotagWithAt ()
+	{
+		$autotags = generateEntityAutoTags (array ('realm' => 'user', 'user_name' => 'user@EXAMPLE.COM'));
+		$this->assertContains (array ('tag' => '$username_user@EXAMPLE.COM'), $autotags);
+		$parsed = getRackCode ("allow {\$username_user@EXAMPLE.COM}");
+		$this->assertSame ('ACK', $parsed['result'], is_string ($parsed['load']) ? $parsed['load'] : '');
+		$this->assertCount (1, $parsed['load']);
+		$condition = $parsed['load'][0]['condition'];
+		$this->assertTrue (eval_expression ($condition, reindexById ($autotags, 'tag', TRUE), TRUE));
+		$other = generateEntityAutoTags (array ('realm' => 'user', 'user_name' => 'user@OTHER.COM'));
+		$this->assertFalse (eval_expression ($condition, reindexById ($other, 'tag', TRUE), TRUE));
+	}
+
 	// For getOutputOf() tests.
 	static function doubleEcho ($str)
 	{
@@ -1145,6 +1163,12 @@ class PureFunctionTest extends RTTestCase
 			array ('validTagName', 'tag', TRUE, TRUE), // not quite expected but as far as the function goes is correct
 			array ('validTagName', '$2015-', TRUE, FALSE),
 			array ('validTagName', '$iqn.domain.', TRUE, FALSE),
+			array ('validTagName', '$username_user@EXAMPLE.COM', TRUE, TRUE),
+			array ('validTagName', '$user@host', TRUE, TRUE),
+			array ('validTagName', '$tag@', TRUE, FALSE),
+			array ('validTagName', '$@tag', TRUE, FALSE),
+			array ('validTagName', 'user@EXAMPLE.COM', FALSE, FALSE),
+			array ('validTagName', 'user@EXAMPLE.COM', TRUE, FALSE),
 
 			array ('goodModeForVSTRole', 'access', 'access', TRUE),
 			array ('goodModeForVSTRole', 'access', 'trunk', FALSE),
