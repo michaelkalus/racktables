@@ -747,11 +747,26 @@ function addPortForObject ()
 	showFuncMessage (__FUNCTION__, 'OK', array ($_REQUEST['port_name']));
 }
 
+// Return the port ID from the request if the port belongs to the current
+// object (the one the permissions have been checked for).
+function assertPortOfCurrentObject ($argname)
+{
+	$port_id = genericAssertion ($argname, 'natural');
+	$result = usePreparedSelectBlade
+	(
+		'SELECT COUNT(*) FROM Port WHERE id = ? AND object_id = ?',
+		array ($port_id, getBypassValue())
+	);
+	if ($result->fetchColumn() != 1)
+		throw new InvalidRequestArgException ($argname, $port_id, 'not a port of this object');
+	return $port_id;
+}
+
 function editPortForObject ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
 	global $sic;
-	$port_id = genericAssertion ('port_id', 'natural');
+	$port_id = assertPortOfCurrentObject ('port_id');
 	try
 	{
 		commitUpdatePort
@@ -3421,7 +3436,7 @@ function getOpspec()
 
 function unlinkPort ()
 {
-	commitUnlinkPort (genericAssertion ('port_id', 'natural'));
+	commitUnlinkPort (assertPortOfCurrentObject ('port_id'));
 	showSuccess ("Port unlinked successfully");
 }
 

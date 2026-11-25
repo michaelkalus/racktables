@@ -222,6 +222,23 @@ function handlePopupPortLink()
 	assertStringArg ('cable', TRUE);
 	$port_info = getPortInfo ($_REQUEST['port']);
 	$remote_port_info = getPortInfo ($_REQUEST['remote_port']);
+	if ($port_info === NULL)
+		throw new InvalidRequestArgException ('port', $_REQUEST['port'], 'no such port');
+	if ($remote_port_info === NULL)
+		throw new InvalidRequestArgException ('remote_port', $_REQUEST['remote_port'], 'no such port');
+	// The forms of this popup do not carry the page context of the object
+	// ports tab, so check the permissions for the object of the local port
+	// the same way the AJAX port editors do. A page context of any other
+	// entity must not become a part of the security context.
+	global $pageno, $etype_by_pageno;
+	if
+	(
+		($pageno == 'ipaddress' || array_key_exists ($pageno, $etype_by_pageno)) &&
+		($pageno != 'object' || getBypassValue() != $port_info['object_id'])
+	)
+		throw new InvalidRequestArgException ('port', $port_info['id'], 'not a port of this object');
+	fixContext (spotEntity ('object', $port_info['object_id']));
+	assertPermission ('object', 'ports', 'editPort');
 	$POIFC = getPortOIFCompat();
 	if (isset ($_REQUEST['port_type']) && isset ($_REQUEST['remote_port_type']))
 	{
