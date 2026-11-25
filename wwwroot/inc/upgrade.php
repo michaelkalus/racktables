@@ -820,6 +820,14 @@ ENDOFTRIGGER;
 			$query[] = "ALTER TABLE `TagStorage` DROP FOREIGN KEY `TagStorage-FK-TagTree`";
 			$query[] = "ALTER TABLE `UserConfig` DROP FOREIGN KEY `UserConfig-FK-varname`";
 			$query[] = "ALTER TABLE `VSEnabledPorts` DROP FOREIGN KEY `VSEnabledPorts-FK-vs_id-proto-vport`";
+			// Older releases created the keys referenced by these two foreign keys as
+			// non-unique. MySQL 8.4 refuses to rebuild a table referenced through such
+			// a key and to create a foreign key on it, so make the keys UNIQUE (as in
+			// a fresh install) while the foreign keys are dropped. Each key contains
+			// the primary key, so this cannot fail on existing data.
+			$query[] = "ALTER TABLE `AttributeValue` DROP FOREIGN KEY `AttributeValue-FK-object`";
+			$query[] = "ALTER TABLE `Object` DROP KEY `id-tid`, ADD UNIQUE KEY `id-tid` (`id`,`objtype_id`)";
+			$query[] = "ALTER TABLE `TagTree` DROP KEY `id-is_assignable`, ADD UNIQUE KEY `id-is_assignable` (`id`,`is_assignable`)";
 			$query[] = "ALTER TABLE `Atom` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `Attribute` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `AttributeMap` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
@@ -894,6 +902,7 @@ ENDOFTRIGGER;
 			$query[] = "ALTER TABLE `TagStorage` ADD CONSTRAINT `TagStorage-FK-TagTree` FOREIGN KEY (`tag_id`, `tag_is_assignable`) REFERENCES `TagTree` (`id`, `is_assignable`)";
 			$query[] = "ALTER TABLE `UserConfig` ADD CONSTRAINT `UserConfig-FK-varname` FOREIGN KEY (`varname`) REFERENCES `Config` (`varname`) ON DELETE CASCADE";
 			$query[] = "ALTER TABLE `VSEnabledPorts` ADD CONSTRAINT `VSEnabledPorts-FK-vs_id-proto-vport` FOREIGN KEY (`vs_id`, `proto`, `vport`) REFERENCES `VSPorts` (`vs_id`, `proto`, `vport`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `AttributeValue` ADD CONSTRAINT `AttributeValue-FK-object` FOREIGN KEY (`object_id`, `object_tid`) REFERENCES `Object` (`id`, `objtype_id`) ON DELETE CASCADE ON UPDATE CASCADE";
 			$query[] = "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS";
 
 			$query[] = "UPDATE Config SET varvalue = '0.20.7' WHERE varname = 'DB_VERSION'";
