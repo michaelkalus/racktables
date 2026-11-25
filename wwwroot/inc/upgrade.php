@@ -496,7 +496,7 @@ CREATE TABLE `CactiServer` (
 			$query[] = "ALTER TABLE TagStorage ADD COLUMN tag_is_assignable ENUM('yes', 'no') NOT NULL default 'yes' AFTER tag_id";
 			$query[] = "ALTER TABLE TagStorage ADD KEY `tag_id-tag_is_assignable` (tag_id, tag_is_assignable)";
 			$query[] = "ALTER TABLE TagTree ADD COLUMN is_assignable ENUM('yes', 'no') NOT NULL default 'yes' AFTER parent_id";
-			$query[] = "ALTER TABLE TagTree ADD KEY `id-is_assignable` (id, is_assignable)";
+			$query[] = "ALTER TABLE TagTree ADD UNIQUE KEY `id-is_assignable` (id, is_assignable)";
 			$query[] = "ALTER TABLE TagStorage DROP FOREIGN KEY `TagStorage-FK-tag_id`";
 			$query[] = "ALTER TABLE TagStorage ADD CONSTRAINT `TagStorage-FK-TagTree` FOREIGN KEY (tag_id, tag_is_assignable) REFERENCES TagTree (id, is_assignable)";
 			$query[] = "UPDATE UserAccount SET user_realname = NULL WHERE user_realname = ''";
