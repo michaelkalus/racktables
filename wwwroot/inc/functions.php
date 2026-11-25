@@ -5963,20 +5963,21 @@ function isIPAddressEmpty ($addrinfo, $except_fields = array())
 	return TRUE;
 }
 
-// returns TRUE if the network cell is allowed to be deleted, FALSE otherwise
-// $netinfo could be either ipv4net or ipv6net entity.
-// in case of returning FALSE, $netinfo['addrlist'] is set
-function isIPNetworkEmpty (&$netinfo)
+// returns the names of the addresses that are reserved automatically for a
+// "connected" network ($net is either ipv4net or ipv6net entity), indexed by ip_bin
+function getIPNetworkAutoReservationNames ($net)
 {
-	if (getConfigVar ('IPV4_JAYWALK') == 'yes')
-		return TRUE;
-	if (! isset ($netinfo['addrlist']))
-		loadIPAddrList ($netinfo);
-	$pure_array = ($netinfo['realm'] == 'ipv4net') ?
-		array ($netinfo['ip_bin'] => 'network', ip_last ($netinfo) => 'broadcast') : // v4
-		array ($netinfo['ip_bin'] => 'Subnet-Router anycast'); // v6
-	$pure_auto = 0;
-	foreach ($pure_array as $ip => $comment)
+	return ($net['realm'] == 'ipv4net') ?
+		array ($net['ip_bin'] => 'network', ip_last ($net) => 'broadcast') : // v4
+		array ($net['ip_bin'] => 'Subnet-Router anycast'); // v6
+}
+
+// returns the addresses of the network that hold nothing but the automatic
+// reservation, as ip_bin => name. $netinfo['addrlist'] must be set.
+function getIPNetworkAutoReservations ($netinfo)
+{
+	$ret = array();
+	foreach (getIPNetworkAutoReservationNames ($netinfo) as $ip => $comment)
 		if
 		(
 			array_key_exists ($ip, $netinfo['addrlist']) &&
@@ -5984,8 +5985,47 @@ function isIPNetworkEmpty (&$netinfo)
 			$netinfo['addrlist'][$ip]['reserved'] == 'yes' &&
 			isIPAddressEmpty ($netinfo['addrlist'][$ip], array ('name', 'reserved'))
 		)
-			$pure_auto++;
-	return ($netinfo['own_addrc'] <= $pure_auto);
+			$ret[$ip] = $comment;
+	return $ret;
+}
+
+// returns TRUE if the network cell is allowed to be deleted, FALSE otherwise
+// $netinfo could be either ipv4net or ipv6net entity.
+// in case of returning FALSE, $netinfo['addrlist'] is set
+// A network that has addresses of its own may be deleted when another network
+// contains it, the addresses then belong to that network, which is set as
+// $netinfo['covering_net'].
+function isIPNetworkEmpty (&$netinfo)
+{
+	if (getConfigVar ('IPV4_JAYWALK') == 'yes')
+		return TRUE;
+	if (! isset ($netinfo['addrlist']))
+		loadIPAddrList ($netinfo);
+	if ($netinfo['own_addrc'] <= count (getIPNetworkAutoReservations ($netinfo)))
+		return TRUE;
+	$netinfo['covering_net'] = spotNetworkByIP ($netinfo['ip_bin'], $netinfo['mask']);
+	return $netinfo['covering_net'] !== NULL;
+}
+
+// Remove the automatic reservations of a network that is being deleted:
+// clear the name and the reserved flag of each of its automatically reserved
+// addresses that still has the automatic name (an allocation may have released
+// the flag already, see IPV4_AUTO_RELEASE), keep the comment and anything else.
+// Keep the addresses that are the same automatic reservations of the network
+// that contains it (e.g. the network address of both networks).
+// $netinfo['addrlist'] must be set.
+function releaseIPNetworkAutoReservations ($netinfo)
+{
+	$covering_net = spotNetworkByIP ($netinfo['ip_bin'], $netinfo['mask']);
+	$keep = $covering_net === NULL ? array() : getIPNetworkAutoReservationNames ($covering_net);
+	foreach (getIPNetworkAutoReservationNames ($netinfo) as $ip => $comment)
+		if
+		(
+			array_key_exists ($ip, $netinfo['addrlist']) &&
+			$netinfo['addrlist'][$ip]['name'] == $comment &&
+			(! array_key_exists ($ip, $keep) || $keep[$ip] != $comment)
+		)
+			updateAddress ($ip, '', 'no');
 }
 
 // PHP 8.5 provides array_first() and array_last() with the same behaviour,
