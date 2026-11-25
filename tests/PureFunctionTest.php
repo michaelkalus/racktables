@@ -897,6 +897,36 @@ class PureFunctionTest extends RTTestCase
 				"Connection to 192.0.2.1 closed by remote host. Extra\r\n",
 				"Connection to 192.0.2.1 closed by remote host. Extra\r\n",
 			),
+
+			// sysObjectID.0 as net-snmp prints it -> key of $known_switches
+			array ('normalizeSysObjectID', 'OID: .1.3.6.1.4.1.9.1.1227', '9.1.1227'),
+			array ('normalizeSysObjectID', '.1.3.6.1.4.1.9.1.1227', '9.1.1227'), // quick print
+			array ('normalizeSysObjectID', 'OID: .1.3.6.1.4.1.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'OID: .1.3.6.1.4.1.43.1.16.4.3.14', '43.1.16.4.3.14'),
+			array ('normalizeSysObjectID', 'OID: .1.3.6.1.4.1.9.12.3.1.3.612', '9.12.3.1.3.612'),
+			array ('normalizeSysObjectID', 'OID: iso.3.6.1.4.1.9.1.634', '9.1.634'), // no MIBs loaded
+			array ('normalizeSysObjectID', 'iso.3.6.1.4.1.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'OID: SNMPv2-SMI::enterprises.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'SNMPv2-SMI::enterprises.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'OID: enterprises.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'enterprises.9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', 'OID: .iso.org.dod.internet.private.enterprises.9.1.634', '9.1.634'),
+			// Netgear FS750T2 (joint-iso-ccitt arc)
+			array ('normalizeSysObjectID', 'OID: joint-iso-ccitt.10977.11825.11833.97.25451.12800.100.4.4', '10977.11825.11833.97.25451.12800.100.4.4'),
+			array ('normalizeSysObjectID', 'OID: .2.10977.11825.11833.97.25451.12800.100.4.4', '10977.11825.11833.97.25451.12800.100.4.4'),
+			array ('normalizeSysObjectID', '.2.10977.11825.11833.97.25451.12800.100.4.4', '10977.11825.11833.97.25451.12800.100.4.4'),
+			// not under enterprises: only the type prefix goes away
+			array ('normalizeSysObjectID', 'OID: .0.0', '.0.0'),
+			array ('normalizeSysObjectID', 'OID: SNMPv2-SMI::zeroDotZero', 'SNMPv2-SMI::zeroDotZero'),
+			array ('normalizeSysObjectID', 'OID: .1.3.6.1.2.1.1', '.1.3.6.1.2.1.1'),
+			// symbolic names a vendor MIB on the RackTables host may produce,
+			// these cannot be mapped without the MIB, see upstream bugs 1481, 1685, 1503
+			array ('normalizeSysObjectID', 'OID: CISCO-PRODUCTS-MIB::cat3560x48', 'CISCO-PRODUCTS-MIB::cat3560x48'),
+			array ('normalizeSysObjectID', 'OID: GENERIC-3COM-VLAN-MIB-1-0-6::a3Com.1.16.4.3.14', 'GENERIC-3COM-VLAN-MIB-1-0-6::a3Com.1.16.4.3.14'),
+			array ('normalizeSysObjectID', 'OID: CISCO-ENTITY-VENDORTYPE-OID-MIB::cevChassisN7Kc7010', 'CISCO-ENTITY-VENDORTYPE-OID-MIB::cevChassisN7Kc7010'),
+			// already normalized
+			array ('normalizeSysObjectID', '9.1.634', '9.1.634'),
+			array ('normalizeSysObjectID', '2011.2.23.95', '2011.2.23.95'),
 		);
 	}
 

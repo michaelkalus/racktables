@@ -4726,16 +4726,28 @@ function doSNMPmining ($object_id, $snmpsetup)
 	}
 }
 
+// Take a sysObjectID.0 value as net-snmp prints it (numeric or symbolic, with
+// or without the "OID: " type prefix) and return the OID relative to
+// enterprises (1.3.6.1.4.1), which is how $known_switches is indexed. The
+// joint-iso-ccitt (2) arc is stripped as well, Netgear FS750T2 reports its OID
+// there. Any other value is returned without the type prefix.
+function normalizeSysObjectID ($value)
+{
+	$value = preg_replace ('/^OID: /', '', trim ($value));
+	$prefix = '(?:\.1\.3\.6\.1\.4\.1\.|iso\.3\.6\.1\.4\.1\.|.*enterprises\.|\.2\.|.*joint-iso-ccitt\.)';
+	return preg_replace ("/^{$prefix}([[:digit:]]+(?:\\.[[:digit:]]+)*)\$/", '\\1', $value);
+}
+
 function doSwitchSNMPmining ($objectInfo, $device)
 {
 	global $known_switches, $iftable_processors;
 
-	if (FALSE === ($sysObjectID = $device->snmpget ('sysObjectID.0')))
+	if (FALSE === ($sysObjectID = $device->snmpgetNumericOID ('sysObjectID.0')))
 	{
 		showError ('Fatal SNMP failure');
 		return;
 	}
-	$sysObjectID = preg_replace ('/^.*( \.1\.3\.6\.1\.|enterprises\.|joint-iso-ccitt\.)([\.[:digit:]]+)$/', '\\2', $sysObjectID);
+	$sysObjectID = normalizeSysObjectID ($sysObjectID);
 	if (!isset ($known_switches[$sysObjectID]))
 	{
 		showError ("Unknown OID '{$sysObjectID}'");
@@ -5227,6 +5239,11 @@ class RTSNMPDevice
 		return $this->snmp->snmpwalkoid($oid);
 	}
 
+	function snmpgetNumericOID($oid)
+	{
+		return $this->snmp->snmpgetNumericOID($oid);
+	}
+
 	protected function snmpSet($oid, $type, $value)
 	{
 		return $this->snmp->snmpset($oid, $type, $value);
@@ -5252,6 +5269,20 @@ abstract class RTSNMP
 	abstract function snmpget($oid);
 	abstract function snmpset($oid, $type, $value);
 	abstract function snmpwalkoid($oid);
+	abstract protected function newSession();
+
+	// Same as snmpget(), but an OID value is printed in numeric form whatever
+	// MIB files are loaded on this host. The output format is a property of
+	// the session object, so the process-wide setting used by the other
+	// functions (and by walk keys) stays as it is.
+	function snmpgetNumericOID($oid)
+	{
+		$session = $this->newSession();
+		$session->oid_output_format = SNMP_OID_OUTPUT_NUMERIC;
+		$ret = $session->get($oid);
+		$session->close();
+		return $ret;
+	}
 }
 
 class RTSNMPv1 extends RTSNMP
@@ -5269,6 +5300,11 @@ class RTSNMPv1 extends RTSNMP
 	function snmpwalkoid($oid)
 	{
 		return snmpwalkoid($this->hostname, $this->snmpsetup['community'], $oid);
+	}
+
+	protected function newSession()
+	{
+		return new SNMP(SNMP::VERSION_1, $this->hostname, $this->snmpsetup['community']);
 	}
 }
 
@@ -5288,6 +5324,11 @@ class RTSNMPv2 extends RTSNMP
 	{
 		return snmp2_real_walk($this->hostname, $this->snmpsetup['community'], $oid);
 	}
+
+	protected function newSession()
+	{
+		return new SNMP(SNMP::VERSION_2c, $this->hostname, $this->snmpsetup['community']);
+	}
 }
 
 class RTSNMPv3 extends RTSNMP
@@ -5305,6 +5346,13 @@ class RTSNMPv3 extends RTSNMP
 	function snmpwalkoid($oid)
 	{
 		return snmp3_real_walk($this->hostname, $this->snmpsetup['sec_name'], $this->snmpsetup['sec_level'], $this->snmpsetup['auth_protocol'], $this->snmpsetup['auth_passphrase'], $this->snmpsetup['priv_protocol'], $this->snmpsetup['priv_passphrase'], $oid);
+	}
+
+	protected function newSession()
+	{
+		$session = new SNMP(SNMP::VERSION_3, $this->hostname, $this->snmpsetup['sec_name']);
+		$session->setSecurity($this->snmpsetup['sec_level'], $this->snmpsetup['auth_protocol'], $this->snmpsetup['auth_passphrase'], $this->snmpsetup['priv_protocol'], $this->snmpsetup['priv_passphrase']);
+		return $session;
 	}
 }
 
