@@ -3714,12 +3714,24 @@ function renderSearchResults ($terms, $summary)
 					echo "</td><td class=tdleft>";
 					if (isset ($obj['by_attr']))
 					{
-						// only explain non-obvious reasons for listing
-						echo '<ul>';
-						foreach ($obj['by_attr'] as $attr_name)
-							if ($attr_name != 'name')
-								echo "<li>{$attr_name} matched</li>";
-						echo '</ul>';
+						// Only explain non-obvious reasons for listing, the name
+						// is already shown above. The comment is shortened the
+						// same way as the rack and location comments in renderCell().
+						$attr_labels = array
+						(
+							'label' => array ('Visible label', 0),
+							'asset_no' => array ('Asset tag', 0),
+							'comment' => array ('Comment', 30),
+						);
+						echo '<table>';
+						foreach ($obj['by_attr'] as $attr_name => $attr_value)
+							if (array_key_exists ($attr_name, $attr_labels))
+							{
+								list ($label, $maxlen) = $attr_labels[$attr_name];
+								echo "<tr><th width='50%' class=sticker>{$label}:</th>";
+								echo '<td class=sticker>' . stringForLabel ($attr_value, $maxlen) . '</td></tr>';
+							}
+						echo '</table>';
 					}
 					if (isset ($obj['by_sticker']))
 					{

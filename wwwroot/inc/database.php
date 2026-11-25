@@ -3142,7 +3142,7 @@ function getObjectAttrsSearchResults ($what)
 		$tmp = getSearchResultByField
 		(
 			'RackObject',
-			array ('id'),
+			array ('id', $column),
 			$column,
 			$what,
 			$column
@@ -3150,7 +3150,7 @@ function getObjectAttrsSearchResults ($what)
 		foreach ($tmp as $row)
 		{
 			$ret[$row['id']]['id'] = $row['id'];
-			$ret[$row['id']]['by_attr'][] = $column;
+			$ret[$row['id']]['by_attr'][$column] = $row[$column];
 		}
 	}
 	return $ret;
