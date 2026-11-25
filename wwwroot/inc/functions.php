@@ -11,7 +11,8 @@
 */
 
 defineIfNotDefined ('TAGNAME_REGEXP', '/^[\p{L}0-9-]( ?([._~+%-] ?)?[\p{L}0-9:])*(%|\+)?$/u');
-defineIfNotDefined ('AUTOTAGNAME_REGEXP', '/^\$[\p{L}0-9-]( ?([._~+%-] ?)?[\p{L}0-9:])*(%|\+)?$/u');
+// '@' is allowed in autotags only, e.g. {$username_user@REALM} for external authentication.
+defineIfNotDefined ('AUTOTAGNAME_REGEXP', '/^\$[\p{L}0-9-]( ?([._~+%@-] ?)?[\p{L}0-9:])*(%|\+)?$/u');
 
 $loclist[0] = 'front';
 $loclist[1] = 'interior';
