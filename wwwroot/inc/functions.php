@@ -7501,10 +7501,13 @@ function addDesiredPort (&$desiredPorts, $port_name, $port_type_id, $port_label,
 // $desiredPorts is a list of ports in getObjectPortsAndLinks format.
 // required port fields are name, iif_id, oif_id, label and l2address.
 // $desiredPorts can be filled by addDesiredPort function using commitAddPort format
+// The changes are made all or none. A deleted port loses its 802.1Q
+// configuration the way commitDeletePorts() deletes it, the portConfChanged
+// hooks run after the change has been committed.
 function replaceObjectPorts ($object_id, $desiredPorts)
 {
 	global $dbxlink;
-	$to_delete = $to_update = $real_ports = array();
+	$to_delete = $to_update = $to_add = $real_ports = array();
 
 	// The check that does not require access to the database goes first.
 	foreach (array_keys ($desiredPorts) as $k)
@@ -7514,30 +7517,49 @@ function replaceObjectPorts ($object_id, $desiredPorts)
 	// only changes requested are to add ports w/o MAC addresses or to update existing
 	// ports in a way that does not introduce new MAC addresses, it is impossible to
 	// tell reliably which ports require which actions without locking the table first.
-	$dbxlink->exec ('LOCK TABLES Port WRITE, PortLog WRITE, Link READ');
-	foreach (getObjectPortsAndLinksTerse ($object_id) as $port)
-	{
-		$key = "{$port['name']}-{$port['iif_id']}";
-		if (! array_key_exists ($key, $desiredPorts))
-		{
-			$to_delete[] = $port;
-			continue;
-		}
-		if ($port['l2address'] != $desiredPorts[$key]['l2address'] || $port['label'] != $desiredPorts[$key]['label'])
-			$to_update[$key] = $port;
-		$real_ports[$key] = 1;
-	}
-	$to_add = array_diff_key ($desiredPorts, $real_ports);
-
+	// Table locks and START TRANSACTION end each other, so with the locks the
+	// transaction is the one opened by disabling autocommit (see commitUpdatePort()).
+	// The server may be configured with autocommit off, restore what it was.
+	$result = usePreparedSelectBlade ('SELECT @@autocommit');
+	$autocommit = $result->fetchColumn() ? 1 : 0;
+	unset ($result);
+	$locked = $done = FALSE;
+	$warnings = $notices = array();
 	try
 	{
+		$dbxlink->exec ('SET autocommit = 0');
+		$dbxlink->exec
+		(
+			'LOCK TABLES Port WRITE, PortLog WRITE, Link READ, VLANSwitch WRITE, ' .
+			'CachedPVM WRITE, CachedPAV WRITE, CachedPNV WRITE, ' .
+			'PortVLANMode WRITE, PortAllowedVLAN WRITE, PortNativeVLAN WRITE'
+		);
+		$locked = TRUE;
+		foreach (getObjectPortsAndLinksTerse ($object_id) as $port)
+		{
+			$key = "{$port['name']}-{$port['iif_id']}";
+			if (! array_key_exists ($key, $desiredPorts))
+			{
+				$to_delete[] = $port;
+				continue;
+			}
+			if ($port['l2address'] != $desiredPorts[$key]['l2address'] || $port['label'] != $desiredPorts[$key]['label'])
+				$to_update[$key] = $port;
+			$real_ports[$key] = 1;
+		}
+		$to_add = array_diff_key ($desiredPorts, $real_ports);
+
 		assertUniqueL2Addresses (reduceSubarraysToColumn (array_merge ($to_update, $to_add), 'l2address'), $object_id);
 		// Make the actual changes.
+		$deleted_names = array();
 		foreach ($to_delete as $port)
 			if ($port['link_count'] != 0)
-				showWarning (sprintf ("Port %s should be deleted, but it's used", formatPort ($port)));
+				$warnings[] = sprintf ("Port %s should be deleted, but it's used", formatPortLink ($object_id, NULL, $port['id'], $port['name']));
 			else
+			{
 				usePreparedDeleteBlade ('Port', array ('id' => $port['id']));
+				$deleted_names[] = $port['name'];
+			}
 		foreach ($to_update as $key => $port)
 			commitUpdatePortReal
 			(
@@ -7560,15 +7582,37 @@ function replaceObjectPorts ($object_id, $desiredPorts)
 				$port['label'],
 				$port['l2address']
 			);
+		// after the additions, which may bring a deleted name back
+		$notices = delete8021QConfigOfDeletedPorts ($object_id, $deleted_names);
+		$dbxlink->exec ('COMMIT');
+		$done = TRUE;
 	}
-	catch (Exception $e)
+	finally
 	{
-		$dbxlink->exec ('UNLOCK TABLES');
-		throw $e;
+		// Release the session on every exit. If an exception is on its way,
+		// a failure here must not replace it.
+		$cleanup = array ('UNLOCK TABLES', "SET autocommit = {$autocommit}");
+		if ($locked && ! $done)
+			array_unshift ($cleanup, 'ROLLBACK');
+		$cleanup_error = NULL;
+		foreach ($cleanup as $query)
+			try
+			{
+				$dbxlink->exec ($query);
+			}
+			catch (Exception $e)
+			{
+				if ($cleanup_error === NULL)
+					$cleanup_error = $e;
+			}
+		if ($done && $cleanup_error !== NULL)
+			throw $cleanup_error;
 	}
 
-	$dbxlink->exec ('UNLOCK TABLES');
+	foreach ($warnings as $warning)
+		showWarning ($warning);
 	showSuccess (sprintf ('Added ports: %u, changed: %u, deleted: %u', count ($to_add), count ($to_update), count ($to_delete)));
+	call8021QPortHooks ($object_id, $notices);
 }
 
 function formatPluginState ($state)
