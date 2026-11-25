@@ -809,6 +809,17 @@ ENDOFTRIGGER;
 			$query[] = "ALTER DATABASE DEFAULT CHARACTER SET UTF8 COLLATE utf8_unicode_ci";
 
 			$query[] = "SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0";
+			// MariaDB refuses to change the collation of a column that is a part of
+			// a foreign key, even with FOREIGN_KEY_CHECKS=0, so the foreign keys that
+			// involve text columns are dropped here and re-created after the conversion.
+			$query[] = "ALTER TABLE `CachedPAV` DROP FOREIGN KEY `CachedPAV-FK-object-port`";
+			$query[] = "ALTER TABLE `CachedPNV` DROP FOREIGN KEY `CachedPNV-FK-compound`";
+			$query[] = "ALTER TABLE `PortAllowedVLAN` DROP FOREIGN KEY `PortAllowedVLAN-FK-object-port`";
+			$query[] = "ALTER TABLE `PortNativeVLAN` DROP FOREIGN KEY `PortNativeVLAN-FK-compound`";
+			$query[] = "ALTER TABLE `PortVLANMode` DROP FOREIGN KEY `PortVLANMode-FK-object-port`";
+			$query[] = "ALTER TABLE `TagStorage` DROP FOREIGN KEY `TagStorage-FK-TagTree`";
+			$query[] = "ALTER TABLE `UserConfig` DROP FOREIGN KEY `UserConfig-FK-varname`";
+			$query[] = "ALTER TABLE `VSEnabledPorts` DROP FOREIGN KEY `VSEnabledPorts-FK-vs_id-proto-vport`";
 			$query[] = "ALTER TABLE `Atom` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `Attribute` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `AttributeMap` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
@@ -875,6 +886,14 @@ ENDOFTRIGGER;
 			$query[] = "ALTER TABLE `VSPorts` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `VSEnabledIPs` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `VSEnabledPorts` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
+			$query[] = "ALTER TABLE `CachedPAV` ADD CONSTRAINT `CachedPAV-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `CachedPVM` (`object_id`, `port_name`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `CachedPNV` ADD CONSTRAINT `CachedPNV-FK-compound` FOREIGN KEY (`object_id`, `port_name`, `vlan_id`) REFERENCES `CachedPAV` (`object_id`, `port_name`, `vlan_id`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortAllowedVLAN` ADD CONSTRAINT `PortAllowedVLAN-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `PortVLANMode` (`object_id`, `port_name`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortNativeVLAN` ADD CONSTRAINT `PortNativeVLAN-FK-compound` FOREIGN KEY (`object_id`, `port_name`, `vlan_id`) REFERENCES `PortAllowedVLAN` (`object_id`, `port_name`, `vlan_id`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortVLANMode` ADD CONSTRAINT `PortVLANMode-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `CachedPVM` (`object_id`, `port_name`)";
+			$query[] = "ALTER TABLE `TagStorage` ADD CONSTRAINT `TagStorage-FK-TagTree` FOREIGN KEY (`tag_id`, `tag_is_assignable`) REFERENCES `TagTree` (`id`, `is_assignable`)";
+			$query[] = "ALTER TABLE `UserConfig` ADD CONSTRAINT `UserConfig-FK-varname` FOREIGN KEY (`varname`) REFERENCES `Config` (`varname`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `VSEnabledPorts` ADD CONSTRAINT `VSEnabledPorts-FK-vs_id-proto-vport` FOREIGN KEY (`vs_id`, `proto`, `vport`) REFERENCES `VSPorts` (`vs_id`, `proto`, `vport`) ON DELETE CASCADE";
 			$query[] = "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS";
 
 			$query[] = "UPDATE Config SET varvalue = '0.20.7' WHERE varname = 'DB_VERSION'";
