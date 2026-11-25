@@ -139,6 +139,35 @@ class PureFunctionTest extends RTTestCase
 		$this->assertFalse (eval_expression ($condition, reindexById ($other, 'tag', TRUE), TRUE));
 	}
 
+	public function providerUsernameAutotagWithBackslash ()
+	{
+		return array
+		(
+			array ('DOMAIN\\user', 'DOMAIN\\other'),
+			array ('DOMAIN\\newuser', 'OTHER\\newuser'),
+			array ('DOMAIN\\user@EXAMPLE.COM', 'DOMAIN\\user@OTHER.COM'),
+		);
+	}
+
+	// A user name such as "DOMAIN\user" (NTLM/SSPI authentication) must
+	// produce a $username_ autotag that RackCode can refer to.
+	/**
+	 * @group small
+	 * @dataProvider providerUsernameAutotagWithBackslash
+	 */
+	public function testUsernameAutotagWithBackslash ($username, $other_username)
+	{
+		$autotags = generateEntityAutoTags (array ('realm' => 'user', 'user_name' => $username));
+		$this->assertContains (array ('tag' => '$username_' . $username), $autotags);
+		$parsed = getRackCode ('allow {$username_' . $username . '}');
+		$this->assertSame ('ACK', $parsed['result'], is_string ($parsed['load']) ? $parsed['load'] : '');
+		$this->assertCount (1, $parsed['load']);
+		$condition = $parsed['load'][0]['condition'];
+		$this->assertTrue (eval_expression ($condition, reindexById ($autotags, 'tag', TRUE), TRUE));
+		$other = generateEntityAutoTags (array ('realm' => 'user', 'user_name' => $other_username));
+		$this->assertFalse (eval_expression ($condition, reindexById ($other, 'tag', TRUE), TRUE));
+	}
+
 	// For getOutputOf() tests.
 	static function doubleEcho ($str)
 	{
@@ -1169,6 +1198,17 @@ class PureFunctionTest extends RTTestCase
 			array ('validTagName', '$@tag', TRUE, FALSE),
 			array ('validTagName', 'user@EXAMPLE.COM', FALSE, FALSE),
 			array ('validTagName', 'user@EXAMPLE.COM', TRUE, FALSE),
+			array ('validTagName', '$username_DOMAIN\\user', TRUE, TRUE),
+			array ('validTagName', '$username_DOMAIN\\newuser', TRUE, TRUE),
+			array ('validTagName', '$username_DOMAIN\\user@EXAMPLE.COM', TRUE, TRUE),
+			array ('validTagName', '$DOMAIN\\user', TRUE, TRUE),
+			array ('validTagName', '$\\user', TRUE, FALSE),
+			array ('validTagName', '$username_\\user', TRUE, FALSE),
+			array ('validTagName', '$DOMAIN\\', TRUE, FALSE),
+			array ('validTagName', '$DOMAIN\\\\user', TRUE, FALSE),
+			array ('validTagName', '$DOMAIN\\@user', TRUE, FALSE),
+			array ('validTagName', 'DOMAIN\\user', FALSE, FALSE),
+			array ('validTagName', 'DOMAIN\\user', TRUE, FALSE),
 
 			array ('goodModeForVSTRole', 'access', 'access', TRUE),
 			array ('goodModeForVSTRole', 'access', 'trunk', FALSE),
