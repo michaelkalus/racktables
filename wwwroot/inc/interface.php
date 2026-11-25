@@ -3679,7 +3679,7 @@ function renderSearchResults ($terms, $summary)
 
 	if ($nhits == 0)
 	{
-		echo "<center><h2>Nothing found for '${terms}'</h2></center>";
+		echo "<center><h2>Nothing found for '" . stringForLabel ($terms, 0) . "'</h2></center>";
 		return;
 	}
 	elseif ($nhits == 1)
@@ -3694,7 +3694,7 @@ function renderSearchResults ($terms, $summary)
 		if (isset ($url))
 			redirectUser ($url);
 	}
-	echo "<center><h2>${nhits} result(s) found for '${terms}'</h2></center>";
+	echo "<center><h2>${nhits} result(s) found for '" . stringForLabel ($terms, 0) . "'</h2></center>";
 	foreach ($summary as $where => $what)
 		switch ($where)
 		{
