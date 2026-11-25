@@ -310,6 +310,11 @@ function saml_getAttributeValues ($attributes, $name)
 	return is_array ($attributes[$name]) ? $attributes[$name] : array($attributes[$name]);
 }
 
+// With this group_filter (the default) the group name is taken from the group DN
+// by getLDAPGroupNameFromDN(), which understands DN escaping. Any other filter
+// is applied to the DN as it is and its first subpattern is the group name.
+define ('LDAP_DEFAULT_GROUP_FILTER', '/^[Cc][Nn]=([^,]+)/');
+
 function constructLDAPOptions()
 {
 	global $LDAP_options;
@@ -318,7 +323,7 @@ function constructLDAPOptions()
 	$LDAP_defaults = array
 	(
 		'group_attr' => 'memberof',
-		'group_filter' => '/^[Cc][Nn]=([^,]+)/',
+		'group_filter' => LDAP_DEFAULT_GROUP_FILTER,
 		'cache_refresh' => 300,
 		'cache_retry' => 15,
 		'cache_expiry' => 600,
@@ -351,6 +356,9 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 			throw new RackTablesError ('LDAP misconfiguration: refresh/retry/expiry mismatch', RackTablesError::MISCONFIGURED);
 		if ($LDAP_options['cache_expiry'] == 0) // immediate expiry set means disabled cache
 			return authenticated_via_ldap_nocache ($username, $password, $ldap_displayname);
+		// A name that cannot be a cache key is checked with the server each time.
+		if (! fitsLDAPCacheUsername ($username))
+			return authenticated_via_ldap_nocache ($username, $password, $ldap_displayname);
 		// authenticated_via_ldap_cache()'s way of locking can sometimes result in
 		// a PDO error condition that convertPDOException() was not able to dispatch.
 		// To avoid reaching printPDOException() (which prints backtrace with password
@@ -359,12 +367,18 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 	}
 	catch (PDOException $e)
 	{
+		abortLDAPCache();
 		if (isset ($debug_mode) && $debug_mode)
 			// in debug mode re-throw DB exception as-is
 			throw $e;
 		else
 			// re-create exception to hide private data from its backtrace
 			throw new RackTablesError ('LDAP caching error', RackTablesError::DB_WRITE_FAILED);
+	}
+	catch (Exception $e)
+	{
+		abortLDAPCache();
+		throw $e;
 	}
 }
 
@@ -641,15 +655,59 @@ function queryLDAPServer ($username, $password)
 		// Pull group membership, if any was returned.
 		if (isset ($info[0][$LDAP_options['group_attr']]))
 			for ($i = 0; $i < $info[0][$LDAP_options['group_attr']]['count']; $i++)
-				if
-				(
-					preg_match ($LDAP_options['group_filter'], $info[0][$LDAP_options['group_attr']][$i], $matches) &&
-					validTagName ('$lgcn_' . $matches[1], TRUE)
-				)
-					$ret['memberof'][] = '$lgcn_' . $matches[1];
+			{
+				$group_dn = $info[0][$LDAP_options['group_attr']][$i];
+				if ($LDAP_options['group_filter'] === LDAP_DEFAULT_GROUP_FILTER)
+					$group_name = getLDAPGroupNameFromDN ($group_dn);
+				elseif (preg_match ($LDAP_options['group_filter'], $group_dn, $matches))
+					$group_name = $matches[1];
+				else
+					$group_name = NULL;
+				if ($group_name === NULL)
+					continue;
+				if (validTagName ('$lgcn_' . $group_name, TRUE))
+					$ret['memberof'][] = '$lgcn_' . $group_name;
+				else
+					error_log ("RackTables: LDAP group '{$group_dn}' skipped, its name is not a valid autotag name");
+			}
 	}
 	@ldap_close ($connect);
 	return $ret;
+}
+
+// Return the group name from a group DN such as
+// "CN=Smith\, John,OU=Groups,DC=example,DC=org": the value of the first RDN with
+// the DN escaping of RFC 4514 removed ("Smith, John"). Return NULL when the
+// first RDN is not CN or its value is empty, hex-encoded (#...) or wrongly
+// escaped. The name may still be unusable as an autotag name.
+function getLDAPGroupNameFromDN ($dn)
+{
+	if (! preg_match ('/^cn=(.*)$/is', $dn, $m) || $m[1] === '' || $m[1][0] == '#')
+		return NULL;
+	$value = $m[1];
+	$len = strlen ($value);
+	$ret = '';
+	for ($i = 0; $i < $len; $i++)
+	{
+		$c = $value[$i];
+		if ($c == ',' || $c == '+') // end of the RDN or of its first attribute
+			break;
+		if ($c != '\\')
+			$ret .= $c;
+		elseif (preg_match ('/^[0-9A-Fa-f]{2}$/', substr ($value, $i + 1, 2)))
+		{
+			$ret .= chr (hexdec (substr ($value, $i + 1, 2)));
+			$i += 2;
+		}
+		elseif ($i + 1 < $len && strpos ('\\"+,;<>=# ', $value[$i + 1]) !== FALSE)
+		{
+			$ret .= $value[$i + 1];
+			$i++;
+		}
+		else
+			return NULL;
+	}
+	return $ret === '' ? NULL : $ret;
 }
 
 function authenticated_via_database ($userinfo, $password)
