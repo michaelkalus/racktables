@@ -1179,16 +1179,23 @@ function renderObject8021QSyncPreview ($object, $vswitch, $plan, $C, $R, $maxdec
 
 	switchportInfoJS ($vswitch['object_id']); // load JS code to make portnames interactive
 	// Initialize one of the three popups: the data is ready.
-	$port_config = addslashes (json_encode (formatPortConfigHints ($vswitch['object_id'], $R)));
-	addJSText (<<<'END'
+	// The JSON is a JavaScript literal that cannot end the script block.
+	$port_config = json_encode
+	(
+		formatPortConfigHints ($vswitch['object_id'], $R),
+		JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+	);
+	addJSText (<<<END
 $(document).ready(function(){
-	var confData = $.parseJSON('$port_config');
+	var confData = {$port_config};
 	applyConfData(confData);
 	var menuItem = $('.context-menu-item.itemname-conf');
 	menuItem.addClass($.contextMenu.disabledItemClassName);
 	setItemIcon(menuItem[0], 'ok');
 });
-
+END
+	); // addJSText()
+	addJSText (<<<'END'
 function checkColumnOfRadios8021Q (prefix, numRows, suffix)
 {
 	var elemId;
