@@ -2493,7 +2493,7 @@ function ip_parse ($ip)
 {
 	try
 	{
-		if (FALSE !== strpos ($ip, ':'))
+		if (is_string ($ip) && FALSE !== strpos ($ip, ':'))
 			return ip6_parse ($ip);
 		else
 			return ip4_parse ($ip);
@@ -2507,6 +2507,10 @@ function ip_parse ($ip)
 
 function ip4_parse ($ip)
 {
+	// inet_pton() throws on a non-string or a NUL byte (PHP 8) or ignores
+	// everything after a NUL byte (PHP 7), neither is a valid address
+	if (! is_string ($ip) || FALSE !== strpos ($ip, "\0"))
+		throw new InvalidArgException ('ip', $ip, "Invalid IPv4 address");
 	if (is_inet_avail())
 	{
 		if (FALSE !== ($ret = @inet_pton ($ip)) && strlen ($ret) == 4)
@@ -2523,6 +2527,9 @@ function ip4_parse ($ip)
 function ip6_parse ($ip)
 {
 	do {
+		// see ip4_parse()
+		if (! is_string ($ip) || FALSE !== strpos ($ip, "\0"))
+			break;
 		if (is_inet6_avail())
 		{
 			if (FALSE !== ($ret = @inet_pton ($ip)) && strlen ($ret) == 16)
