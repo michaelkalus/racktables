@@ -31,7 +31,7 @@ function renderSLBEntityCell ($cell, $highlighted = FALSE)
 	switch ($cell['realm'])
 	{
 	case 'object':
-		echo "<tr><td><a class='$a_class' href='index.php?page=object&object_id={$cell['id']}'>{$cell['dname']}</a>";
+		echo "<tr><td><a class='$a_class' href='index.php?page=object&object_id={$cell['id']}'>" . stringForLabel ($cell['dname'], 0) . '</a>';
 		echo "</td></tr><tr><td>";
 		printImageHREF ('LB');
 		echo "</td></tr>";
@@ -275,7 +275,7 @@ function renderRSPool ($pool_id)
 	echo "<tr><td class=pcleft>\n";
 
 	$summary = array();
-	$summary['Pool name'] = $poolInfo['name'];
+	$summary['Pool name'] = stringForLabel ($poolInfo['name'], 0);
 	$summary['Real servers'] = $poolInfo['rscount'];
 	$summary['VS instances'] = $poolInfo['refcnt'];
 	$summary['tags'] = '';
@@ -393,10 +393,10 @@ function renderEditRSList ($rs_list)
 		echo getOpLink (array('op'=>'delRS', 'id'=>$rsid), '', 'delete', 'Delete this real server');
 		echo "</td><td><input type=text name=rsip value='{$rs['rsip']}'></td>";
 		echo "<td><input type=text name=rsport size=5 value='{$rs['rsport']}'></td>";
-		echo "<td><input type=text name=comment size=15 value='{$rs['comment']}'></td>";
+		echo "<td><input type=text name=comment size=15 value='" . stringForTextInputValue ($rs['comment'], 0) . "'></td>";
 		$checked = $rs['inservice'] == 'yes' ? 'checked' : '';
 		echo "<td><input type=checkbox name=inservice $checked></td>";
-		echo "<td><textarea name=rsconfig>{$rs['rsconfig']}</textarea></td><td>";
+		echo '<td><textarea name=rsconfig>' . stringForTextarea ($rs['rsconfig']) . '</textarea></td><td>';
 		printImageHREF ('SAVE', 'Save changes', TRUE);
 		echo "</td></tr></form>\n";
 		$order = $nextorder[$order];
@@ -466,7 +466,7 @@ function renderRealServerList ()
 		}
 		echo "<tr valign=top class=row_{$order}><td>";
 		$dname = $pool_list[$rsinfo['rspool_id']]['name'] != '' ? $pool_list[$rsinfo['rspool_id']]['name'] : 'ANONYMOUS';
-		echo mkA ($dname, 'ipv4rspool', $rsinfo['rspool_id']);
+		echo mkA (stringForLabel ($dname, 0), 'ipv4rspool', $rsinfo['rspool_id']);
 		echo '</td><td align=center>';
 		if ($rsinfo['inservice'] == 'yes')
 			printImageHREF ('inservice', 'in service');
@@ -474,7 +474,7 @@ function renderRealServerList ()
 			printImageHREF ('notinservice', 'NOT in service');
 		echo '</td><td>' . mkA ($rsinfo['rsip'], 'ipaddress', $rsinfo['rsip']) . '</td>';
 		echo "<td>{$rsinfo['rsport']}</td>";
-		echo "<td><pre>{$rsinfo['rsconfig']}</pre></td>";
+		echo '<td><pre>' . stringForTextarea ($rsinfo['rsconfig']) . '</pre></td>';
 		echo "</tr>\n";
 	}
 	echo "</table>";
@@ -514,8 +514,8 @@ function renderVirtualService ($vsid)
 	$summary['Virtual IP address'] = mkA ($vsinfo['vip'], 'ipaddress', $vsinfo['vip']);
 	$summary['Virtual port'] = $vsinfo['vport'];
 	$summary['tags'] = '';
-	$summary['VS configuration'] = '<div class="dashed slbconf">' . $vsinfo['vsconfig'] . '</div>';
-	$summary['RS configuration'] = '<div class="dashed slbconf">' . $vsinfo['rsconfig'] . '</div>';
+	$summary['VS configuration'] = '<div class="dashed slbconf">' . stringForTextarea ($vsinfo['vsconfig']) . '</div>';
+	$summary['RS configuration'] = '<div class="dashed slbconf">' . stringForTextarea ($vsinfo['rsconfig']) . '</div>';
 	renderEntitySummary ($vsinfo, 'Summary', $summary);
 	echo '</td>';
 
@@ -562,12 +562,12 @@ function renderEditRSPool ($pool_id)
 	$poolinfo = spotEntity ('ipv4rspool', $pool_id);
 	printOpFormIntro ('updIPv4RSP');
 	echo '<table border=0 align=center>';
-	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='{$poolinfo['name']}'></td></tr>\n";
+	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='" . stringForStoredTextInputValue ($poolinfo['name']) . "'></td></tr>\n";
 	echo "<tr><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
-	echo "<tr><th class=tdright>VS config:</th><td class=tdleft><textarea name=vsconfig rows=20 cols=80>{$poolinfo['vsconfig']}</textarea></td></tr>\n";
-	echo "<tr><th class=tdright>RS config:</th><td class=tdleft><textarea name=rsconfig rows=20 cols=80>{$poolinfo['rsconfig']}</textarea></td></tr>\n";
+	echo "<tr><th class=tdright>VS config:</th><td class=tdleft><textarea name=vsconfig rows=20 cols=80>" . stringForTextarea ($poolinfo['vsconfig']) . "</textarea></td></tr>\n";
+	echo "<tr><th class=tdright>RS config:</th><td class=tdleft><textarea name=rsconfig rows=20 cols=80>" . stringForTextarea ($poolinfo['rsconfig']) . "</textarea></td></tr>\n";
 	echo "<tr><th class=submit colspan=2>";
 	printImageHREF ('SAVE', 'Save changes', TRUE);
 	echo "</td></tr>\n";

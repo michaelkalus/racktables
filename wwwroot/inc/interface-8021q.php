@@ -459,7 +459,7 @@ function renderObject8021QPorts ($object_id)
 			elseif ($port['reservation_comment'] != '')
 				$socket['link'] = implode (' ', array(
 					formatLoggedSpan ($port['last_log'], 'Rsv:', 'strong underline'),
-					formatLoggedSpan ($port['last_log'], $port['reservation_comment'])
+					formatLoggedSpan ($port['last_log'], stringForLabel ($port['reservation_comment'], 0))
 				));
 			$sockets[$port['name']][] = $socket;
 		}

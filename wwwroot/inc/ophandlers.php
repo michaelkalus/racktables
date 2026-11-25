@@ -1028,14 +1028,12 @@ function delIPv6Prefix ()
 function editAddress ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
-	assertStringArg ('name', TRUE);
-	assertStringArg ('comment', TRUE);
 	updateAddress
 	(
 		genericAssertion ('ip', 'inet'),
-		$_REQUEST['name'],
+		assertStringArg ('name', TRUE),
 		isCheckSet ('reserved', 'yesno'),
-		$_REQUEST['comment']
+		assertStringArg ('comment', TRUE)
 	);
 	showFuncMessage (__FUNCTION__, 'OK');
 }

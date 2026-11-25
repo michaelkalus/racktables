@@ -44,6 +44,8 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		$object_attribute_cache = array();
 		foreach (array_reverse ($this->objects) as $object_id)
 		{
+			usePreparedDeleteBlade ('IPv4NAT', array ('object_id' => $object_id));
+			usePreparedDeleteBlade ('IPv4LB', array ('object_id' => $object_id));
 			usePreparedDeleteBlade ('VLANSwitch', array ('object_id' => $object_id));
 			usePreparedDeleteBlade ('RackSpace', array ('object_id' => $object_id));
 			usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $object_id));
@@ -61,6 +63,12 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('198.51.100.5'))));
 		usePreparedDeleteBlade ('IPv6Address', array ('ip' => ip6_parse ('2001:db8:5::5')));
 		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('127.0.0.1'))));
+		foreach (array ('198.51.100.5', '198.51.100.20') as $ip)
+		{
+			usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ($ip))));
+			usePreparedDeleteBlade ('IPv4Log', array ('ip' => ip4_bin2db (ip4_parse ($ip))));
+		}
+		usePreparedDeleteBlade ('IPv6Log', array ('ip' => ip6_parse ('2001:db8:5::5')));
 		if ($this->objtype_id !== NULL)
 		{
 			commitReduceOPC ($this->objtype_id, 4);
@@ -386,6 +394,9 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		$this->vs_id = lastInsertID();
 		usePreparedInsertBlade ('VSIPs', array ('vs_id' => $this->vs_id, 'vip' => ip4_parse ('198.51.100.6')));
 		usePreparedInsertBlade ('VSIPs', array ('vs_id' => $this->vs_id, 'vip' => ip6_parse ('2001:db8:5::6')));
+		$this->pool_id = commitCreateRSPool (self::RAW);
+		addRStoRSPool ($this->pool_id, ip4_parse ('198.51.100.7'), 80);
+		addRStoRSPool ($this->pool_id, ip6_parse ('2001:db8:5::7'), 80);
 
 		foreach (array ('ipv4net' => $net4_id, 'ipv6net' => $net6_id) as $realm => $net_id)
 		{
@@ -398,6 +409,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 			$this->assertEscaped ("op-upd-ip-name'>", '</span>', $output);
 			$this->assertEscaped ("op-upd-ip-comment'>", '</span>', $output);
 			$this->assertEscaped ('vs_id=' . $this->vs_id . '">', '</a>', $output);
+			$this->assertEscaped ('pool_id=' . $this->pool_id . '">', '</a>', $output);
 		}
 
 		$pageno = 'ipaddress';
@@ -697,5 +709,377 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 			"<input type=hidden name=descr_1 value='" . htmlspecialchars ($ptrname, ENT_QUOTES, 'UTF-8') . "'>",
 			$output
 		);
+	}
+
+	// the value of a field of the IP address properties form as the browser
+	// shows it, or NULL if the value cannot be told
+	protected function addressFormValue ($output, $field)
+	{
+		if (! preg_match ("/<input type=text name={$field} id=id_{$field} size=20 value='([^']*)'>/", $output, $m))
+			return NULL;
+		return html_entity_decode ($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+	}
+
+	// save the IP address properties form the way index.php does
+	protected function saveAddressForm ($ip, $name, $comment)
+	{
+		global $sic, $pageno, $tabno;
+		$pageno = 'ipaddress';
+		$tabno = 'properties';
+		$sic = array();
+		$_REQUEST = array();
+		$this->setArg ('ip', $ip);
+		$this->setArg ('name', $name);
+		$this->setArg ('comment', $comment);
+		editAddress();
+	}
+
+	// IP address name and comment in the properties form of an address
+	/**
+	 * @group small
+	 */
+	public function testAddressPropertiesForm ()
+	{
+		global $pageno, $tabno;
+		$pageno = 'ipaddress';
+		$tabno = 'properties';
+		$ip_bin = ip4_parse ('198.51.100.20');
+		// as typed (in-place editor) and HTML-escaped (the form before)
+		foreach (array (self::RAW, htmlspecialchars (self::RAW, ENT_QUOTES, 'UTF-8')) as $stored)
+		{
+			updateAddress ($ip_bin, $stored, 'no', $stored);
+			$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
+			$this->assertEscaped ("name=name id=id_name size=20 value='", "'>", $output);
+			$this->assertEscaped ("name=comment id=id_comment size=20 value='", "'>", $output);
+		}
+		// Text with an unescaped special character was not escaped when
+		// stored, so its references are its own text.
+		updateAddress ($ip_bin, '&amp; <', 'no', '');
+		$this->assertSame ('&amp; <', $this->addressFormValue (getOutputOf ('renderIPAddressProperties', $ip_bin), 'name'));
+	}
+
+	// The properties form stores the text as typed. A value stored before
+	// in either form is shown as typed, stored as typed on the first save
+	// and stays unchanged on the next saves.
+	/**
+	 * @group small
+	 */
+	public function testAddressPropertiesRoundTrip ()
+	{
+		$ip = '198.51.100.20';
+		$ip_bin = ip4_parse ($ip);
+		$cases = array
+		(
+			'A & B <c> "d" \'e\' &amp; f',
+			'R&D',
+			self::RAW,
+		);
+		foreach ($cases as $typed)
+			foreach (array ($typed, htmlspecialchars ($typed, ENT_QUOTES, 'UTF-8')) as $stored)
+			{
+				updateAddress ($ip_bin, $stored, 'no', $stored);
+				for ($cycle = 1; $cycle <= 3; $cycle++)
+				{
+					$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
+					$name = $this->addressFormValue ($output, 'name');
+					$comment = $this->addressFormValue ($output, 'comment');
+					$this->assertSame ($typed, $name, "name shown, cycle {$cycle}, stored '{$stored}'");
+					$this->assertSame ($typed, $comment, "comment shown, cycle {$cycle}, stored '{$stored}'");
+					$this->saveAddressForm ($ip, $name, $comment);
+					$address = getIPAddress ($ip_bin);
+					$this->assertSame ($typed, $address['name'], "name stored, cycle {$cycle}, stored '{$stored}'");
+					$this->assertSame ($typed, $address['comment'], "comment stored, cycle {$cycle}, stored '{$stored}'");
+				}
+			}
+		// The one ambiguous case: text that is exactly the escaped form of
+		// another text is shown and saved as that text.
+		updateAddress ($ip_bin, '&amp;', 'no', '');
+		$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
+		$this->assertSame ('&', $this->addressFormValue ($output, 'name'));
+	}
+
+	// address name and comment in the change log of an address
+	/**
+	 * @group small
+	 */
+	public function testAddressLog ()
+	{
+		$ip_bin = ip4_parse ('198.51.100.20');
+		updateAddress ($ip_bin, self::RAW, 'no', self::RAW);
+		$output = getOutputOf ('renderIPAddressLog', $ip_bin);
+		$this->assertEscaped ('Name set to &#039;', '&#039;', $output);
+		$this->assertEscaped ('comment set to &#039;', '&#039;', $output);
+	}
+
+	protected function addNATRule ()
+	{
+		$this->nets4[] = createIPv4Prefix ('198.51.100.0/24', $this->myString ('net'));
+		$object_id = $this->addObject ($this->myString ('router'), 7);
+		bindIPToObject (ip4_parse ('198.51.100.10'), $object_id, 'eth0', 'regular');
+		updateAddress (ip4_parse ('198.51.100.10'), self::RAW, 'no', '');
+		updateAddress (ip4_parse ('198.51.100.20'), self::RAW, 'no', '');
+		usePreparedInsertBlade
+		(
+			'IPv4NAT',
+			array
+			(
+				'object_id' => $object_id,
+				'proto' => 'TCP',
+				'localip' => ip4_bin2db (ip4_parse ('198.51.100.10')),
+				'localport' => 80,
+				'remoteip' => ip4_bin2db (ip4_parse ('198.51.100.20')),
+				'remoteport' => 80,
+				'description' => '',
+			)
+		);
+		return $object_id;
+	}
+
+	// local and remote address names of a NAT rule on the object page
+	/**
+	 * @group small
+	 */
+	public function testNATAddressNamesOnObjectPage ()
+	{
+		global $pageno, $tabno;
+		$object_id = $this->addNATRule();
+		$pageno = 'object';
+		$tabno = 'default';
+		$this->setArg ('object_id', $object_id);
+		$this->assertEscaped ("<td class='description tdleft'>(", ')</td>', getOutputOf ('renderObject', $object_id));
+	}
+
+	// local and remote address names of a NAT rule on the NAT tab
+	// (renderNATv4ForObject() declares a nested function of the same name as
+	// renderIPAddressAllocations() does)
+	/**
+	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function testNATAddressNames ()
+	{
+		global $pageno, $tabno;
+		$object_id = $this->addNATRule();
+		$pageno = 'object';
+		$tabno = 'nat4';
+		$this->setArg ('object_id', $object_id);
+		$output = getOutputOf ('renderNATv4ForObject', $object_id);
+		$this->assertEscaped (':80 (', ')</td>', $output);
+		$this->assertEscaped ("<td class='description'>(", ')', $output);
+	}
+
+	// port reservation comment on the 802.1Q ports tab
+	/**
+	 * @group small
+	 */
+	public function testObject8021QPortsReservation ()
+	{
+		global $pageno, $tabno;
+		list ($object_id, $default_port) = $this->add8021QSwitch();
+		foreach (getObjectPortsAndLinks ($object_id, FALSE) as $port)
+			commitUpdatePortComment ($port['id'], self::RAW);
+		$pageno = 'object';
+		$tabno = '8021qports';
+		$this->setArg ('object_id', $object_id);
+		$this->assertEscaped ("'>", '</span>', getOutputOf ('renderObject8021QPorts', $object_id));
+	}
+
+	protected function addRSPool ()
+	{
+		$this->pool_id = commitCreateRSPool (self::RAW, '</textarea>' . self::RAW, '</textarea>' . self::RAW);
+		addRStoRSPool ($this->pool_id, ip4_parse ('198.51.100.30'), 80, 'yes', '</textarea>' . self::RAW, self::RAW);
+	}
+
+	// real server comment and configuration in the RS list editor, RS pool
+	// name and configuration in the RS pool editor
+	/**
+	 * @group small
+	 */
+	public function testRSPoolEditors ()
+	{
+		global $pageno, $tabno, $taglist;
+		$this->addRSPool();
+		$pageno = 'ipv4rspool';
+		$tabno = 'editrslist';
+		$this->setArg ('pool_id', $this->pool_id);
+		$output = getOutputOf ('renderEditRSList', getRSListInPool ($this->pool_id));
+		$this->assertEscaped ("name=comment size=15 value='", "'>", $output);
+		$this->assertStringContainsString ('<textarea name=rsconfig>&lt;/textarea&gt;' . self::ESCAPED . '</textarea>', $output);
+		$this->assertStringNotContainsString (self::RAW, $output);
+
+		$tabno = 'edit';
+		// See testSLBNameAndConfig() for the tag picker.
+		$saved_taglist = $taglist;
+		$taglist = array();
+		$output = getOutputOf ('renderEditRSPool', $this->pool_id);
+		$taglist = $saved_taglist;
+		$this->assertEscaped ("name=name value='", "'>", $output);
+		foreach (array ('vsconfig', 'rsconfig') as $name)
+			$this->assertStringContainsString ("<textarea name={$name} rows=20 cols=80>&lt;/textarea&gt;" . self::ESCAPED . '</textarea>', $output);
+		$this->assertStringNotContainsString (self::RAW, $output);
+	}
+
+	// RS pool name and real server configuration on the RS pool page and in
+	// the real server list
+	/**
+	 * @group small
+	 */
+	public function testRSPoolPages ()
+	{
+		global $pageno, $tabno;
+		$this->addRSPool();
+		$pageno = 'ipv4rspool';
+		$tabno = 'default';
+		$this->setArg ('pool_id', $this->pool_id);
+		$this->assertEscaped ('Pool name:</th><td class=tdleft>', '</td>', getOutputOf ('renderRSPool', $this->pool_id));
+
+		$pageno = 'ipv4slb';
+		$tabno = 'rservers';
+		$output = getOutputOf ('renderRealServerList');
+		$this->assertEscaped ('pool_id=' . $this->pool_id . '">', '</a>', $output);
+		$this->assertStringContainsString ('<pre>&lt;/textarea&gt;' . self::ESCAPED . '</pre>', $output);
+	}
+
+	// VS and RS configuration on the page of a virtual service
+	/**
+	 * @group small
+	 */
+	public function testVServiceConfig ()
+	{
+		global $pageno, $tabno;
+		usePreparedInsertBlade
+		(
+			'IPv4VS',
+			array
+			(
+				'vip' => ip4_parse ('198.51.100.7'),
+				'vport' => 80,
+				'proto' => 'TCP',
+				'name' => $this->myString ('vs'),
+				'vsconfig' => self::RAW,
+				'rsconfig' => self::RAW,
+			)
+		);
+		$this->vs4_id = lastInsertID();
+		$pageno = 'ipv4vs';
+		$tabno = 'default';
+		$this->setArg ('vs_id', $this->vs4_id);
+		$output = getOutputOf ('renderVirtualService', $this->vs4_id);
+		$this->assertEscaped ('<div class="dashed slbconf">', '</div>', $output);
+		$this->assertStringNotContainsString (self::RAW, $output);
+	}
+
+	// name of a load balancer in an SLB cell
+	/**
+	 * @group small
+	 */
+	public function testSLBEntityCellObjectName ()
+	{
+		$object_id = $this->addObject (self::RAW, 4);
+		$output = getOutputOf ('renderSLBEntityCell', spotEntity ('object', $object_id));
+		$this->assertEscaped ("object_id={$object_id}'>", '</a>', $output);
+	}
+
+	// the value of a select with a single option
+	/**
+	 * @group small
+	 */
+	public function testSelectSingleOptionValue ()
+	{
+		$output = getSelect (array (self::RAW => 'a'), array ('name' => 'x'));
+		$this->assertEscaped ("<input type=hidden name=x id=x value='", "'>", $output);
+	}
+
+	// the preselected tags of a tag picker
+	/**
+	 * @group small
+	 */
+	public function testTagsPickerPreselect ()
+	{
+		$preselect = array
+		(
+			array ('id' => 1, 'tag' => self::RAW, 'description' => '', 'time' => NULL, 'user' => self::RAW),
+		);
+		$output = getOutputOf ('printTagsPickerUl', 'taglist', $preselect);
+		$this->assertEquals (1, preg_match ("/data-tagit-preselect='([^']*)'/", $output, $m));
+		$decoded = json_decode (html_entity_decode ($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), TRUE);
+		$this->assertIsArray ($decoded);
+		$this->assertSame (self::RAW, $decoded[0]['tag']);
+		$this->assertSame (self::RAW, $decoded[0]['user']);
+	}
+
+	// the current page and tab in the search form
+	// (showPathAndSearch() declares a nested function)
+	/**
+	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function testSearchFormPageAndTab ()
+	{
+		global $pageno, $tabno;
+		$pageno = 'index';
+		// what transformRequestData() leaves of a tab name in the URL
+		$tabno = htmlspecialchars ('x onmouseover=alert(1) \'"<>', ENT_QUOTES, 'UTF-8');
+		$output = getOutputOf ('showPathAndSearch', $pageno, $tabno);
+		$this->assertStringContainsString ("<input type=hidden name=last_page value='index'>", $output);
+		$this->assertStringContainsString ("<input type=hidden name=last_tab value='{$tabno}'>", $output);
+	}
+
+	public function providerWikiLinks ()
+	{
+		return array
+		(
+			array ('http://example.com/a?b=1', TRUE),
+			array ('HTTPS://example.com/', TRUE),
+			array ('ftp://example.com/file', TRUE),
+			array ('mailto:noc@example.com', TRUE),
+			array ('ssh://host.example.com', TRUE),
+			array ('telnet://host.example.com', TRUE),
+			array ('rdp://host.example.com', TRUE),
+			array ('vnc://host.example.com:5901', TRUE),
+			array ('//example.com/path', TRUE),
+			array ('/path/page.html', TRUE),
+			array ('index.php?page=object&object_id=1', TRUE),
+			array ('docs/a:b', TRUE),
+			array ('javascript:alert(1)', FALSE),
+			array ('JavaScript:alert(1)', FALSE),
+			array (" \x01javascript:alert(1)", FALSE),
+			array ("java\tscript:alert(1)", FALSE),
+			array ("java\rscript:alert(1)", FALSE),
+			array ('vbscript:msgbox(1)', FALSE),
+			array ('data:text/html,<b>x</b>', FALSE),
+			array ('file:///etc/passwd', FALSE),
+			array ('x:y', FALSE),
+		);
+	}
+
+	// link target of a wiki-style string or dictionary attribute value
+	/**
+	 * @group small
+	 * @dataProvider providerWikiLinks
+	 */
+	public function testWikiLinkTarget ($href, $is_link)
+	{
+		$record = array ('id' => 14, 'type' => 'string', 'value' => "[[text | {$href}]]");
+		parseWikiLink ($record);
+		$output = formatAttributeValue ($record, 4);
+		$link = "<a href='" . htmlspecialchars (trim ($href), ENT_QUOTES, 'UTF-8') . "'>text</a>";
+		if ($is_link)
+			$this->assertSame ($link, $output);
+		else
+			$this->assertSame ('text', $output);
+
+		$record = array ('id' => 2, 'type' => 'dict', 'key' => 1, 'value' => "[[text | {$href}]]");
+		parseWikiLink ($record);
+		$output = formatAttributeValue ($record, 1560);
+		if ($is_link)
+			$this->assertStringContainsString ("<a class='img-link' href='" . htmlspecialchars (trim ($href), ENT_QUOTES, 'UTF-8') . "'>", $output);
+		else
+		{
+			$this->assertSame ('text', $output);
+			$this->assertStringNotContainsString ('<a', $output);
+		}
 	}
 }
