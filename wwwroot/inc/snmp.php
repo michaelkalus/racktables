@@ -2625,6 +2625,12 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'text' => 'ME-C3750-24TE-M: 24 RJ-45/10-100TX + 4 SFP/1000',
 		'processors' => array ('catalyst-stack-any-SFP', 'catalyst-stack-any-100TX'),
 	),
+	'9.1.578' => array
+	(
+		'dict_key' => 282,
+		'text' => 'Cisco 2851 ISR: 2 RJ-45/10-100-1000T(X)',
+		'processors' => array ('catalyst-chassis-any-1000T'),
+	),
 	'9.1.614' => array
 	(
 		'dict_key' => 175,
