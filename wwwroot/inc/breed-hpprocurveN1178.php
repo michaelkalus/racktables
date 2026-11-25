@@ -95,7 +95,7 @@ function hpprocurveN1178ReadInterfaceStatus ($text)
 			if (! isset($rest))
 				$rest = NULL;
 
-			$field_list = preg_split ('/\s+/', $rest);
+			$field_list = preg_split ('/\s+/', (string) $rest);
 			if (count ($field_list) < 4)
 				break;
 			list ($type, $delim, $alert, $adm_status, $status_raw, $mode) = $field_list;

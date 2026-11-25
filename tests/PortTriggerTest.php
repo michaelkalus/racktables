@@ -5,6 +5,14 @@
 
 class PortTriggerTest extends RTTestCase
 {
+	private $object1_id;
+	private $object2_id;
+	private $port1_1_id;
+	private $port1_2_id;
+	private $port1_3_id;
+	private $port1_4_id;
+	private $port2_1_id;
+
 	public function setUp () : void
 	{
 		$this->object1_id = commitAddObject ($this->myString ('object 1'), NULL, 1, NULL);
