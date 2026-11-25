@@ -158,15 +158,6 @@ $opspec_list['object-editrspvs-updLB'] = array
 		array ('url_argname' => 'vs_id', 'assertion' => 'natural'),
 	),
 );
-$opspec_list['ipv4rspool-editrslist-delRS'] = array
-(
-	'table' => 'IPv4RS',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'id', 'assertion' => 'natural'),
-	),
-);
 $opspec_list['parentmap-edit-add'] = array
 (
 	'table' => 'ObjectParentCompat',
@@ -1717,11 +1708,27 @@ function updateSLBDefConfig ()
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 
+// Remove a real server of the current RS pool (the one the permissions have
+// been checked for), and nothing else.
+function deleteRealServer ()
+{
+	setFuncMessages (__FUNCTION__, array ('OK' => 49));
+	$rs_id = genericAssertion ('id', 'natural');
+	if (usePreparedDeleteBlade ('IPv4RS', array ('id' => $rs_id, 'rspool_id' => getBypassValue())) != 1)
+		throw new InvalidRequestArgException ('id', $rs_id, 'not a real server of this RS pool');
+	showFuncMessage (__FUNCTION__, 'OK');
+}
+
+// Update a real server of the current RS pool (the one the permissions have
+// been checked for), and nothing else.
 function updateRealServer ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
+	$rs_id = genericAssertion ('rs_id', 'natural');
+	if (! array_key_exists ($rs_id, getRSListInPool (getBypassValue())))
+		throw new InvalidRequestArgException ('rs_id', $rs_id, 'not a real server of this RS pool');
 	commitUpdateRS (
-		genericAssertion ('rs_id', 'natural'),
+		$rs_id,
 		genericAssertion ('rsip', 'inet'),
 		genericAssertion ('rsport', 'string0'),
 		isCheckSet ('inservice', 'yesno'),
@@ -1866,6 +1873,26 @@ function removePortFromVS()
 		showNotice ("Nothing changed");
 }
 
+// The triplet operations are available on the pages of the load balancer,
+// the VS group and the RS pool. Make sure the triplet in the request belongs
+// to the entity of the current page (the one the permissions have been
+// checked for).
+function assertTripletOfCurrentEntity ($key_fields)
+{
+	$fieldname = array
+	(
+		'object' => 'object_id',
+		'ipvs' => 'vs_id',
+		'ipv4rspool' => 'rspool_id',
+	);
+	$realm = etypeByPageno();
+	if (! array_key_exists ($realm, $fieldname))
+		throw new InvalidArgException ('realm', $realm);
+	$field = $fieldname[$realm];
+	if ($key_fields[$field] != getBypassValue())
+		throw new InvalidRequestArgException ($field, $key_fields[$field], 'must be the current ' . $realm);
+}
+
 function updateTripletConfig()
 {
 	global $op;
@@ -1875,6 +1902,7 @@ function updateTripletConfig()
 		'vs_id' => genericAssertion ('vs_id', 'natural'),
 		'rspool_id' => genericAssertion ('rspool_id', 'natural'),
 	);
+	assertTripletOfCurrentEntity ($key_fields);
 	$config_fields = array
 	(
 		'vsconfig' => nullIfEmptyStr (assertStringArg ('vsconfig', TRUE)),
@@ -1976,6 +2004,7 @@ function removeTriplet()
 		'vs_id' => genericAssertion ('vs_id', 'natural'),
 		'rspool_id' => genericAssertion ('rspool_id', 'natural'),
 	);
+	assertTripletOfCurrentEntity ($key_fields);
 
 	global $dbxlink;
 	$dbxlink->beginTransaction();
@@ -1991,6 +2020,7 @@ function createTriplet()
 	$object_id = genericAssertion ('object_id', 'natural');
 	$vs_id = genericAssertion ('vs_id', 'natural');
 	$rspool_id = genericAssertion ('rspool_id', 'natural');
+	assertTripletOfCurrentEntity (array ('object_id' => $object_id, 'vs_id' => $vs_id, 'rspool_id' => $rspool_id));
 	$vips = genericAssertion ('enabled_vips', 'array0');
 	$ports = genericAssertion ('enabled_ports', 'array0');
 
