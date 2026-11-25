@@ -5957,6 +5957,10 @@ function isIPNetworkEmpty (&$netinfo)
 	return ($netinfo['own_addrc'] <= $pure_auto);
 }
 
+// PHP 8.5 provides array_first() and array_last() with the same behaviour,
+// declare them only for earlier PHP versions.
+if (! function_exists ('array_first'))
+{
 // returns the first element of given array, or NULL if array is empty
 function array_first ($array)
 {
@@ -5964,13 +5968,17 @@ function array_first ($array)
 	if (count ($single))
 		return $single[0];
 }
+}
 
+if (! function_exists ('array_last'))
+{
 // returns the last element of given array, or NULL if array is empty
 function array_last ($array)
 {
 	$single = array_slice (array_values ($array), -1, 1);
 	if (count ($single))
 		return $single[0];
+}
 }
 
 // FIXME: Remove this function at some point because it is a reimplementation
