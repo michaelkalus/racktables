@@ -2501,13 +2501,15 @@ function bindIPv6ToObject ($ip_bin, $object_id = 0, $name = '', $type = '')
 // Return the id of the smallest IP network containing the given IP address
 // or NULL, if nothing was found. When finding the covering network for
 // another network, it is important to filter out matched records with longer
-// masks (they aren't going to be the right pick).
+// masks (they aren't going to be the right pick). Only networks with a mask
+// shorter than $masklen match, so the default is one more than the address
+// length to include /32 (/128) networks.
 function getIPAddressNetworkId ($ip_bin, $masklen = NULL)
 {
 	switch (strlen ($ip_bin))
 	{
-		case 4:  return getIPv4AddressNetworkId ($ip_bin, isset ($masklen) ? $masklen : 32);
-		case 16: return getIPv6AddressNetworkId ($ip_bin, isset ($masklen) ? $masklen : 128);
+		case 4:  return getIPv4AddressNetworkId ($ip_bin, isset ($masklen) ? $masklen : 33);
+		case 16: return getIPv6AddressNetworkId ($ip_bin, isset ($masklen) ? $masklen : 129);
 		default: throw new InvalidArgException ('ip_bin', $ip_bin, "Invalid binary IP");
 	}
 }
@@ -2531,7 +2533,7 @@ function spotNetworkByIP ($ip_bin, $masklen = NULL)
 // or NULL, if nothing was found. When finding the covering network for
 // another network, it is important to filter out matched records with longer
 // masks (they aren't going to be the right pick).
-function getIPv4AddressNetworkId ($ip_bin, $masklen = 32)
+function getIPv4AddressNetworkId ($ip_bin, $masklen = 33)
 {
 	$row = callHook ('fetchIPv4AddressNetworkRow', $ip_bin, $masklen);
 	return $row === NULL ? NULL : $row['id'];
@@ -2542,15 +2544,15 @@ function fetchIPAddressNetworkRow ($ip_bin, $masklen = NULL)
 	switch (strlen ($ip_bin))
 	{
 	case 4:
-		return callHook ('fetchIPv4AddressNetworkRow', $ip_bin, isset ($masklen) ? $masklen : 32);
+		return callHook ('fetchIPv4AddressNetworkRow', $ip_bin, isset ($masklen) ? $masklen : 33);
 	case 16:
-		return callHook ('fetchIPv6AddressNetworkRow', $ip_bin, isset ($masklen) ? $masklen : 128);
+		return callHook ('fetchIPv6AddressNetworkRow', $ip_bin, isset ($masklen) ? $masklen : 129);
 	default:
 		throw new InvalidArgException ('ip_bin', $ip_bin, "Invalid binary address");
 	}
 }
 
-function fetchIPv4AddressNetworkRow ($ip_bin, $masklen = 32)
+function fetchIPv4AddressNetworkRow ($ip_bin, $masklen = 33)
 {
 	$ip_db = ip4_bin2db ($ip_bin);
 	$result = usePreparedSelectBlade
@@ -2565,13 +2567,13 @@ function fetchIPv4AddressNetworkRow ($ip_bin, $masklen = 32)
 
 // Return the id of the smallest IPv6 network containing the given IPv6 address
 // ($ip is an instance of IPv4Address class) or NULL, if nothing was found.
-function getIPv6AddressNetworkId ($ip_bin, $masklen = 128)
+function getIPv6AddressNetworkId ($ip_bin, $masklen = 129)
 {
 	$row = callHook ('fetchIPv6AddressNetworkRow', $ip_bin, $masklen);
 	return $row === NULL ? NULL : $row['id'];
 }
 
-function fetchIPv6AddressNetworkRow ($ip_bin, $masklen = 128)
+function fetchIPv6AddressNetworkRow ($ip_bin, $masklen = 129)
 {
 	$result = usePreparedSelectBlade
 	(

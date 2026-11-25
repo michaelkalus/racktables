@@ -5563,7 +5563,15 @@ function dynamic_title_decoder_throwing ($path_position)
 		switch ($pageno)
 		{
 			case 'ipaddress':
-				$net = spotNetworkByIP (ip_parse ($_REQUEST['ip']));
+				$ip_bin = ip_parse ($_REQUEST['ip']);
+				$net = spotNetworkByIP ($ip_bin);
+				// The address may be outside of any network (IPV4_JAYWALK).
+				if ($net === NULL)
+					return array
+					(
+						'name' => 'no network',
+						'params' => array ('page' => strlen ($ip_bin) == 16 ? 'ipv6space' : 'ipv4space'),
+					);
 				$ret = array
 				(
 					'name' => $net['ip'] . '/' . $net['mask'],
