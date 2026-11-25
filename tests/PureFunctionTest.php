@@ -573,6 +573,10 @@ class PureFunctionTest extends RTTestCase
 		unset ($ten_kilo_less_3[1562]);
 		return array
 		(
+			// The content of a textarea is posted back and must keep the text
+			// exactly as stored, so every ampersand is escaped.
+			array ('stringForTextarea', '&lt;b&gt; & <b>', '&amp;lt;b&amp;gt; &amp; &lt;b&gt;'),
+
 			// coalescing functions
 			array ('nullIfEmptyStr', 'abc', 'abc'),
 			array ('nullIfEmptyStr', '', NULL), // intended use case: '' == ''
@@ -1703,6 +1707,34 @@ class PureFunctionTest extends RTTestCase
 				array ('object_name' => 'server a', 'port_name' => 'port a', 'ip' => '10.0.0.1'),
 				0
 			),
+
+			// The display helpers escape markup and quotes, but leave alone the
+			// character references of text that is stored already escaped.
+			array ('stringForLabel', 'R&D "prod" <x>', 0, 'R&amp;D &quot;prod&quot; &lt;x&gt;'),
+			array ('stringForLabel', 'R&amp;D &quot;prod&quot; &lt;x&gt;', 0, 'R&amp;D &quot;prod&quot; &lt;x&gt;'),
+			array ('stringForLabel', 'O&#039;Brien', 0, 'O&#039;Brien'),
+			array ('stringForLabel', 'a&amp;b & c <d> \'e\'', 0, 'a&amp;b &amp; c &lt;d&gt; &#039;e&#039;'),
+			array ('stringForLabel', '&amp;amp;', 0, '&amp;amp;'),
+			array ('stringForLabel', '&amp;lt;', 0, '&amp;lt;'),
+			array ('stringForLabel', '&#60;&#x3C;&#X3c;&nbsp;&hellip;', 0, '&#60;&#x3C;&#X3c;&nbsp;&hellip;'),
+			// malformed or unknown references are escaped
+			array ('stringForLabel', '&lt &#x3c &#60 &; &#; &#x;', 0, '&amp;lt &amp;#x3c &amp;#60 &amp;; &amp;#; &amp;#x;'),
+			array ('stringForLabel', '&apos;&AMP;&bogus;&#1114112;', 0, '&amp;apos;&amp;AMP;&amp;bogus;&amp;#1114112;'),
+			array ('stringForLabel', '&' . str_repeat ('a', 40) . ';', 0, '&amp;' . str_repeat ('a', 40) . ';'),
+			array ('stringForLabel', "a\xffb", 0, ''),
+			// truncation cuts a reference in half, the rest of it is escaped
+			array ('stringForLabel', 'ab&amp;cd', 5, "<span title='ab&amp;cd'>ab&amp;a&hellip;</span>"),
+			array ('stringForLabel', 'a &lt;b&gt;', 6, "<span title='a &lt;b&gt;'>a&nbsp;&amp;lt&hellip;</span>"),
+			array ('stringForLabel', 'a &lt;b&gt;', 7, "<span title='a &lt;b&gt;'>a&nbsp;&lt;&hellip;</span>"),
+			array ('stringForTD', 'R&amp;D <x>', 0, 'R&amp;D &lt;x&gt;'),
+			array ('stringForTD', '', 0, '&nbsp;'),
+			array ('stringForOption', 'R&amp;D "prod" <x>', 0, 'R&amp;D &quot;prod&quot; &lt;x&gt;'),
+			array ('stringForOption', '&lt;x&gt;yz', 4, '&amp;lt&hellip;'),
+			array ('stringForOption', '&lt;x&gt;yz', 5, '&lt;&hellip;'),
+			// The values of form fields are posted back and must keep the text
+			// exactly as stored, so these helpers escape every ampersand.
+			array ('stringForTextInputValue', 'R&amp;D "prod" <x>', 0, 'R&amp;amp;D &quot;prod&quot; &lt;x&gt;'),
+			array ('stringForTextInputValue', 'R&amp;D', 4, 'R&amp;am'),
 		);
 	}
 
