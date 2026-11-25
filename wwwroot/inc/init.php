@@ -14,17 +14,17 @@
 *
 */
 
-require_once 'pre-init.php';
-require_once 'config.php';
-require_once 'functions.php';
-require_once 'database.php';
-require_once 'auth.php';
-require_once 'navigation.php';
-require_once 'triggers.php';
-require_once 'remote.php';
-require_once 'caching.php';
-require_once 'slb.php';
-require_once 'slbv2.php';
+require_once __DIR__ . '/pre-init.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/navigation.php';
+require_once __DIR__ . '/triggers.php';
+require_once __DIR__ . '/remote.php';
+require_once __DIR__ . '/caching.php';
+require_once __DIR__ . '/slb.php';
+require_once __DIR__ . '/slbv2.php';
 
 // secret.php may be missing, in which case this is a special fatal error
 if (! fileSearchExists ($path_to_secret_php))

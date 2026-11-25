@@ -10,8 +10,8 @@
 *
 */
 
-require_once 'ajax-interface.php';
-require_once 'slb-interface.php';
+require_once __DIR__ . '/ajax-interface.php';
+require_once __DIR__ . '/slb-interface.php';
 
 // Interface function's special.
 $nextorder['odd'] = 'even';
