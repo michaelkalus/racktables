@@ -1338,15 +1338,16 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN rack_id int(10) unsigned NOT NULL";
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN unit_no int(10) unsigned NOT NULL";
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN atom enum('front','interior','rear') NOT NULL";
-			$query[] = "ALTER TABLE Atom ADD PRIMARY KEY (molecule_id, rack_id, unit_no, atom)";
-			$query[] = "ALTER TABLE Atom DROP KEY `Atom-FK-molecule_id`";
+			// The index for the foreign key is dropped in the same statement because
+			// the server drops an index that it created implicitly for a foreign key
+			// (as the 0.20.1 batch did) as soon as another index can serve the key.
+			$query[] = "ALTER TABLE Atom ADD PRIMARY KEY (molecule_id, rack_id, unit_no, atom), DROP KEY `Atom-FK-molecule_id`";
 			$query[] = "UPDATE Config SET varvalue = '0.21.1' WHERE varname = 'DB_VERSION'";
 			break;
 		case '0.21.2':
-			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `old_molecule_id` (old_molecule_id)";
-			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `new_molecule_id` (new_molecule_id)";
-			$query[] = "ALTER TABLE MountOperation DROP KEY `MountOperation-FK-old_molecule_id`";
-			$query[] = "ALTER TABLE MountOperation DROP KEY `MountOperation-FK-new_molecule_id`";
+			// Same as for Atom in the 0.21.1 batch.
+			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `old_molecule_id` (old_molecule_id), DROP KEY `MountOperation-FK-old_molecule_id`";
+			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `new_molecule_id` (new_molecule_id), DROP KEY `MountOperation-FK-new_molecule_id`";
 			$query[] = "ALTER TABLE IPv4Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "ALTER TABLE IPv6Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "INSERT INTO Chapter (`id`, `sticky`, `name`) VALUES (39,'no','UPS models')";
