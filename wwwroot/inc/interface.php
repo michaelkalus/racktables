@@ -690,7 +690,7 @@ function renderRow ($row_id)
 			$record['value'] != '' &&
 			permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $record['id'])))
 		)
-			$summary['{sticker}' . $record['name']] = formatAttributeValue ($record, 1561);
+			$summary['{sticker}' . stringForLabel ($record['name'], 0)] = formatAttributeValue ($record, 1561);
 
 	// Main layout starts.
 	echo "<table border=0 class=objectview cellspacing=0 cellpadding=0>";
@@ -1270,7 +1270,7 @@ function populateRackPower ($rackData, &$summary)
 	}
 	foreach ($sum as $attr)
 		if ($attr['sum'] > 0.0)
-			$summary[$attr['name']] = $attr['sum'];
+			$summary[stringForLabel ($attr['name'], 0)] = $attr['sum'];
 }
 
 // used by renderGridForm() and renderRackPage()
@@ -1294,7 +1294,7 @@ function renderRackInfoPortlet ($rackData)
 			$record['value'] != '' &&
 			permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $record['id'])))
 		)
-			$summary['{sticker}' . $record['name']] = formatAttributeValue ($record, 1560);
+			$summary['{sticker}' . stringForLabel ($record['name'], 0)] = formatAttributeValue ($record, 1560);
 	$summary['% used'] = getProgressBar (getRSUforRack ($rackData));
 	$summary['Objects'] = count ($rackData['mountedObjects']);
 	$summary['tags'] = '';
@@ -1379,8 +1379,8 @@ function renderObjectPortRow ($port, $is_highlighted)
 	if ($is_highlighted)
 		echo ' class=highlight';
 	$a_class = isEthernetPort ($port) ? 'port-menu' : '';
-	echo "><td class='tdleft $name_class' NOWRAP><a name='port-{$port['id']}' class='interactive-portname nolink $a_class'>{$port['name']}</a></td>";
-	echo "<td class=tdleft>{$port['label']}</td>";
+	echo "><td class='tdleft $name_class' NOWRAP><a name='port-{$port['id']}' class='interactive-portname nolink $a_class' data-portname='" . htmlspecialchars ($port['name'], ENT_QUOTES, 'UTF-8') . "'>" . stringForLabel ($port['name'], 0) . "</a></td>";
+	echo '<td class=tdleft>' . stringForLabel ($port['label'] ?? '', 0) . '</td>';
 	echo "<td class=tdleft>" . formatPortIIFOIF ($port) . "</td><td class='tdleft l2address'>{$port['l2address']}</td>";
 	if ($port['remote_object_id'])
 	{
@@ -1392,7 +1392,7 @@ function renderObjectPortRow ($port, $is_highlighted)
 		$editable = permitted ('object', 'ports', 'editPort')
 			? 'editable'
 			: '';
-		echo "<td class=tdleft><span class='rsvtext $editable id-{$port['id']} op-upd-reservation-cable'>{$port['cableid']}</span></td>";
+		echo "<td class=tdleft><span class='rsvtext $editable id-{$port['id']} op-upd-reservation-cable'>" . stringForLabel ($port['cableid'] ?? '', 0) . '</span></td>';
 	}
 	else
 		echo implode ('', formatPortReservation ($port)) . '<td></td>';
@@ -1459,7 +1459,7 @@ function renderObject ($object_id)
 			$record['value'] != '' &&
 			permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $record['id'])))
 		)
-			$summary['{sticker}' . $record['name']] = formatAttributeValue ($record, $info['objtype_id']);
+			$summary['{sticker}' . stringForLabel ($record['name'], 0)] = formatAttributeValue ($record, $info['objtype_id']);
 	$summary[] = array (getOutputOf ('printTagTRs',
 		$info,
 		makeHref
@@ -1738,8 +1738,8 @@ function renderPortsForObject ($object_id)
 		printImageHREF ('delete', 'Unlink and Delete this port');
 		echo "</a></td>\n";
 		$a_class = isEthernetPort ($port) ? 'port-menu' : '';
-		echo "<td class='tdleft $name_class' NOWRAP><input type=text name=name class='interactive-portname $a_class' value='{$port['name']}' size=16></td>";
-		echo "<td><input type=text name=label value='{$port['label']}'></td>";
+		echo "<td class='tdleft $name_class' NOWRAP><input type=text name=name class='interactive-portname $a_class' data-portname='" . htmlspecialchars ($port['name'], ENT_QUOTES, 'UTF-8') . "' value='" . stringForTextInputValue ($port['name'], 0) . "' size=16></td>";
+		echo "<td><input type=text name=label value='" . stringForTextInputValue ($port['label'] ?? '', 0) . "'></td>";
 		echo '<td class=tdleft>';
 		if ($port['iif_id'] != 1)
 			echo '<label>' . $port['iif_name'] . ' ';
@@ -1764,7 +1764,7 @@ function renderPortsForObject ($object_id)
 				"</td>";
 			echo "<td class=tdleft> " . formatLoggedSpan ($port['last_log'], $port['remote_name'], 'underline') .
 				"<input type=hidden name=reservation_comment value=''></td>";
-			echo "<td><input type=text name=cable value='{$port['cableid']}'></td>";
+			echo "<td><input type=text name=cable value='" . stringForTextInputValue ($port['cableid'] ?? '', 0) . "'></td>";
 			echo "<td class=tdcenter>";
 			echo getOpLink (array('op'=>'unlinkPort', 'port_id'=>$port['id'], ), '', 'cut', 'Unlink this port');
 			echo "</td>";
@@ -1886,7 +1886,7 @@ JSEND
 		$alloc_list .= "<tr class='{$rendered_alloc['tr_class']}' valign=top>";
 
 		$alloc_list .= "<td>" . getOpLink (array ('op' => 'del', 'ip' => $alloc['addrinfo']['ip']), '', 'delete', 'Delete this IP address') . "</td>";
-		$alloc_list .= "<td class=tdleft><input type='text' name='bond_name' value='{$alloc['osif']}' size=10>" . $rendered_alloc['td_name_suffix'] . "</td>";
+		$alloc_list .= "<td class=tdleft><input type='text' name='bond_name' value='" . stringForTextInputValue ($alloc['osif'], 0) . "' size=10>" . $rendered_alloc['td_name_suffix'] . "</td>";
 		$alloc_list .= $rendered_alloc['td_ip'];
 		if ($ext_ipv4_view == 'yes')
 		{
@@ -3044,8 +3044,8 @@ function renderIPv4NetworkAddresses ($range)
 			&& permitted ('ipaddress', 'properties', 'editAddress')
 			? 'editable'
 			: '';
-		echo "<td><span class='rsvtext $editable id-$dottedquad op-upd-ip-name'>{$addr['name']}</span></td>";
-		echo "<td><span class='rsvtext $editable id-$dottedquad op-upd-ip-comment'>{$addr['comment']}</span></td>";
+		echo "<td><span class='rsvtext $editable id-$dottedquad op-upd-ip-name'>" . stringForLabel ($addr['name'], 0) . '</span></td>';
+		echo "<td><span class='rsvtext $editable id-$dottedquad op-upd-ip-comment'>" . stringForLabel ($addr['comment'], 0) . '</span></td>';
 		echo "<td>";
 		$delim = '';
 		if ( $addr['reserved'] == 'yes')
@@ -3070,7 +3070,7 @@ function renderIPv4NetworkAddresses ($range)
 		foreach ($addr['vsglist'] as $vs_id)
 		{
 			$vs = spotEntity ('ipvs', $vs_id);
-			echo $delim . mkA ($vs['name'], 'ipvs', $vs['id']) . '&rarr;';
+			echo $delim . mkA (stringForLabel ($vs['name'], 0), 'ipvs', $vs['id']) . '&rarr;';
 			$delim = '<br>';
 		}
 		foreach ($addr['rsplist'] as $rsp_id)
@@ -3170,8 +3170,8 @@ function renderIPv6NetworkAddresses ($netinfo)
 			&& permitted ('ipaddress', 'properties', 'editAddress')
 			? 'editable'
 			: '');
-		echo "<td><span class='rsvtext $editable id-{$addr['ip']} op-upd-ip-name'>{$addr['name']}</span></td>";
-		echo "<td><span class='rsvtext $editable id-{$addr['ip']} op-upd-ip-comment'>{$addr['comment']}</span></td><td>";
+		echo "<td><span class='rsvtext $editable id-{$addr['ip']} op-upd-ip-name'>" . stringForLabel ($addr['name'], 0) . '</span></td>';
+		echo "<td><span class='rsvtext $editable id-{$addr['ip']} op-upd-ip-comment'>" . stringForLabel ($addr['comment'], 0) . '</span></td><td>';
 		$delim = '';
 		if ( $addr['reserved'] == 'yes')
 		{
@@ -3195,7 +3195,7 @@ function renderIPv6NetworkAddresses ($netinfo)
 		foreach ($addr['vsglist'] as $vs_id)
 		{
 			$vs = spotEntity ('ipvs', $vs_id);
-			echo $delim . mkA ($vs['name'], 'ipvs', $vs['id']) . '&rarr;';
+			echo $delim . mkA (stringForLabel ($vs['name'], 0), 'ipvs', $vs['id']) . '&rarr;';
 			$delim = '<br>';
 		}
 		foreach ($addr['rsplist'] as $rsp_id)
@@ -3263,9 +3263,9 @@ function renderIPAddress ($ip_bin)
 
 	$summary = array();
 	if ($address['name'] != '')
-		$summary['Name'] = $address['name'];
+		$summary['Name'] = stringForLabel ($address['name'], 0);
 	if ($address['comment'] != '')
-		$summary['Comment'] = $address['comment'];
+		$summary['Comment'] = stringForLabel ($address['comment'], 0);
 	$summary['Reserved'] = $address['reserved'];
 	$summary['Allocations'] = count ($address['allocs']);
 	if (isset ($address['outpf']))
@@ -3458,7 +3458,7 @@ JSEND
 			printOpFormIntro ('upd', array ('object_id' => $bond['object_id']));
 			echo "<td>" . getOpLink (array ('op' => 'del', 'object_id' => $bond['object_id'] ), '', 'delete', 'Unallocate address') . "</td>";
 			echo "<td>" . makeIPAllocLink ($ip_bin, $bond) . "</td>";
-			echo "<td><input type='text' name='bond_name' value='{$bond['name']}' size=10 aid='{$bond['object_id']}'></td><td>";
+			echo "<td><input type='text' name='bond_name' value='" . stringForTextInputValue ($bond['name'], 0) . "' size=10 aid='{$bond['object_id']}'></td><td>";
 			printSelect ($aat, array ('name' => 'bond_type'), $bond['type']);
 			echo "</td><td>";
 			printImageHREF ('save', 'Save changes', TRUE);
@@ -4068,7 +4068,7 @@ function renderLocationPage ($location_id)
 			$record['value'] != '' &&
 			permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $record['id'])))
 		)
-			$summary['{sticker}' . $record['name']] = formatAttributeValue ($record, 1562);
+			$summary['{sticker}' . stringForLabel ($record['name'], 0)] = formatAttributeValue ($record, 1562);
 	$summary['tags'] = '';
 	renderEntitySummary ($locationData, 'Summary', $summary);
 	if ($locationData['comment'] != '')
@@ -5206,9 +5206,9 @@ function renderRouterCell ($ip_bin, $ifname, $cell)
 	$dottedquad = ip_format ($ip_bin);
 	echo "<table class='{$class}'><tr><td rowspan=3>{$dottedquad}";
 	if ($ifname != '')
-		echo '@' . $ifname;
+		echo '@' . stringForLabel ($ifname, 0);
 	echo "</td>";
-	echo "<td><a href='index.php?page=object&object_id={$cell['id']}&hl_ip={$dottedquad}'><strong>{$cell['dname']}</strong></a></td>";
+	echo "<td><a href='index.php?page=object&object_id={$cell['id']}&hl_ip={$dottedquad}'><strong>" . stringForLabel ($cell['dname'], 0) . '</strong></a></td>';
 	echo "</td></tr><tr><td>";
 	printImageHREF ('router');
 	echo "</td></tr><tr><td>";
@@ -5463,21 +5463,21 @@ function dynamic_title_decoder_throwing ($path_position)
 		$chapter_name = isset ($chapters[$chapter_no]) ? $chapters[$chapter_no]['name'] : 'N/A';
 		return array
 		(
-			'name' => "Chapter '{$chapter_name}'",
+			'name' => "Chapter '" . stringForOption ($chapter_name, 0) . "'",
 			'params' => array ('chapter_no' => $chapter_no)
 		);
 	case 'user':
 		$userinfo = spotEntity ('user', genericAssertion ('user_id', 'natural'));
 		return array
 		(
-			'name' => "Local user '" . $userinfo['user_name'] . "'",
+			'name' => "Local user '" . stringForOption ($userinfo['user_name'], 0) . "'",
 			'params' => array ('user_id' => $userinfo['user_id'])
 		);
 	case 'ipv4rspool':
 		$pool_info = spotEntity ('ipv4rspool', genericAssertion ('pool_id', 'natural'));
 		return array
 		(
-			'name' => $pool_info['name'] == '' ? 'ANONYMOUS' : $pool_info['name'],
+			'name' => $pool_info['name'] == '' ? 'ANONYMOUS' : stringForOption ($pool_info['name'], 0),
 			'params' => array ('pool_id' => $pool_info['id'])
 		);
 	case 'ipv4vs':
@@ -5491,14 +5491,14 @@ function dynamic_title_decoder_throwing ($path_position)
 		$vs_info = spotEntity ('ipvs', genericAssertion ('vs_id', 'natural'));
 		return array
 		(
-			'name' => $vs_info['name'],
+			'name' => stringForOption ($vs_info['name'], 0),
 			'params' => array ('vs_id' => $vs_info['id'])
 		);
 	case 'object':
 		$object = spotEntity ('object', genericAssertion ('object_id', 'natural'));
 		return array
 		(
-			'name' => $object['dname'],
+			'name' => stringForOption ($object['dname'], 0),
 			'params' => array ('object_id' => $object['id'])
 		);
 	case 'location':
@@ -5892,7 +5892,7 @@ function renderDiscoveredNeighbors ($object_id)
 				echo "<td rowspan=\"$count\" $td_class NOWRAP>" .
 					($portinfo_local ?
 						formatPortLink ($mydevice['id'], NULL, $portinfo_local['id'], $portinfo_local['name'], 'interactive-portname port-menu') :
-						"<a class='interactive-portname port-menu nolink'>$local_port</a>"
+						"<a class='interactive-portname port-menu nolink' data-portname='" . htmlspecialchars ($local_port, ENT_QUOTES, 'UTF-8') . "'>" . stringForLabel ($local_port, 0) . '</a>'
 					) .
 					($count > 1 ? "<br> ($count neighbors)" : '') .
 					'</td>';

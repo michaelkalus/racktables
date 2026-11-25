@@ -4901,7 +4901,10 @@ function formatPortLink($host_id, $hostname, $port_id, $portname, $a_class = '')
 	if (isset ($hostname))
 		$text_items[] = $hostname;
 	if (isset ($portname))
-		$text_items[] = $portname;
+	{
+		$additional .= ($additional == '' ? '' : ' ') . "data-portname='" . htmlspecialchars ($portname, ENT_QUOTES, 'UTF-8') . "'";
+		$text_items[] = stringForLabel ($portname, 0);
+	}
 
 	return "<a $additional href=\"$href\">" . implode(' ', $text_items) . '</a>';
 }

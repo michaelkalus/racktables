@@ -271,7 +271,7 @@ function renderRSPool ($pool_id)
 
 	echo "<table border=0 class=objectview cellspacing=0 cellpadding=0>";
 	if ($poolInfo['name'] != '')
-		echo "<tr><td colspan=2 align=center><h1>{$poolInfo['name']}</h1></td></tr>";
+		echo '<tr><td colspan=2 align=center><h1>' . stringForLabel ($poolInfo['name'], 0) . '</h1></td></tr>';
 	echo "<tr><td class=pcleft>\n";
 
 	$summary = array();

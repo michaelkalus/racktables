@@ -525,7 +525,7 @@ function renderObject8021QPorts ($object_id)
 			$tdclass .= 'class="border_highlight"';
 			$anchor = "name='port-$hl_port_id'";
 		}
-		echo "<tr class='{$trclass}' valign=top><td{$td_extra} {$tdclass} NOWRAP><a class='interactive-portname port-menu nolink' $anchor>{$port_name}</a></td>" . $socket_columns;
+		echo "<tr class='{$trclass}' valign=top><td{$td_extra} {$tdclass} NOWRAP><a class='interactive-portname port-menu nolink' $anchor data-portname='" . htmlspecialchars ($port_name, ENT_QUOTES, 'UTF-8') . "'>" . stringForLabel ($port_name, 0) . '</a></td>' . $socket_columns;
 		echo "<td{$td_extra}>{$text_left}</td><td class=tdright nowrap{$td_extra}>{$text_right}</td></tr>";
 		if (!array_key_exists ($port_name, $sockets))
 			continue;
@@ -1356,7 +1356,7 @@ END
 			$anchor = "name='port-$hl_port_id'";
 			$td_class = ' border_highlight';
 		}
-		echo "<tr class='{$trclass}'><td class='tdleft{$td_class}' NOWRAP><a class='interactive-portname port-menu nolink' $anchor>{$port_name}</a></td>";
+		echo "<tr class='{$trclass}'><td class='tdleft{$td_class}' NOWRAP><a class='interactive-portname port-menu nolink' $anchor data-portname='" . htmlspecialchars ($port_name, ENT_QUOTES, 'UTF-8') . "'>" . stringForLabel ($port_name, 0) . '</a></td>';
 		if (!count ($radio_attrs))
 		{
 			echo "<td class='tdleft{$left_extra}'>{$left_text}</td>";

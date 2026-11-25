@@ -206,7 +206,12 @@ function applyConfData(data) {
 	});
 }
 
+// Prefer the stored port name the page provides in data-portname over the
+// displayed text, which may be encoded differently.
 function getPortName (element) {
+	var stored = $(element).attr('data-portname');
+	if (stored !== undefined)
+		return stored;
 	if (element.type == 'text')
 		return $(element).val();
 	else
