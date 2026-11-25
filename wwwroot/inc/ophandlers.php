@@ -67,25 +67,6 @@ $opspec_list['object-ports-useup'] = array
 		array ('url_argname' => 'object_id', 'assertion' => 'natural'), # preserve context
 	),
 );
-$opspec_list['object-ports-delPort'] = array
-(
-	'table' => 'Port',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'port_id', 'table_colname' => 'id', 'assertion' => 'natural'),
-		array ('url_argname' => 'object_id', 'assertion' => 'natural'),
-	),
-);
-$opspec_list['object-ports-deleteAll'] = array
-(
-	'table' => 'Port',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'object_id', 'assertion' => 'natural'),
-	),
-);
 $opspec_list['location-log-del'] = array
 (
 	'table' => 'ObjectLog',
@@ -753,6 +734,19 @@ function assertPortOfCurrentObject ($argname)
 	return $port_id;
 }
 
+function deletePortForObject ()
+{
+	if (commitDeletePorts (getBypassValue(), array (assertPortOfCurrentObject ('port_id'))))
+		showOneLiner (49);
+	else
+		showError ('the port does not exist any more');
+}
+
+function deleteAllPortsForObject ()
+{
+	showOneLiner (38, array (commitDeletePorts (getBypassValue())));
+}
+
 function editPortForObject ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
@@ -905,9 +899,29 @@ function addIPAllocation ()
 		return;
 	}
 
-	if($address['reserved'] && $address['name'] != '')
+	// Tell what bindIPToObject() does to the address record. The reserved
+	// flag is 'yes' or 'no', the name may be there without a reservation.
+	$release = getConfigVar ('IPV4_AUTO_RELEASE');
+	$name = $address['name'] == '' ? '' : " \"{$address['name']}\"";
+	if ($release >= 2)
 	{
-		showWarning("IP ".ip_format($ip_bin)." reservation \"".$address['name']."\" is removed");
+		// the whole address record goes
+		$removed = array();
+		if ($address['reserved'] == 'yes')
+			$removed[] = 'reservation';
+		if ($address['name'] != '')
+			$removed[] = 'name' . $name;
+		if ($address['comment'] != '')
+			$removed[] = 'comment';
+		if (count ($removed))
+			showWarning ('IP ' . ip_format ($ip_bin) . ' ' . implode (' and ', $removed) . (count ($removed) > 1 ? ' are' : ' is') . ' removed');
+	}
+	elseif ($address['reserved'] == 'yes')
+	{
+		if ($release >= 1)
+			showWarning ('IP ' . ip_format ($ip_bin) . " reservation{$name} is removed" . ($name == '' ? '' : ', the name is kept'));
+		else
+			showWarning ('IP ' . ip_format ($ip_bin) . " reservation{$name} is kept");
 		//TODO ask to take reserved IP or not !
 	}
 
@@ -3705,12 +3719,19 @@ function tableHandler()
 		$retcode = 48;
 		break;
 	case 'DELETE':
-		usePreparedDeleteBlade
+		// Unlike an UPDATE, which affects no rows when it changes nothing,
+		// a DELETE that affects no rows has found nothing to delete.
+		$deleted = usePreparedDeleteBlade
 		(
 			$opspec['table'],
 			buildOpspecColumns ($opspec, 'arglist'),
 			array_fetch ($opspec, 'conjunction', 'AND')
 		);
+		if (! $deleted)
+		{
+			showError ('no matching record found, nothing was deleted');
+			return;
+		}
 		$retcode = 49;
 		break;
 	case 'UPDATE':

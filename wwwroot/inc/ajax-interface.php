@@ -268,7 +268,7 @@ function updateCableIdAJAX()
 	assertPermission ('object', 'ports', 'editPort');
 	if (! $port_info['linked'])
 		throw new RackTablesError ('Can\'t update cable ID: port is not linked');
-	if ($port_info['reservation_comment'] !== $text)
+	if ($port_info['cableid'] !== nullIfEmptyStr ($text))
 		commitUpdatePortLink ($port_info['id'], $text);
 	echo 'OK';
 }

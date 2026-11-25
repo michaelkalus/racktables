@@ -1924,9 +1924,87 @@ function commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_i
 		)
 	);
 	$notices = $renamed ? rename8021QPort ($object_id, $port_id, $old_name, $port_name) : array();
-	if ($old_reservation_comment !== $port_reservation_comment)
+	// The port may not exist or belong to another object, then the UPDATE
+	// has changed nothing.
+	if ($old_name !== FALSE && $old_reservation_comment !== $port_reservation_comment)
 		addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $old_reservation_comment, $port_reservation_comment));
 	return $notices;
+}
+
+// Delete the given ports of the object (all its ports if $port_ids is NULL)
+// with the 802.1Q configuration stored under their names. The configuration
+// is stored by object ID and port name, so it does not go by ON DELETE
+// CASCADE, and it stays when another port of the object still has the name
+// (see rename8021QPort()). The portConfChanged hooks run after the change has
+// been committed (see call8021QPortHooks()). Returns the number of deleted
+// ports.
+function commitDeletePorts ($object_id, $port_ids = NULL)
+{
+	global $tablemap_8021q;
+	$where = 'object_id = ?';
+	$params = array ($object_id);
+	if ($port_ids !== NULL)
+	{
+		if (! count ($port_ids))
+			return 0;
+		$where .= ' AND id IN(' . questionMarks (count ($port_ids)) . ')';
+		$params = array_merge ($params, $port_ids);
+	}
+	$notices = array();
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
+	{
+		// Take the locks in the order commitUpdatePortReal() takes them.
+		$result = usePreparedSelectBlade ("SELECT name FROM Port WHERE {$where} FOR UPDATE", $params);
+		$names = $result->fetchAll (PDO::FETCH_COLUMN, 0);
+		unset ($result);
+		$ret = 0;
+		if (count ($names))
+		{
+			getVLANSwitchInfo ($object_id, 'FOR UPDATE');
+			$ret = usePreparedExecuteBlade ("DELETE FROM Port WHERE {$where}", $params);
+			foreach (array_unique ($names) as $name)
+			{
+				// The desired configuration of a port cannot exist without the
+				// cached one. The database compares the names with the collation
+				// of the column, which ignores letter case, so it finds the
+				// stored spelling of the name.
+				$result = usePreparedSelectBlade
+				(
+					'SELECT port_name FROM ' . $tablemap_8021q['cached']['pvm'] . ' WHERE object_id = ? AND port_name = ? FOR UPDATE',
+					array ($object_id, $name)
+				);
+				$stored_name = $result->fetchColumn();
+				unset ($result);
+				if ($stored_name === FALSE)
+					continue;
+				$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM Port WHERE object_id = ? AND name = ?', array ($object_id, $stored_name));
+				$found = $result->fetchColumn();
+				unset ($result);
+				if ($found)
+					continue;
+				// The allowed and native VLAN rows go by ON DELETE CASCADE.
+				foreach (array ('desired', 'cached') as $instance)
+					usePreparedDeleteBlade
+					(
+						$tablemap_8021q[$instance]['pvm'],
+						array ('object_id' => $object_id, 'port_name' => $stored_name)
+					);
+				$notices[] = array ($stored_name, NULL);
+			}
+			// An 802.1Q form opened before has the deleted port in it.
+			if (count ($notices))
+				usePreparedExecuteBlade ('UPDATE VLANSwitch SET mutex_rev = mutex_rev + 1 WHERE object_id = ?', array ($object_id));
+		}
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
+	endAtomicChange ($savepoint, TRUE);
+	call8021QPortHooks ($object_id, $notices);
+	return $ret;
 }
 
 function commitUpdatePortComment ($port_id, $port_reservation_comment)

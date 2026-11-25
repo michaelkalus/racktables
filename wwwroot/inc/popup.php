@@ -237,7 +237,8 @@ function handlePopupPortLink()
 		($pageno != 'object' || getBypassValue() != $port_info['object_id'])
 	)
 		throw new InvalidRequestArgException ('port', $port_info['id'], 'not a port of this object');
-	fixContext (spotEntity ('object', $port_info['object_id']));
+	$object = spotEntity ('object', $port_info['object_id']);
+	fixContext ($object);
 	assertPermission ('object', 'ports', 'editPort');
 	$POIFC = getPortOIFCompat();
 	if (isset ($_REQUEST['port_type']) && isset ($_REQUEST['remote_port_type']))
@@ -263,23 +264,41 @@ function handlePopupPortLink()
 
 	if ($matches)
 	{
+		// patch cable?
+		$heap_id = array_key_exists ('heap_id', $_REQUEST) ? genericAssertion ('heap_id', 'uint0') : 0;
+		if ($heap_id != 0)
+		{
+			// Taking a cable from a heap is an operation of the patch cable
+			// heaps page, which has no object in its security context, so
+			// check it with the context of the user alone.
+			global $auto_tags, $expl_tags, $impl_tags, $target_given_tags, $user_given_tags;
+			$saved_context = getContext();
+			$user_auto_tags = array();
+			foreach ($auto_tags as $taginfo)
+				if (! tagNameOnChain ($taginfo['tag'], $object['atags']))
+					$user_auto_tags[] = $taginfo;
+			$auto_tags = $user_auto_tags;
+			$target_given_tags = array();
+			$expl_tags = mergeTagChains ($user_given_tags, $target_given_tags);
+			$impl_tags = getImplicitTags ($expl_tags);
+			$heap_permitted = permitted ('cables', 'amount', 'dec');
+			restoreContext ($saved_context);
+			if (! $heap_permitted)
+				throw new RTPermissionDenied();
+		}
 		if ($port_info['oif_id'] != $type_local)
 			commitUpdatePortOIF ($port_info['id'], $type_local);
 		if ($remote_port_info['oif_id'] != $type_remote)
 			commitUpdatePortOIF ($remote_port_info['id'], $type_remote);
 		linkPorts ($port_info['id'], $remote_port_info['id'], $_REQUEST['cable']);
-		// patch cable?
-		if (array_key_exists ('heap_id', $_REQUEST))
+		if ($heap_id != 0)
 		{
 			// Leave the compatibility constraints check up to the foreign keys.
-			if (0 != $heap_id = genericAssertion ('heap_id', 'uint0'))
-			{
-				$heaps = getPatchCableHeapSummary();
-				if (commitModifyPatchCableAmount ($heap_id, -1))
-					showSuccess ('consumed a patch cable from ' . formatPatchCableHeapAsPlainText ($heaps[$heap_id]));
-				else
-					showError ('failed to consume a patch cable');
-			}
+			$heaps = getPatchCableHeapSummary();
+			if (commitModifyPatchCableAmount ($heap_id, -1))
+				showSuccess ('consumed a patch cable from ' . formatPatchCableHeapAsPlainText ($heaps[$heap_id]));
+			else
+				showError ('failed to consume a patch cable');
 		}
 		showOneLiner
 		(

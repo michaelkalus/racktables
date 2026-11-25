@@ -2,7 +2,8 @@
 
 // The 802.1Q configuration of a port is stored by object ID and port name, so
 // renaming the port must move the configuration to the new name, and a rename
-// that does not take place must not change the configuration.
+// that does not take place must not change the configuration. Deleting the
+// port must delete the configuration as well.
 class PortRename8021QTest extends RTTestCase
 {
 	protected $objects = array();
@@ -47,7 +48,12 @@ class PortRename8021QTest extends RTTestCase
 
 	public function tearDown () : void
 	{
-		global $dbxlink, $hook, $hooks_stack;
+		global $dbxlink, $hook, $hooks_stack, $sic, $pageno, $tabno, $log_messages;
+		foreach (array ('object_id', 'port_id') as $argname)
+			unset ($sic[$argname], $_REQUEST[$argname]);
+		$pageno = 'index';
+		$tabno = 'default';
+		$log_messages = array();
 		$hook = $this->saved_hook;
 		$hooks_stack = $this->saved_hooks_stack;
 		if ($this->hidden_table !== NULL)
@@ -536,5 +542,181 @@ class PortRename8021QTest extends RTTestCase
 		$this->assertEquals ($this->expected (array ('ge-0/0/1')), $this->stored ($object_id));
 		$this->assertFalse (isTransactionActive());
 		$this->assertSessionReleased ($object_id);
+	}
+	// run the ophandler the way index.php?module=redirect does
+	protected function runPortOp ($opname, $object_id, $args = array())
+	{
+		global $sic, $ophandler, $pageno, $tabno, $op;
+		$pageno = 'object';
+		$tabno = 'ports';
+		$op = $opname;
+		foreach (array ('object_id' => $object_id) + $args as $argname => $argvalue)
+			$sic[$argname] = $_REQUEST[$argname] = $argvalue;
+		call_user_func ($ophandler[$pageno][$tabno][$op]);
+	}
+
+	protected function hookedNames ()
+	{
+		$ret = array();
+		foreach (self::$hook_calls as $call)
+		{
+			$this->assertNull ($call['port']);
+			$ret[] = $call['port_name'];
+		}
+		sort ($ret);
+		return $ret;
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testDeletePort ()
+	{
+		$object_id = $this->addSwitch();
+		$port_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$mutex_rev = $this->mutexRev ($object_id);
+		$this->runPortOp ('delPort', $object_id, array ('port_id' => $port_id));
+		$this->assertFalse ($this->portName ($port_id));
+		$this->assertEquals ($this->expected (array ('gi0/2')), $this->stored ($object_id));
+		$this->assertEquals (array ('gi0/1'), $this->hookedNames());
+		// the hooks run after the commit
+		$this->assertEquals (array ('gi0/2'), self::$hook_calls[0]['committed']);
+		$this->assertEquals ($mutex_rev + 1, $this->mutexRev ($object_id));
+		$this->assertFalse (isTransactionActive());
+	}
+
+	// The configuration goes, and the hook gets, the spelling of the name
+	// the configuration is stored under, which may differ from the port name
+	// in letter case.
+	/**
+	 * @group small
+	 */
+	public function testDeletePortLetterCase ()
+	{
+		$object_id = $this->addSwitch();
+		$port_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		usePreparedUpdateBlade ('Port', array ('name' => 'GI0/1'), array ('id' => $port_id));
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$this->runPortOp ('delPort', $object_id, array ('port_id' => $port_id));
+		$this->assertFalse ($this->portName ($port_id));
+		$this->assertEquals ($this->expected (array()), $this->stored ($object_id));
+		$this->assertEquals (0, $this->countSpelling ($object_id, 'gi0/1'));
+		$this->assertEquals (array ('gi0/1'), $this->hookedNames());
+	}
+
+	// A failing hook does not undo the committed delete, the other hooks
+	// still run and the first error reaches the caller.
+	/**
+	 * @group small
+	 */
+	public function testDeletePortFailingHook ()
+	{
+		$object_id = $this->addSwitch();
+		$this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		self::$hook_error = 'hook failed';
+		try
+		{
+			$this->runPortOp ('deleteAll', $object_id);
+			$this->fail ('the hook error must reach the caller');
+		}
+		catch (RackTablesError $e)
+		{
+			$this->assertEquals ('hook failed', $e->getMessage());
+		}
+		$this->assertEquals (array ('gi0/1', 'gi0/2'), $this->hookedNames());
+		foreach (self::$hook_calls as $call)
+			$this->assertEquals (array(), $call['committed']);
+		$this->assertEquals (0, count (getObjectPortsAndLinksTerse ($object_id)));
+		$this->assertEquals ($this->expected (array()), $this->stored ($object_id));
+		$this->assertFalse (isTransactionActive());
+	}
+
+	// The configuration stays with a name another port of the object still has.
+	/**
+	 * @group small
+	 */
+	public function testDeletePortSharedName ()
+	{
+		$object_id = $this->addSwitch();
+		$port_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		$port2_id = commitAddPort ($object_id, 'GI0/1', '1-19', '', '');
+		$this->runPortOp ('delPort', $object_id, array ('port_id' => $port_id));
+		$this->assertFalse ($this->portName ($port_id));
+		$this->assertEquals ($this->expected (array ('gi0/1')), $this->stored ($object_id));
+		$this->runPortOp ('delPort', $object_id, array ('port_id' => $port2_id));
+		$this->assertEquals ($this->expected (array()), $this->stored ($object_id));
+	}
+
+	// Configuration stored under a name no port has is not touched.
+	/**
+	 * @group small
+	 */
+	public function testDeleteAllPorts ()
+	{
+		$object_id = $this->addSwitch();
+		$port_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		$this->addConfiguredPort ($object_id, 'gi0/2');
+		commitAddPort ($object_id, 'gi0/2', '1-19', '', '');
+		commitAddPort ($object_id, 'gi0/3', '1-24', '', '');
+		$orphan = array ('mode' => 'access', 'allowed' => array (5), 'native' => 5);
+		add8021QPort ($object_id, 'ge-0/0/1', $orphan);
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$this->runPortOp ('deleteAll', $object_id);
+		$this->assertEquals (0, count (getObjectPortsAndLinksTerse ($object_id)));
+		$expected = $this->expected (array());
+		$expected['desired']['ge-0/0/1'] = $orphan;
+		$expected['cached']['ge-0/0/1'] = $orphan;
+		$this->assertEquals ($expected, $this->stored ($object_id));
+		$this->assertEquals (array ('gi0/1', 'gi0/2'), $this->hookedNames());
+		$this->assertFalse (isTransactionActive());
+	}
+
+	// If the configuration cannot be deleted, the port is not deleted either.
+	/**
+	 * @group small
+	 */
+	public function testDeletePortFailing ()
+	{
+		global $dbxlink;
+		$object_id = $this->addSwitch();
+		$port1_id = $this->addConfiguredPort ($object_id, 'gi0/1');
+		$port2_id = $this->addConfiguredPort ($object_id, 'gi0/2');
+		$this->trigger = 'PortRename8021QTest_' . getmypid();
+		try
+		{
+			$dbxlink->exec
+			(
+				"CREATE TRIGGER {$this->trigger} BEFORE DELETE ON CachedPVM FOR EACH ROW " .
+				"BEGIN IF OLD.port_name = 'gi0/2' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected'; END IF; END"
+			);
+		}
+		catch (PDOException $e)
+		{
+			$this->trigger = NULL;
+			$this->markTestSkipped ('cannot create a trigger: ' . $e->getMessage());
+		}
+		registerHook ('portConfChanged', 'PortRename8021QTest::recordHook');
+		$before = $this->stored ($object_id);
+		foreach (array (array ('delPort', array ('port_id' => $port2_id)), array ('deleteAll', array())) as $test)
+		{
+			try
+			{
+				$this->runPortOp ($test[0], $object_id, $test[1]);
+				$this->fail ('the delete must fail');
+			}
+			catch (PDOException $e)
+			{
+				$this->assertStringContainsString ('injected', $e->getMessage());
+			}
+			$this->assertEquals ('gi0/1', $this->portName ($port1_id));
+			$this->assertEquals ('gi0/2', $this->portName ($port2_id));
+			$this->assertEquals ($before, $this->stored ($object_id));
+			$this->assertEquals (array(), self::$hook_calls, 'no hook must run');
+			$this->assertFalse (isTransactionActive());
+		}
 	}
 }
