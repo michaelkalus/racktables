@@ -3258,7 +3258,7 @@ function autoPopulateUCS()
 				$new_object_id = commitAddObject ($mname, NULL, 4, NULL);
 			else
 			{
-				$spname = preg_replace ('#.+/ls-(.+)#i', '{$1}', $item['assigned']) . "(" . $oinfo['name'] . ")";
+				$spname = preg_replace ('#.+/ls-(.+)#i', '${1}', $item['assigned']) . "(" . $oinfo['name'] . ")";
 				$spname_id[$spname] = $new_object_id = commitAddObject ($spname, NULL, 4, NULL);
 			}
 			#    Set H/W Type for Blade Server
@@ -3268,14 +3268,14 @@ function autoPopulateUCS()
 			commitUpdateAttrValue ($new_object_id, 1, $item['serial']);
 			#  	 Set Slot#
 			commitUpdateAttrValue ($new_object_id, 28, $item['slot']);
-			$parent_name = preg_replace ('#^([^/]+)/([^/]+)/([^/]+)$#', '{$1}/{$2}', $item['DN']);
+			$parent_name = preg_replace ('#^([^/]+)/([^/]+)/([^/]+)$#', '${1}/${2}', $item['DN']);
 			if (array_key_exists ($parent_name, $chassis_id))
 				commitLinkEntities ('object', $chassis_id[$parent_name], 'object', $new_object_id);
 			$done++;
 			break;
 		case 'VnicPort':
-			$spname = preg_replace ('#^([^/]+)/ls-([^/]+)/([^/]+)$#', '{$2}', $item['DN']) . "(" . $oinfo['name'] . ")";
-			$porttype = preg_replace ('#^([^/]+)/([^/]+)/([^-/]+)-.+$#', '{$3}', $item['DN']);
+			$spname = preg_replace ('#^([^/]+)/ls-([^/]+)/([^/]+)$#', '${2}', $item['DN']) . "(" . $oinfo['name'] . ")";
+			$porttype = preg_replace ('#^([^/]+)/([^/]+)/([^-/]+)-.+$#', '${3}', $item['DN']);
 			try
 			{
 				// Add "virtual" (1469) ports for associated blades only. The attempt may fail
@@ -3293,7 +3293,7 @@ function autoPopulateUCS()
 				$new_object_id = commitAddObject ($mname, NULL, 4, NULL);
 			else
 			{
-				$spname = preg_replace ('#.+/ls-(.+)#i', '{$1}', $item['assigned']) . "(" . $oinfo['name'] . ")";
+				$spname = preg_replace ('#.+/ls-(.+)#i', '${1}', $item['assigned']) . "(" . $oinfo['name'] . ")";
 				$new_object_id = commitAddObject ($spname, NULL, 4, NULL);
 			}
 			# Set H/W Type for RackmountServer
@@ -3301,7 +3301,7 @@ function autoPopulateUCS()
 				commitUpdateAttrValue ($new_object_id, 2, $ucsproductmap[$item['model']]);
 			# Set Serial#
 			commitUpdateAttrValue ($new_object_id, 1, $item['serial']);
-			$parent_name = preg_replace ('#^([^/]+)/([^/]+)/([^/]+)$#', '{$1}/{$2}', $item['DN']);
+			$parent_name = preg_replace ('#^([^/]+)/([^/]+)/([^/]+)$#', '${1}/${2}', $item['DN']);
 			commitLinkEntities ('object', $ucsm_id, 'object', $new_object_id);
 			$done++;
 			break;
