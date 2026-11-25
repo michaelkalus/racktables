@@ -5344,7 +5344,7 @@ function showPathAndSearch ($pageno, $tabno)
 				$anchor_tail = '#' . $param_value;
 				continue;
 			}
-			$item .= ($is_first ? '' : '&') . "{$param_name}={$param_value}";
+			$item .= ($is_first ? '' : '&') . $param_name . '=' . urlencode ($param_value);
 			$is_first = FALSE;
 		}
 		$item .= $anchor_tail;
@@ -5537,11 +5537,14 @@ function dynamic_title_decoder_throwing ($path_position)
 		);
 	case 'search':
 		if (isset ($_REQUEST['q']))
+		{
+			$terms = genericAssertion ('q', 'string0');
 			return array
 			(
 				'name' => "search results for '{$_REQUEST['q']}'",
-				'params' => array ('q' => $_REQUEST['q'])
+				'params' => array ('q' => $terms)
 			);
+		}
 		else
 			return array
 			(
