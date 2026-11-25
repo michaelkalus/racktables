@@ -2260,9 +2260,11 @@ function addLocation ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
 	assertStringArg ('name');
+	if (0 != $parent_id = genericAssertion ('parent_id', 'unsigned'))
+		spotEntity ('location', $parent_id);
 
 	$location_id = commitAddObject ($_REQUEST['name'], NULL, 1562, NULL);
-	if (0 != $parent_id = genericAssertion ('parent_id', 'unsigned'))
+	if ($parent_id != 0)
 		commitLinkEntities ('location', $parent_id, 'location', $location_id);
 	showSuccess ('added location ' . mkA ($_REQUEST['name'], 'location', $location_id));
 }
@@ -2277,36 +2279,48 @@ function updateLocation ()
 	$location_id = genericAssertion ('location_id', 'natural');
 	$parent_id = genericAssertion ('parent_id', 'unsigned');
 	assertStringArg ('name');
+	if ($parent_id > 0)
+		spotEntity ('location', $parent_id);
 
-	if ($pageno == 'location')
+	$savepoint = beginAtomicChange ('updateLocation');
+	try
 	{
-		$taglist = genericAssertion ('taglist', 'array0');
-		$has_problems = isCheckSet ('has_problems', 'yesno');
-		assertStringArg ('comment', TRUE);
-		commitUpdateObject ($location_id, $_REQUEST['name'], NULL, $has_problems, NULL, $_REQUEST['comment']);
-		updateObjectAttributes ($location_id);
-		rebuildTagChainForEntity ('location', $location_id, buildTagChainFromIds ($taglist), TRUE);
+		if ($pageno == 'location')
+		{
+			$taglist = genericAssertion ('taglist', 'array0');
+			$has_problems = isCheckSet ('has_problems', 'yesno');
+			assertStringArg ('comment', TRUE);
+			commitUpdateObject ($location_id, $_REQUEST['name'], NULL, $has_problems, NULL, $_REQUEST['comment']);
+			updateObjectAttributes ($location_id);
+			rebuildTagChainForEntity ('location', $location_id, buildTagChainFromIds ($taglist), TRUE);
+		}
+		else
+			commitRenameObject ($location_id, $_REQUEST['name']);
+
+		$locationData = spotEntity ('location', $location_id);
+
+		// parent_id was submitted, but no link exists - create it
+		if ($parent_id > 0 && !$locationData['parent_id'])
+			commitLinkEntities ('location', $parent_id, 'location', $location_id);
+
+		// parent_id was submitted, but it doesn't match the existing link - update it
+		if ($parent_id > 0 && $parent_id != $locationData['parent_id'])
+			commitUpdateEntityLink
+			(
+				'location', $locationData['parent_id'], 'location', $location_id,
+				'location', $parent_id, 'location', $location_id
+			);
+
+		// no parent_id was submitted, but a link exists - delete it
+		if ($parent_id == 0 && $locationData['parent_id'])
+			commitUnlinkEntities ('location', $locationData['parent_id'], 'location', $location_id);
+		endAtomicChange ($savepoint, TRUE);
 	}
-	else
-		commitRenameObject ($location_id, $_REQUEST['name']);
-
-	$locationData = spotEntity ('location', $location_id);
-
-	// parent_id was submitted, but no link exists - create it
-	if ($parent_id > 0 && !$locationData['parent_id'])
-		commitLinkEntities ('location', $parent_id, 'location', $location_id);
-
-	// parent_id was submitted, but it doesn't match the existing link - update it
-	if ($parent_id > 0 && $parent_id != $locationData['parent_id'])
-		commitUpdateEntityLink
-		(
-			'location', $locationData['parent_id'], 'location', $location_id,
-			'location', $parent_id, 'location', $location_id
-		);
-
-	// no parent_id was submitted, but a link exists - delete it
-	if ($parent_id == 0 && $locationData['parent_id'])
-		commitUnlinkEntities ('location', $locationData['parent_id'], 'location', $location_id);
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 
 	showFuncMessage (__FUNCTION__, 'OK', array ($_REQUEST['name']));
 }
@@ -2322,9 +2336,19 @@ function deleteLocation ()
 		showFuncMessage (__FUNCTION__, 'ERR1', array ($locationData['name']));
 		return;
 	}
-	releaseFiles ('location', $location_id);
-	destroyTagsForEntity ('location', $location_id);
-	commitDeleteObject ($location_id);
+	$savepoint = beginAtomicChange ('deleteLocation');
+	try
+	{
+		releaseFiles ('location', $location_id);
+		destroyTagsForEntity ('location', $location_id);
+		commitDeleteObject ($location_id);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 	showFuncMessage (__FUNCTION__, 'OK', array ($locationData['name']));
 	return buildRedirectURL ('rackspace', 'editlocations');
 }
@@ -2334,6 +2358,8 @@ function addRow ()
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
 	$location_id = genericAssertion ('location_id', 'unsigned');
 	assertStringArg ('name');
+	if ($location_id)
+		spotEntity ('location', $location_id);
 	$row_id = commitAddObject ($_REQUEST['name'], NULL, 1561, NULL);
 	if ($location_id)
 		commitLinkEntities ('location', $location_id, 'row', $row_id);
@@ -2349,30 +2375,42 @@ function updateRow ()
 	$row_id = genericAssertion ('row_id', 'natural');
 	$location_id = genericAssertion ('location_id', 'unsigned');
 	assertStringArg ('name');
+	if ($location_id > 0)
+		spotEntity ('location', $location_id);
 
-	commitUpdateObject ($row_id, $_REQUEST['name'], NULL, 'no', NULL, NULL);
+	$savepoint = beginAtomicChange ('updateRow');
+	try
+	{
+		commitUpdateObject ($row_id, $_REQUEST['name'], NULL, 'no', NULL, NULL);
 
-	global $pageno;
-	if ($pageno == 'row')
-		updateObjectAttributes ($row_id);
+		global $pageno;
+		if ($pageno == 'row')
+			updateObjectAttributes ($row_id);
 
-	$rowData = spotEntity ('row', $row_id);
+		$rowData = spotEntity ('row', $row_id);
 
-	// location_id was submitted, but no link exists - create it
-	if ($location_id > 0 && !$rowData['location_id'])
-		commitLinkEntities ('location', $location_id, 'row', $row_id);
+		// location_id was submitted, but no link exists - create it
+		if ($location_id > 0 && !$rowData['location_id'])
+			commitLinkEntities ('location', $location_id, 'row', $row_id);
 
-	// location_id was submitted, but it doesn't match the existing link - update it
-	if ($location_id > 0 && $location_id != $rowData['location_id'])
-		commitUpdateEntityLink
-		(
-			'location', $rowData['location_id'], 'row', $row_id,
-			'location', $location_id, 'row', $row_id
-		);
+		// location_id was submitted, but it doesn't match the existing link - update it
+		if ($location_id > 0 && $location_id != $rowData['location_id'])
+			commitUpdateEntityLink
+			(
+				'location', $rowData['location_id'], 'row', $row_id,
+				'location', $location_id, 'row', $row_id
+			);
 
-	// no parent_id was submitted, but a link exists - delete it
-	if ($location_id == 0 && $rowData['location_id'])
-		commitUnlinkEntities ('location', $rowData['location_id'], 'row', $row_id);
+		// no parent_id was submitted, but a link exists - delete it
+		if ($location_id == 0 && $rowData['location_id'])
+			commitUnlinkEntities ('location', $rowData['location_id'], 'row', $row_id);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 
 	showFuncMessage (__FUNCTION__, 'OK', array ($_REQUEST['name']));
 }
@@ -2448,19 +2486,30 @@ function updateRack ()
 	assertStringArg ('comment', TRUE);
 	$taglist = genericAssertion ('taglist', 'array0');
 	$rack_id = getBypassValue();
-	usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
-	commitUpdateRack
-	(
-		$rack_id,
-		$row_id,
-		$_REQUEST['name'],
-		$height,
-		isCheckSet ('has_problems', 'yesno'),
-		$_REQUEST['asset_no'],
-		$_REQUEST['comment']
-	);
-	updateObjectAttributes ($rack_id);
-	rebuildTagChainForEntity ('rack', $rack_id, buildTagChainFromIds ($taglist), TRUE);
+	// Apply all of the changes or none of them.
+	$savepoint = beginAtomicChange ('updateRack');
+	try
+	{
+		commitUpdateRack
+		(
+			$rack_id,
+			$row_id,
+			$_REQUEST['name'],
+			$height,
+			isCheckSet ('has_problems', 'yesno'),
+			$_REQUEST['asset_no'],
+			$_REQUEST['comment']
+		);
+		updateObjectAttributes ($rack_id);
+		rebuildTagChainForEntity ('rack', $rack_id, buildTagChainFromIds ($taglist), TRUE);
+		usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 	showFuncMessage (__FUNCTION__, 'OK', array ($_REQUEST['name']));
 }
 
