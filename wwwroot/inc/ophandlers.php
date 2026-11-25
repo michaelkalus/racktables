@@ -2105,10 +2105,12 @@ function deleteRSPool ()
 
 function importPTRData ()
 {
-	setFuncMessages (__FUNCTION__, array ('OK' => 26, 'ERR' => 141));
+	setFuncMessages (__FUNCTION__, array ('OK' => 26, 'ERR' => 141, 'SKIP' => 200));
 	$net = spotEntity ('ipv4net', getBypassValue());
 	$addrcount = genericAssertion ('addrcount', 'natural');
-	$nbad = $ngood = 0;
+	$nbad = $ngood = $nskip = 0;
+	$records = array();
+	$first = $last = NULL;
 	for ($i = 1; $i <= $addrcount; $i++)
 	{
 		$inputname = "import_{$i}";
@@ -2116,16 +2118,35 @@ function importPTRData ()
 			continue;
 		$ip_bin = assertIPv4Arg ("addr_{$i}");
 		assertStringArg ("descr_{$i}", TRUE);
-		assertStringArg ("rsvd_{$i}");
-		// Non-existent addresses will not have this argument set in request.
-		$rsvd = 'no';
-		if ($_REQUEST["rsvd_{$i}"] == 'yes')
-			$rsvd = 'yes';
+		if (! ip_in_range ($ip_bin, $net))
+		{
+			$nbad++;
+			continue;
+		}
+		$records[] = array ($ip_bin, $_REQUEST["descr_{$i}"]);
+		if ($first === NULL || strcmp ($ip_bin, $first) < 0)
+			$first = $ip_bin;
+		if ($last === NULL || strcmp ($ip_bin, $last) > 0)
+			$last = $ip_bin;
+	}
+	// Check the current state, not the one the form was made for. Load the
+	// names and reservations at once, the range is within the network.
+	$addrlist = array();
+	if (count ($records))
+		$addrlist = scanIPSpace (array (array ('first' => $first, 'last' => $last)), IPSCAN_DO_ADDR);
+	foreach ($records as $record)
+	{
+		list ($ip_bin, $ptrname) = $record;
+		// Addresses without a name, comment or reservation are not listed.
+		$addr = isset ($addrlist[$ip_bin]) ? $addrlist[$ip_bin] : constructIPAddress ($ip_bin);
+		if (! isLivePTRImportable ($net, $ip_bin, $addr))
+		{
+			$nskip++;
+			continue;
+		}
 		try
 		{
-			if (! ip_in_range ($ip_bin, $net))
-				throw new InvalidArgException ('ip_bin', $ip_bin);
-			updateAddress ($ip_bin, $_REQUEST["descr_{$i}"], $rsvd);
+			updateAddress ($ip_bin, $ptrname, $addr['reserved']);
 			$ngood++;
 		}
 		catch (RackTablesError $e)
@@ -2137,6 +2158,8 @@ function importPTRData ()
 		showFuncMessage (__FUNCTION__, 'OK', array ($ngood));
 	else
 		showFuncMessage (__FUNCTION__, 'ERR', array ($nbad, $ngood));
+	if ($nskip)
+		showFuncMessage (__FUNCTION__, 'SKIP', array ("Skipped {$nskip} reserved address(es)"));
 }
 
 function generateAutoPorts ()

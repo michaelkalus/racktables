@@ -4343,7 +4343,6 @@ function renderLivePTR ($id)
 		{
 			echo "<input type=hidden name=addr_{$idx} value={$straddr}>\n";
 			echo "<input type=hidden name=descr_{$idx} value={$ptrname}>\n";
-			echo "<input type=hidden name=rsvd_{$idx} value={$addr['reserved']}>\n";
 		}
 		echo '<tr';
 		$print_cbox = FALSE;
@@ -4370,6 +4369,8 @@ function renderLivePTR ($id)
 			$print_cbox = TRUE;
 			$cnt_mismatch++;
 		}
+		if (! isLivePTRImportable ($range, $ip_bin, $addr))
+			$print_cbox = FALSE;
 		echo "><td class='tdleft";
 		if (isset ($range['addrlist'][$ip_bin]['class']) && $range['addrlist'][$ip_bin]['class'] != '')
 			echo ' ' . $range['addrlist'][$ip_bin]['class'];
