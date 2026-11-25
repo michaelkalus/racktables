@@ -5383,7 +5383,7 @@ function showPathAndSearch ($pageno, $tabno)
 	echo "<input type=hidden name=last_tab value=$tabno>";
 	// This input's implicit tabindex will be the lowest unless there is a form with ports or addresses on the page.
 	echo '<label><u>S</u>earch:<input accesskey="s" type=text name=q size=20 value="';
-	echo array_key_exists ('q', $sic) ? stringForTextInputValue ($sic['q']) : '';
+	echo array_key_exists ('q', $sic) && is_string ($sic['q']) ? stringForTextInputValue ($sic['q']) : '';
 	echo '"></label></form></div>';
 
 	// Path (breadcrumbs)
