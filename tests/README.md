@@ -15,6 +15,27 @@ To run all tests (several minutes to complete):
 $ phpunit
 ```
 
+## The Upgrade Test
+
+`UpgradeTest.php` (group "large") imports each SQL dump from `data/`
+into the unit testing database and upgrades it to the current version,
+one dump per PHP process.  It takes between one and three minutes
+depending on the server.  It needs the `mysql` (or `mariadb`)
+command-line client in `PATH`, otherwise it is skipped.  The client
+connects with the host, port and credentials from `secret.php`, which
+the test passes in a temporary option file.
+
+The test drops and re-creates the unit testing database for every dump.
+It restores a clean install (keeping the account with `user_id` 1) at
+the end and after every dump that did not upgrade cleanly, so that the
+next dump and the following tests start from a usable database.  The
+database user needs the same privileges as for the installation.  The triggers and views of the dumps are imported with the
+importing user as the definer.
+
+On MySQL 8.4 and later the upgrade from the dumps 0.20.7 to 0.21.1 has
+known failing statements (issue #20); the test reports these dumps as
+incomplete and fails on any other error.
+
 ## The Unit Testing Database
 
 Tests should never be run against a production instance of RackTables.
