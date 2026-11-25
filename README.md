@@ -1,3 +1,29 @@
+# About this fork
+This repository is a community-maintained fork of
+[RackTables](https://github.com/RackTables/racktables). It is not the official
+repository and is not affiliated with or endorsed by the original authors. It
+was created because upstream is no longer actively maintained, and its purpose
+is to keep RackTables working on current PHP and MySQL/MariaDB releases and to
+fix reported bugs and security issues.
+
+Please report bugs in this fork via its
+[GitHub issues](https://github.com/michaelkalus/racktables/issues). Reports
+about the original project are kept at https://bugs.racktables.org.
+
+Changes compared to upstream:
+* installation on MySQL 8.4, and upgrading an older database through the 0.20.2 step on MySQL 8.4;
+* PHP 8.5 compatibility (`array_first()` and `array_last()` are no longer redeclared);
+* fewer deprecation messages on PHP 8.1 and later (no `"${var}"` string interpolation);
+* search terms are escaped on the search results page (CVE-2023-49453);
+* searching for a string with three dots that is not an IPv4 address no longer fails;
+* addresses of /32 and /128 networks are found in their network;
+* the Objects list no longer fails when a rack has no row;
+* autotags of user names may contain `@`, for user@REALM accounts.
+
+Some of these changes were adopted from unmerged upstream pull requests and
+keep the authorship of their original authors. The licence is unchanged:
+GPLv2, see `COPYING` and `LICENSE`.
+
 # Welcome!
 Thank you for selecting RackTables as your datacenter management solution!
 If you are looking for documentation or wish to send feedback, please
