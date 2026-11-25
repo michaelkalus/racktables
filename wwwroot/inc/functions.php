@@ -1235,6 +1235,26 @@ function parseWikiLink (&$record)
 	$record['a_value'] = execGMarker ($record['o_value']);
 }
 
+// Tell if the URL of a Wiki link (see above) may be used as a link target:
+// a relative URL or an absolute URL with one of the schemes below (web, FTP
+// and mail links and the remote access protocols of management links).
+// Anything else is shown as text.
+function isWikiLinkTargetAllowed ($url)
+{
+	// Browsers ignore leading and trailing control characters and spaces and
+	// any tabs and newlines in a URL.
+	$url = preg_replace ('/[\t\n\r]/', '', trim ($url, "\x00..\x20"));
+	// A colon before the first slash, question mark or hash ends a scheme.
+	if (! preg_match ('/^([^\/?#]*?):/', $url, $m))
+		return TRUE;
+	return in_array
+	(
+		strtolower ($m[1]),
+		array ('http', 'https', 'ftp', 'mailto', 'ssh', 'telnet', 'rdp', 'vnc'),
+		TRUE
+	);
+}
+
 // FIXME: should this be saved as "P-data"?
 function execGMarker ($line)
 {

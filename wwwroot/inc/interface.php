@@ -1585,7 +1585,7 @@ function renderObject ($object_id)
 					foreach($address['allocs'] as $bond)
 						echo mkA ("{$bond['object_name']}({$bond['name']})", 'object', $bond['object_id']) . ' ';
 				elseif ($pf['remote_addr_name'] != '')
-					echo '(' . $pf['remote_addr_name'] . ')';
+					echo '(' . stringForLabel ($pf['remote_addr_name'], 0) . ')';
 				echo "</td><td class='description tdleft'>{$pf['description']}</td></tr>";
 			}
 			echo "</table><br><br>";
@@ -3078,7 +3078,7 @@ function renderIPv4NetworkAddresses ($range)
 		foreach ($addr['rsplist'] as $rsp_id)
 		{
 			$rsp = spotEntity ('ipv4rspool', $rsp_id);
-			echo "{$delim}&rarr;" . mkA ($rsp['name'], 'ipv4rspool', $rsp['id']);
+			echo "{$delim}&rarr;" . mkA (stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
 			$delim = '<br>';
 		}
 		echo "</td></tr>\n";
@@ -3203,7 +3203,7 @@ function renderIPv6NetworkAddresses ($netinfo)
 		foreach ($addr['rsplist'] as $rsp_id)
 		{
 			$rsp = spotEntity ('ipv4rspool', $rsp_id);
-			echo "{$delim}&rarr;" . mkA ($rsp['name'], 'ipv4rspool', $rsp['id']);
+			echo "{$delim}&rarr;" . mkA (stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
 			$delim = '<br>';
 		}
 		echo "</td></tr>\n";
@@ -3387,9 +3387,9 @@ function renderIPAddressProperties ($ip_bin)
 	echo "<table border=0 cellpadding=10 cellpadding=1 align='center'>\n";
 	printOpFormIntro ('editAddress');
 	echo '<tr><td class=tdright><label for=id_name>Name:</label></td>';
-	echo "<td class=tdleft><input type=text name=name id=id_name size=20 value='{$address['name']}'></tr>";
+	echo "<td class=tdleft><input type=text name=name id=id_name size=20 value='" . stringForStoredTextInputValue ($address['name']) . "'></tr>";
 	echo '<tr><td class=tdright><label for=id_comment>Comment:</label></td>';
-	echo "<td class=tdleft><input type=text name=comment id=id_comment size=20 value='{$address['comment']}'></tr>";
+	echo "<td class=tdleft><input type=text name=comment id=id_comment size=20 value='" . stringForStoredTextInputValue ($address['comment']) . "'></tr>";
 	echo '<td class=tdright><label for=id_reserved>Reserved:</label></td>';
 	echo "<td class=tdleft><input type=checkbox name=reserved id=id_reserved size=20 ";
 	echo ($address['reserved']=='yes') ? 'checked' : '';
@@ -3546,7 +3546,7 @@ function renderNATv4ForObject ($object_id)
 		) . "</td>";
 		echo "<td>{$pf['proto']}/{$osif}" . getRenderedIPPortPair ($pf['localip'], $pf['localport']);
 		if ($pf['local_addr_name'] != '')
-			echo ' (' . $pf['local_addr_name'] . ')';
+			echo ' (' . stringForLabel ($pf['local_addr_name'], 0) . ')';
 		echo "</td>";
 		echo "<td>" . getRenderedIPPortPair ($pf['remoteip'], $pf['remoteport']) . "</td>";
 
@@ -3557,7 +3557,7 @@ function renderNATv4ForObject ($object_id)
 			foreach ($address['allocs'] as $bond)
 				echo mkA ("{$bond['object_name']}({$bond['name']})", 'object', $bond['object_id']) . ' ';
 		elseif ($pf['remote_addr_name'] != '')
-			echo '(' . $pf['remote_addr_name'] . ')';
+			echo '(' . stringForLabel ($pf['remote_addr_name'], 0) . ')';
 		printOpFormIntro
 		(
 			'updNATv4Rule',
@@ -5405,8 +5405,9 @@ function showPathAndSearch ($pageno, $tabno)
 	echo "<div class='searchbox' style='float:right'>";
 	echo "<form name=search method=get>";
 	echo '<input type=hidden name=page value=search>';
-	echo "<input type=hidden name=last_page value=$pageno>";
-	echo "<input type=hidden name=last_tab value=$tabno>";
+	// The tab name comes from the request (HTML-escaped already).
+	echo "<input type=hidden name=last_page value='" . htmlspecialchars ($pageno, ENT_QUOTES, 'UTF-8', FALSE) . "'>";
+	echo "<input type=hidden name=last_tab value='" . htmlspecialchars ($tabno, ENT_QUOTES, 'UTF-8', FALSE) . "'>";
 	// This input's implicit tabindex will be the lowest unless there is a form with ports or addresses on the page.
 	echo '<label><u>S</u>earch:<input accesskey="s" type=text name=q size=20 value="';
 	echo array_key_exists ('q', $sic) && is_string ($sic['q']) ? stringForTextInputValue ($sic['q']) : '';
@@ -6071,7 +6072,7 @@ function formatAttributeValue ($record, $objtype_id)
 					showWarning ("could not parse '{$filter}' for management protocol '{$proto}' in MGMT_PROTOS");
 					continue;
 				}
-		return array_key_exists ('href', $record) ?
+		return array_key_exists ('href', $record) && isWikiLinkTargetAllowed ($record['href']) ?
 			"<a href='" . htmlspecialchars ($record['href'], ENT_QUOTES, 'UTF-8') . "'>{$a_value}</a>" :
 			$a_value;
 	case 'dict':
@@ -6102,7 +6103,7 @@ function formatAttributeValue ($record, $objtype_id)
 			$filter_url = makeHref ($filter_args);
 			$result = "<a href='{$filter_url}'>{$a_value}</a>";
 		}
-		if (array_key_exists ('href', $record))
+		if (array_key_exists ('href', $record) && isWikiLinkTargetAllowed ($record['href']))
 			$result .= "&nbsp;<a class='img-link' href='" . htmlspecialchars ($record['href'], ENT_QUOTES, 'UTF-8') . "'>" . getImageHREF ('html', 'vendor\'s info page') . "</a>";
 		return $result;
 	default:
@@ -6351,8 +6352,8 @@ function renderIPAddressLog ($ip_bin)
 	{
 		echo '<tr>';
 		echo '<td class=tdleft>' . $line['date'] . '</td>';
-		echo '<td class=tdleft>' . $line['user'] . '</td>';
-		echo '<td class=tdleft>' . $line['message'] . '</td>';
+		echo '<td class=tdleft>' . stringForTD ($line['user'], 0) . '</td>';
+		echo '<td class=tdleft>' . stringForTD ($line['message'], 0) . '</td>';
 		echo '</tr>';
 	}
 	echo '</table>';
