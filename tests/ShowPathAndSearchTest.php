@@ -7,7 +7,12 @@ class ShowPathAndSearchTest extends RTTestCase
 	const TERMS = 'a&b #c 50%41 d+e "f" \'g\' <b>h</b> ' . "\xC5\xBElu\xC5\xA5";
 
 	/**
+	 * showPathAndSearch() declares a nested function, so it can be called
+	 * only once per process.
+	 *
 	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
 	 */
 	public function testSearchBreadcrumb ()
 	{
@@ -18,8 +23,6 @@ class ShowPathAndSearchTest extends RTTestCase
 		$tabno = 'default';
 		$sic = array ('page' => 'search', 'q' => self::TERMS);
 		$_REQUEST = array ('page' => 'search', 'q' => htmlspecialchars (self::TERMS, ENT_QUOTES, 'UTF-8'));
-		// showPathAndSearch() declares a nested function, so it can be
-		// called only once per process.
 		$output = getOutputOf ('showPathAndSearch', 'search', 'default');
 		list ($pageno, $tabno, $sic, $_REQUEST) = $saved;
 

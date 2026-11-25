@@ -57,7 +57,12 @@ class TagsPickerOrderTest extends RTTestCase
 	}
 
 	/**
+	 * enableTagsPicker() emits the tag list only once per process, so run
+	 * this test in a process that has not rendered a tag picker yet.
+	 *
 	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
 	 */
 	public function testPickerOrder ()
 	{

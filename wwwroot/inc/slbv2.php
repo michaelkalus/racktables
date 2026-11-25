@@ -720,7 +720,7 @@ function addSLBIPLink ($link_row)
 	$ret = usePreparedInsertBlade ('VSEnabledIPs', $link_row);
 	$result = usePreparedSelectBlade
 	(
-		"SELECT proto, vport FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id) WHERE vei.object_id = ? AND vip = ? HAVING COUNT(distinct proto,vport) != COUNT(vport)",
+		"SELECT proto, vport FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id) WHERE vei.object_id = ? AND vip = ? GROUP BY proto, vport HAVING COUNT(*) > 1",
 		array ($link_row['object_id'], $link_row['vip'])
 	);
 	if ($row = $result->fetch (PDO::FETCH_ASSOC, 0))

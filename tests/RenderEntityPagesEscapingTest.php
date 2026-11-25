@@ -58,7 +58,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 			destroyIPv4Prefix ($net_id);
 		foreach ($this->nets6 as $net_id)
 			destroyIPv6Prefix ($net_id);
-		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_parse ('198.51.100.5')));
+		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('198.51.100.5'))));
 		usePreparedDeleteBlade ('IPv6Address', array ('ip' => ip6_parse ('2001:db8:5::5')));
 		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('127.0.0.1'))));
 		if ($this->objtype_id !== NULL)
@@ -209,11 +209,14 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 	}
 
 	// port name, label and cable ID on the ports tab
-	// (renderPortsForObject(), renderIPForObject() and renderIPAddressAllocations()
-	// declare a nested function of the same name, so only one of them can be
-	// called per process)
 	/**
+	 * renderPortsForObject(), renderIPForObject() and renderIPAddressAllocations()
+	 * declare a nested function of the same name, so only one of them can be
+	 * called, and only once, per process.
+	 *
 	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
 	 */
 	public function testPortsForObject ()
 	{

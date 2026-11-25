@@ -105,18 +105,13 @@ class IPNetworkDeleteTest extends RTTestCase
 	// address space both offer a working delete link, FALSE if neither does
 	protected function pageOffersDelete ($realm, $id)
 	{
-		global $pageno, $tabno, $entityCache, $taglist;
+		global $pageno, $tabno, $entityCache;
 		$entityCache = array();
 		$pageno = $realm;
 		$tabno = 'properties';
-		// With no tags the page skips the tag picker, which can be set up only
-		// once per process (see enableTagsPicker() and TagsPickerOrderTest).
-		$saved_taglist = $taglist;
-		$taglist = array();
 		ob_start();
 		renderIPNetworkProperties ($id);
 		$properties = FALSE !== strpos (ob_get_clean(), 'op=del');
-		$taglist = $saved_taglist;
 		$pageno = $realm == 'ipv4net' ? 'ipv4space' : 'ipv6space';
 		$tabno = 'manage';
 		ob_start();

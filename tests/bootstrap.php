@@ -19,6 +19,20 @@ class RTTestCase extends PHPUnit\Framework\TestCase
 	{
 		return sprintf ('%s-%s-%u', $s, $c, getmypid());
 	}
+
+	// A test that leaves a transaction open makes the following tests run
+	// inside it, so roll it back and report the test that left it.
+	/**
+	 * @after
+	 */
+	public function assertNoTransactionLeft () : void
+	{
+		global $dbxlink;
+		if (! isTransactionActive())
+			return;
+		$dbxlink->rollBack();
+		$this->fail ('The test left a database transaction open.');
+	}
 }
 
 // Sanity check DB connection
