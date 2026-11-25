@@ -1489,24 +1489,39 @@ function commitUpdateRack ($rack_id, $new_row_id, $new_name, $new_height, $new_h
 		if ($old_row_id != $new_row_id)
 		{
 			// Move it to the specified row
-			usePreparedUpdateBlade
-			(
-				'EntityLink',
-				array ('parent_entity_id' => $new_row_id),
-				array ('child_entity_type' => 'rack', 'child_entity_id' => $rack_id)
-			);
+			if ($old_row_id === NULL)
+				// the rack is not linked to any row yet
+				commitLinkEntities ('row', $new_row_id, 'rack', $rack_id);
+			else
+				usePreparedUpdateBlade
+				(
+					'EntityLink',
+					array ('parent_entity_id' => $new_row_id),
+					array ('child_entity_type' => 'rack', 'child_entity_id' => $rack_id)
+				);
 
 			// Set the sort_order attribute so it's placed at the end of the new row
 			$rowInfo = getRowInfo ($new_row_id);
-			usePreparedUpdateBlade
-			(
-				'AttributeValue',
-				array ('uint_value' => $rowInfo['count']),
-				array ('object_id' => $rack_id, 'attr_id' => 29)
-			);
+			if ($old_row_id === NULL)
+			{
+				// The rack lost its row without the sort order of that row being
+				// reset, renumber the new row with the rack at the end.
+				$rack_ids = array_values (array_diff (selectRackOrder ($new_row_id), array ($rack_id)));
+				$rack_ids[] = $rack_id;
+				updateRackSortOrder ($rack_ids);
+			}
+			else
+			{
+				usePreparedUpdateBlade
+				(
+					'AttributeValue',
+					array ('uint_value' => $rowInfo['count']),
+					array ('object_id' => $rack_id, 'attr_id' => 29)
+				);
 
-			// Reset the sort order of the old row
-			resetRackSortOrder ($old_row_id);
+				// Reset the sort order of the old row
+				resetRackSortOrder ($old_row_id);
+			}
 		}
 
 		// Update the height

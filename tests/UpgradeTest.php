@@ -208,6 +208,7 @@ ENDOFCODE;
 		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
 		// references anything but the full column list of a PRIMARY or UNIQUE key.
 		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");
+		$this->assertViewsAsInstalled ($db_name, $version);
 	}
 
 	// Returns the line that starts with $prefix from a CREATE TABLE statement,
@@ -272,6 +273,43 @@ ENDOFCODE;
 			if (! isset ($unique[$fk['table']]) || ! in_array ($fk['columns'], $unique[$fk['table']], TRUE))
 				$ret[] = $name;
 		return $ret;
+	}
+
+	// Every view must have the definition a fresh install creates (the 0.23.0-community
+	// batch redefines Rack, issue #23). Create each view of install.php under another
+	// name and compare the definitions as the server stores them.
+	private function assertViewsAsInstalled ($db_name, $version)
+	{
+		global $dbxlink;
+		require_once '../wwwroot/inc/install.php';
+		$checked = 0;
+		foreach (get_pseudo_file ('structure') as $statement)
+		{
+			if (! preg_match ('/^CREATE VIEW `([^`]+)` AS /', $statement, $m))
+				continue;
+			$view = $m[1];
+			$copy = "{$view}_install_check";
+			$dbxlink->exec ("DROP VIEW IF EXISTS `{$copy}`");
+			$dbxlink->exec (preg_replace ('/^CREATE VIEW `[^`]+`/', "CREATE VIEW `{$copy}`", $statement));
+			try
+			{
+				$result = usePreparedSelectBlade
+				(
+					'SELECT TABLE_NAME, VIEW_DEFINITION FROM information_schema.VIEWS WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (?, ?)',
+					array ($db_name, $view, $copy)
+				);
+				$defs = $result->fetchAll (PDO::FETCH_KEY_PAIR);
+				$result->closeCursor();
+			}
+			finally
+			{
+				$dbxlink->exec ("DROP VIEW `{$copy}`");
+			}
+			$this->assertArrayHasKey ($view, $defs, "View {$view} after upgrading from {$version}");
+			$this->assertSame ($defs[$copy], $defs[$view], "Definition of view {$view} after upgrading from {$version}");
+			$checked++;
+		}
+		$this->assertSame (4, $checked, 'views in install.php');
 	}
 
 	private static function findMySQLClient ()
