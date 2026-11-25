@@ -7525,6 +7525,7 @@ function replaceObjectPorts ($object_id, $desiredPorts)
 	unset ($result);
 	$locked = $done = FALSE;
 	$warnings = $notices = array();
+	$created = count (lastCreated());
 	try
 	{
 		$dbxlink->exec ('SET autocommit = 0');
@@ -7594,6 +7595,10 @@ function replaceObjectPorts ($object_id, $desiredPorts)
 		$cleanup = array ('UNLOCK TABLES', "SET autocommit = {$autocommit}");
 		if ($locked && ! $done)
 			array_unshift ($cleanup, 'ROLLBACK');
+		// The ports added before a failure are gone with the rollback.
+		if (! $done)
+			foreach (array_slice (lastCreated(), $created) as $item)
+				lastCreated ($item['realm'], $item['id'], TRUE);
 		$cleanup_error = NULL;
 		foreach ($cleanup as $query)
 			try

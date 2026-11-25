@@ -888,6 +888,7 @@ class PortRename8021QTest extends RTTestCase
 			}
 			if ($i == 1)
 				unset ($desired['fail-1']);
+			$created = lastCreated();
 			try
 			{
 				replaceObjectPorts ($object_id, $desired);
@@ -898,6 +899,11 @@ class PortRename8021QTest extends RTTestCase
 				$this->assertStringContainsString ('injected', $e->getMessage());
 			}
 			$dbxlink->exec ("DROP TRIGGER {$this->trigger}");
+			// the ports added before the failure are not reported as created
+			$this->assertEquals ($created, lastCreated(), "trigger {$i}");
+			$last_port_id = getLastCreatedId ('port');
+			if ($last_port_id !== NULL)
+				$this->assertNotFalse ($this->portName ($last_port_id), "trigger {$i}");
 			$this->assertEquals ($before_ports, $this->portRows ($object_id), "trigger {$i}");
 			$this->assertEquals ($before_conf, $this->stored ($object_id), "trigger {$i}");
 			$this->assertEquals ($mutex_rev, $this->mutexRev ($object_id), "trigger {$i}");
