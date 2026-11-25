@@ -4,7 +4,7 @@
 # framework. See accompanying file "COPYING" for the full copyright and
 # licensing information.
 
-require_once 'slb2-interface.php';
+require_once __DIR__ . '/slb2-interface.php';
 
 function renderSLBDefConfig()
 {

@@ -5285,7 +5285,7 @@ function parseSearchTerms ($terms)
 define('PARSER_ABI_VER', 2);
 function spotPayload ($text, $reqtype = 'SYNT_CODETEXT')
 {
-	require_once 'code.php';
+	require_once __DIR__ . '/code.php';
 	try
 	{
 		$parser = new RackCodeParser();
@@ -6758,12 +6758,15 @@ function etypeByPageno ($pg = NULL)
 	return $etype_by_pageno[$pg];
 }
 
+// A bare file name (as used in $interface_requires) refers to the RackTables
+// file in this directory if there is one, so a same-named file elsewhere in
+// include_path cannot take its place. Anything else goes through include_path.
 function requireListOfFiles ($x)
 {
-	if (! is_array ($x))
-		require_once $x;
-	else
-		foreach ($x as $filename)
+	foreach ((is_array ($x) ? $x : array ($x)) as $filename)
+		if (basename ($filename) == $filename && file_exists (__DIR__ . '/' . $filename))
+			require_once __DIR__ . '/' . $filename;
+		else
 			require_once $filename;
 }
 

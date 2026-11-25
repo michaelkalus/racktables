@@ -13,7 +13,7 @@ implement the "interface" module.
 
 */
 
-require_once 'slb-interface.php';
+require_once __DIR__ . '/slb-interface.php';
 
 $color = array();
 
