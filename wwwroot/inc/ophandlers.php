@@ -1444,15 +1444,21 @@ function addLotOfObjects()
 		}
 }
 
+// Set a container of the current object (the one the permissions have been
+// checked for), and nothing else.
 function linkObjects ()
 {
-	commitLinkEntities
-	(
-		genericAssertion ('parent_entity_type', 'string'),
-		genericAssertion ('parent_entity_id', 'natural'),
-		genericAssertion ('child_entity_type', 'string'),
-		genericAssertion ('child_entity_id', 'natural')
-	);
+	$parent_entity_type = genericAssertion ('parent_entity_type', 'string');
+	$parent_entity_id = genericAssertion ('parent_entity_id', 'natural');
+	$child_entity_type = genericAssertion ('child_entity_type', 'string');
+	$child_entity_id = genericAssertion ('child_entity_id', 'natural');
+	if ($parent_entity_type != 'object')
+		throw new InvalidRequestArgException ('parent_entity_type', $parent_entity_type, 'must be object');
+	if ($child_entity_type != 'object')
+		throw new InvalidRequestArgException ('child_entity_type', $child_entity_type, 'must be object');
+	if ($child_entity_id != getBypassValue())
+		throw new InvalidRequestArgException ('child_entity_id', $child_entity_id, 'must be the current object');
+	commitLinkEntities ('object', $parent_entity_id, 'object', $child_entity_id);
 	showSuccess ('Container set successfully');
 }
 
