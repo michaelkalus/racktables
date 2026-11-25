@@ -640,6 +640,32 @@ class PureFunctionTest extends RTTestCase
 				'f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.f.8.b.d.0.1.0.0.2.ip6.arpa'
 			),
 
+			// IPv6 addresses with an embedded IPv4 address
+			array ('ip6_checkparse', '::1.2.3.4', "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04"),
+			array ('ip6_checkparse', '::ffff:192.0.2.1', "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xC0\x00\x02\x01"),
+			array ('ip6_checkparse', '1:2:3:4:5:6:10.0.0.1', "\x00\x01\x00\x02\x00\x03\x00\x04\x00\x05\x00\x06\x0A\x00\x00\x01"),
+			array ('ip6_checkparse', '::0.0.0.0', "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
+			array ('ip6_checkparse', '::255.255.255.255', "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xFF\xFF\xFF\xFF"),
+			// three dots, but not an address (search for a host name)
+			array ('ip6_checkparse', 'a.b.c.d', FALSE),
+			array ('ip6_checkparse', 'host.example.co.uk', FALSE),
+			array ('ip6_checkparse', '::a.b.c.d', FALSE),
+			array ('ip6_checkparse', '::ffff:1.2.3.x', FALSE),
+			array ('ip6_checkparse', '::0x1.2.3.4', FALSE),
+			array ('ip6_checkparse', '::+1.2.3.4', FALSE),
+			array ('ip6_checkparse', '::1.2.3.4 ', FALSE),
+			array ('ip6_checkparse', "::1.2.3.4\n", FALSE),
+			array ('ip6_checkparse', '::01.2.3.4', FALSE),
+			// out of range
+			array ('ip6_checkparse', '::1.2.3.256', FALSE),
+			array ('ip6_checkparse', '::300.2.3.4', FALSE),
+			array ('ip6_checkparse', '::1.2.3.1000', FALSE),
+			// empty parts
+			array ('ip6_checkparse', '::1.2..4', FALSE),
+			array ('ip6_checkparse', '::.1.2.3', FALSE),
+			array ('ip6_checkparse', '::1.2.3.', FALSE),
+			array ('ip6_checkparse', '...', FALSE),
+
 			array ('withoutLocationTypes', array(), array()),
 			array ('withoutLocationTypes', array (1560 => 'rack', 1561 => 'row', 1562 => 'location'), array()),
 			array ('withoutLocationTypes', $ten_kilo, $ten_kilo_less_3),
