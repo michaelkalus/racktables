@@ -203,6 +203,14 @@ A database upgraded to this version cannot be used with upstream RackTables
 code again: upstream releases do not know this version and refuse to run on
 it. Keep a backup of the database taken before the upgrade if you may want to
 go back.
+
+Databases installed by older releases have two non-unique keys that foreign
+keys refer to. MySQL 8.4 refuses that by default, so it cannot restore a dump
+of such a database; this release makes the keys unique. To move a database to
+MySQL 8.4, upgrade it on the old server first and dump it afterwards. To
+restore an older dump on MySQL 8.4, run
+"SET SESSION restrict_fk_on_non_standard_key = OFF;" in the session that
+imports it, then upgrade.
 ENDOFTEXT
 ,
 );
@@ -1306,6 +1314,8 @@ ENDOFTRIGGER;
 		case '0.21.0':
 			$query[] = "UPDATE Port SET label = NULL WHERE label = ''";
 			$query[] = "DELETE FROM RackThumbnail";
+			// MySQL 8.4 does not rebuild TagTree while its key is non-unique (issue #20).
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('TagTree')));
 			$query[] = "ALTER TABLE TagTree ADD COLUMN color mediumint unsigned DEFAULT NULL AFTER tag";
 
 			$query[] = "
@@ -1374,6 +1384,8 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			$query[] = "ALTER TABLE IPv6Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "INSERT INTO Chapter (`id`, `sticky`, `name`) VALUES (39,'no','UPS models')";
 			$query[] = "INSERT INTO AttributeMap (`objtype_id`,`attr_id`,`chapter_id`) VALUES (12,2,39)"; // UPS (UPS models) -> HW type
+			// Same as in the 0.21.0 batch, for databases that start the upgrade past it.
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('TagTree')));
 			$query[] = "ALTER TABLE TagTree ADD COLUMN description char(255) DEFAULT NULL AFTER color";
 
 			// new iif_type SFP28
@@ -1424,6 +1436,8 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			$query[] = "UPDATE Config SET varvalue = '0.22.1' WHERE varname = 'DB_VERSION'";
 			break;
 		case '0.23.0-community':
+			// issue #20: make the legacy keys of Object and TagTree UNIQUE in every database
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('Object', 'TagTree')));
 			$query[] = "UPDATE Config SET varvalue = '0.23.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
@@ -1654,6 +1668,64 @@ echo '</body></html>';
 function extendPortCompatQuery()
 {
 	return "INSERT INTO PortCompat SELECT pc1.type2, pc1.type1 FROM PortCompat pc1 LEFT JOIN PortCompat pc2 ON pc1.type1 = pc2.type2 AND pc1.type2 = pc2.type1 WHERE pc2.type1 IS NULL";
+}
+
+// Older releases created the keys Object.id-tid and TagTree.id-is_assignable as
+// non-unique. Both are referenced by a foreign key, which MySQL 8.4 refuses for a
+// non-unique key: it does not rebuild such a table (ADD COLUMN, CONVERT TO) and
+// cannot restore a dump of such a database. Returns the queries that make the key
+// of each given table UNIQUE (as in a fresh install, the key contains the primary
+// key) while its foreign key is dropped, then re-create the foreign key as a fresh
+// install defines it. The queries depend on the current state: nothing for a key
+// that is UNIQUE with its foreign key in place, and only the missing steps after
+// an interrupted run, so any batch can use this at any point of the upgrade path.
+function getUniqueLegacyKeyQueries ($tables)
+{
+	global $dbxlink;
+	$keys = array
+	(
+		'Object' => array
+		(
+			'key' => 'id-tid',
+			'columns' => '`id`,`objtype_id`',
+			'child' => 'AttributeValue',
+			'fk' => 'AttributeValue-FK-object',
+			'fk_def' => 'FOREIGN KEY (`object_id`, `object_tid`) REFERENCES `Object` (`id`, `objtype_id`) ON DELETE CASCADE ON UPDATE CASCADE',
+		),
+		'TagTree' => array
+		(
+			'key' => 'id-is_assignable',
+			'columns' => '`id`,`is_assignable`',
+			'child' => 'TagStorage',
+			'fk' => 'TagStorage-FK-TagTree',
+			'fk_def' => 'FOREIGN KEY (`tag_id`, `tag_is_assignable`) REFERENCES `TagTree` (`id`, `is_assignable`)',
+		),
+	);
+	$query = array();
+	foreach ($tables as $table)
+	{
+		$k = $keys[$table];
+		// NULL when the key does not exist
+		$prepared = $dbxlink->prepare ('SELECT MAX(NON_UNIQUE) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
+		$prepared->execute (array ($table, $k['key']));
+		$non_unique = $prepared->fetchColumn();
+		unset ($prepared);
+		$prepared = $dbxlink->prepare ("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'");
+		$prepared->execute (array ($k['child'], $k['fk']));
+		$fk_exists = $prepared->fetchColumn() > 0;
+		unset ($prepared);
+		$is_unique = $non_unique !== NULL && $non_unique == 0;
+		if ($is_unique && $fk_exists)
+			continue;
+		if ($fk_exists)
+			$query[] = "ALTER TABLE `{$k['child']}` DROP FOREIGN KEY `{$k['fk']}`";
+		if ($non_unique === NULL)
+			$query[] = "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$k['key']}` ({$k['columns']})";
+		elseif (! $is_unique)
+			$query[] = "ALTER TABLE `{$table}` DROP KEY `{$k['key']}`, ADD UNIQUE KEY `{$k['key']}` ({$k['columns']})";
+		$query[] = "ALTER TABLE `{$k['child']}` ADD CONSTRAINT `{$k['fk']}` {$k['fk_def']}";
+	}
+	return $query;
 }
 
 function convertSLBTablesToBinIPs()
