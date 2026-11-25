@@ -809,6 +809,25 @@ ENDOFTRIGGER;
 			$query[] = "ALTER DATABASE DEFAULT CHARACTER SET UTF8 COLLATE utf8_unicode_ci";
 
 			$query[] = "SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0";
+			// MariaDB refuses to change the collation of a column that is a part of
+			// a foreign key, even with FOREIGN_KEY_CHECKS=0, so the foreign keys that
+			// involve text columns are dropped here and re-created after the conversion.
+			$query[] = "ALTER TABLE `CachedPAV` DROP FOREIGN KEY `CachedPAV-FK-object-port`";
+			$query[] = "ALTER TABLE `CachedPNV` DROP FOREIGN KEY `CachedPNV-FK-compound`";
+			$query[] = "ALTER TABLE `PortAllowedVLAN` DROP FOREIGN KEY `PortAllowedVLAN-FK-object-port`";
+			$query[] = "ALTER TABLE `PortNativeVLAN` DROP FOREIGN KEY `PortNativeVLAN-FK-compound`";
+			$query[] = "ALTER TABLE `PortVLANMode` DROP FOREIGN KEY `PortVLANMode-FK-object-port`";
+			$query[] = "ALTER TABLE `TagStorage` DROP FOREIGN KEY `TagStorage-FK-TagTree`";
+			$query[] = "ALTER TABLE `UserConfig` DROP FOREIGN KEY `UserConfig-FK-varname`";
+			$query[] = "ALTER TABLE `VSEnabledPorts` DROP FOREIGN KEY `VSEnabledPorts-FK-vs_id-proto-vport`";
+			// Older releases created the keys referenced by these two foreign keys as
+			// non-unique. MySQL 8.4 refuses to rebuild a table referenced through such
+			// a key and to create a foreign key on it, so make the keys UNIQUE (as in
+			// a fresh install) while the foreign keys are dropped. Each key contains
+			// the primary key, so this cannot fail on existing data.
+			$query[] = "ALTER TABLE `AttributeValue` DROP FOREIGN KEY `AttributeValue-FK-object`";
+			$query[] = "ALTER TABLE `Object` DROP KEY `id-tid`, ADD UNIQUE KEY `id-tid` (`id`,`objtype_id`)";
+			$query[] = "ALTER TABLE `TagTree` DROP KEY `id-is_assignable`, ADD UNIQUE KEY `id-is_assignable` (`id`,`is_assignable`)";
 			$query[] = "ALTER TABLE `Atom` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `Attribute` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `AttributeMap` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
@@ -875,6 +894,15 @@ ENDOFTRIGGER;
 			$query[] = "ALTER TABLE `VSPorts` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `VSEnabledIPs` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
 			$query[] = "ALTER TABLE `VSEnabledPorts` CONVERT TO CHARACTER SET utf8 COLLATE utf8_unicode_ci";
+			$query[] = "ALTER TABLE `CachedPAV` ADD CONSTRAINT `CachedPAV-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `CachedPVM` (`object_id`, `port_name`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `CachedPNV` ADD CONSTRAINT `CachedPNV-FK-compound` FOREIGN KEY (`object_id`, `port_name`, `vlan_id`) REFERENCES `CachedPAV` (`object_id`, `port_name`, `vlan_id`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortAllowedVLAN` ADD CONSTRAINT `PortAllowedVLAN-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `PortVLANMode` (`object_id`, `port_name`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortNativeVLAN` ADD CONSTRAINT `PortNativeVLAN-FK-compound` FOREIGN KEY (`object_id`, `port_name`, `vlan_id`) REFERENCES `PortAllowedVLAN` (`object_id`, `port_name`, `vlan_id`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `PortVLANMode` ADD CONSTRAINT `PortVLANMode-FK-object-port` FOREIGN KEY (`object_id`, `port_name`) REFERENCES `CachedPVM` (`object_id`, `port_name`)";
+			$query[] = "ALTER TABLE `TagStorage` ADD CONSTRAINT `TagStorage-FK-TagTree` FOREIGN KEY (`tag_id`, `tag_is_assignable`) REFERENCES `TagTree` (`id`, `is_assignable`)";
+			$query[] = "ALTER TABLE `UserConfig` ADD CONSTRAINT `UserConfig-FK-varname` FOREIGN KEY (`varname`) REFERENCES `Config` (`varname`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `VSEnabledPorts` ADD CONSTRAINT `VSEnabledPorts-FK-vs_id-proto-vport` FOREIGN KEY (`vs_id`, `proto`, `vport`) REFERENCES `VSPorts` (`vs_id`, `proto`, `vport`) ON DELETE CASCADE";
+			$query[] = "ALTER TABLE `AttributeValue` ADD CONSTRAINT `AttributeValue-FK-object` FOREIGN KEY (`object_id`, `object_tid`) REFERENCES `Object` (`id`, `objtype_id`) ON DELETE CASCADE ON UPDATE CASCADE";
 			$query[] = "SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS";
 
 			$query[] = "UPDATE Config SET varvalue = '0.20.7' WHERE varname = 'DB_VERSION'";
@@ -1319,15 +1347,16 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN rack_id int(10) unsigned NOT NULL";
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN unit_no int(10) unsigned NOT NULL";
 			$query[] = "ALTER TABLE Atom MODIFY COLUMN atom enum('front','interior','rear') NOT NULL";
-			$query[] = "ALTER TABLE Atom ADD PRIMARY KEY (molecule_id, rack_id, unit_no, atom)";
-			$query[] = "ALTER TABLE Atom DROP KEY `Atom-FK-molecule_id`";
+			// The index for the foreign key is dropped in the same statement because
+			// the server drops an index that it created implicitly for a foreign key
+			// (as the 0.20.1 batch did) as soon as another index can serve the key.
+			$query[] = "ALTER TABLE Atom ADD PRIMARY KEY (molecule_id, rack_id, unit_no, atom), DROP KEY `Atom-FK-molecule_id`";
 			$query[] = "UPDATE Config SET varvalue = '0.21.1' WHERE varname = 'DB_VERSION'";
 			break;
 		case '0.21.2':
-			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `old_molecule_id` (old_molecule_id)";
-			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `new_molecule_id` (new_molecule_id)";
-			$query[] = "ALTER TABLE MountOperation DROP KEY `MountOperation-FK-old_molecule_id`";
-			$query[] = "ALTER TABLE MountOperation DROP KEY `MountOperation-FK-new_molecule_id`";
+			// Same as for Atom in the 0.21.1 batch.
+			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `old_molecule_id` (old_molecule_id), DROP KEY `MountOperation-FK-old_molecule_id`";
+			$query[] = "ALTER TABLE MountOperation ADD UNIQUE KEY `new_molecule_id` (new_molecule_id), DROP KEY `MountOperation-FK-new_molecule_id`";
 			$query[] = "ALTER TABLE IPv4Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "ALTER TABLE IPv6Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "INSERT INTO Chapter (`id`, `sticky`, `name`) VALUES (39,'no','UPS models')";
