@@ -2690,6 +2690,8 @@ function renderIPSpaceEditor()
 			echo "<tr valign=top><td>";
 			if (! isIPNetworkEmpty ($netinfo))
 				printImageHREF ('nodestroy', 'There are ' . count ($netinfo['addrlist']) . ' allocations inside');
+			elseif (isset ($netinfo['covering_net']))
+				echo getOpLink (array	('op' => 'del', 'id' => $netinfo['id']), '', 'destroy', getCoveredIPNetDeleteHint ($netinfo), 'need-confirmation');
 			else
 				echo getOpLink (array	('op' => 'del', 'id' => $netinfo['id']), '', 'destroy', 'Delete this prefix');
 			echo '</td><td class=tdleft>' . mkCellA ($netinfo) . '</td>';
@@ -3225,6 +3227,15 @@ function renderIPv6NetworkAddresses ($netinfo)
 		addJSInternal ('js/inplace-edit.js');
 }
 
+// the hint of the delete link of a network that has addresses of its own
+// and is contained in another network (see isIPNetworkEmpty())
+function getCoveredIPNetDeleteHint ($netinfo)
+{
+	$covering_net = $netinfo['covering_net'];
+	return 'Delete this prefix, the addresses inside will belong to ' .
+		$covering_net['ip'] . '/' . $covering_net['mask'];
+}
+
 function renderIPNetworkProperties ($id)
 {
 	$netdata = spotEntity (etypeByPageno(), $id);
@@ -3247,6 +3258,8 @@ function renderIPNetworkProperties ($id)
 	echo '<center>';
 	if (! isIPNetworkEmpty ($netdata))
 		echo getOpLink (NULL, 'delete this prefix', 'nodestroy', 'There are ' . count ($netdata['addrlist']) . ' allocations inside');
+	elseif (isset ($netdata['covering_net']))
+		echo getOpLink (array('op'=>'del'), 'delete this prefix', 'destroy', getCoveredIPNetDeleteHint ($netdata), 'need-confirmation');
 	else
 		echo getOpLink (array('op'=>'del'), 'delete this prefix', 'destroy');
 	echo '</center>';

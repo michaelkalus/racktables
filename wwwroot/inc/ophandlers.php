@@ -1008,11 +1008,7 @@ function delIPv4Prefix ()
 		showError ("There are allocations within prefix, delete forbidden");
 		return;
 	}
-	if (array_key_exists ($netinfo['ip_bin'], $netinfo['addrlist']))
-		updateV4Address ($netinfo['ip_bin'], '', 'no');
-	$last_ip = ip_last ($netinfo);
-	if (array_key_exists ($last_ip, $netinfo['addrlist']))
-		updateV4Address ($last_ip, '', 'no');
+	releaseIPNetworkAutoReservations ($netinfo);
 	destroyIPv4Prefix ($netinfo['id']);
 	showFuncMessage (__FUNCTION__, 'OK');
 	global $pageno;
@@ -1030,8 +1026,7 @@ function delIPv6Prefix ()
 		showError ("There are allocations within prefix, delete forbidden");
 		return;
 	}
-	if (array_key_exists ($netinfo['ip_bin'], $netinfo['addrlist']))
-		updateV6Address ($netinfo['ip_bin'], '', 'no');
+	releaseIPNetworkAutoReservations ($netinfo);
 	destroyIPv6Prefix ($netinfo['id']);
 	showFuncMessage (__FUNCTION__, 'OK');
 	global $pageno;
