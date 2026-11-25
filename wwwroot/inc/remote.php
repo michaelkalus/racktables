@@ -471,6 +471,7 @@ function queryTerminal ($object_id, $commands, $tolerate_remote_errors = TRUE)
 		throw new RTGatewayError ('cannot pick management address');
 
 	$hide_warnings = FALSE;
+	$ignore_ssh_closed = FALSE;
 
 	// telnet prompt and mode specification
 	switch ($breed = detectDeviceBreed ($object_id))
@@ -484,6 +485,10 @@ function queryTerminal ($object_id, $commands, $tolerate_remote_errors = TRUE)
 				$protocol = 'telnet'; # Aironet IOS is broken
 			$prompt = '^(Login|[Uu]sername|Password): $|^\S+[>#]$|\[[^][]*\]\? $|\?\s+\[[^][]*\]\s*$|\[confirm yes\/no\]: $'; // set the prompt in case user would like to specify telnet protocol
 			$commands = "terminal length 0\nterminal no monitor\n" . $commands;
+			# FTOS closes the session upon exit, so ssh and sshnokey always
+			# print 'Connection to $ip closed by remote host.', which is not an error.
+			if ($breed == 'ftos8')
+				$ignore_ssh_closed = TRUE;
 			break;
 		case 'fdry5':
 			$protocol = 'netcat'; // default is netcat mode
@@ -578,6 +583,8 @@ function queryTerminal ($object_id, $commands, $tolerate_remote_errors = TRUE)
 	$params = callHook ('makeGatewayParams', $object_id, array (&$settings), array (&$commands));
 	// call gateway
 	$ret_code = callScript ($settings['protocol'], $params, $commands, $out, $errors);
+	if ($ignore_ssh_closed && substr ($settings['protocol'], 0, 3) == 'ssh')
+		$errors = stripSSHClosedByRemoteHost ($errors);
 
 	if (substr($settings['protocol'],0,3) != 'ssh' || ! $settings['tolerate_remote_errors'])
 	{
@@ -591,6 +598,13 @@ function queryTerminal ($object_id, $commands, $tolerate_remote_errors = TRUE)
 			if ($line != '' && ! $hide_warnings)
 				showWarning ("{$settings['protocol']} {$settings['hostname']}: $line");
 	return strtr($out, array("\r" => "")); // cut ^M symbols
+}
+
+// Remove the 'Connection to <host> closed by remote host.' lines from the
+// ssh stderr text and keep everything else.
+function stripSSHClosedByRemoteHost ($errors)
+{
+	return preg_replace ('/^Connection to \S+ closed by remote host\.\r?(?:\n|$)/m', '', $errors);
 }
 
 function callScript ($gwname, $params, $in, &$out, &$errors)
