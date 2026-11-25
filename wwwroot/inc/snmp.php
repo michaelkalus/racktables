@@ -4783,24 +4783,48 @@ function doSwitchSNMPmining ($objectInfo, $device)
 	case preg_match ('/^9\.5\.18$/', $sysObjectID):
 		$exact_release = preg_replace ('/^.*, Version ([^ ]+), .*$/', '\\1', $sysDescr);
 		$major_line = preg_replace ('/^([[:digit:]]+\.[[:digit:]]+)[^[:digit:]].*/', '\\1', $exact_release);
+		// SW type values per object type, each in its own chapter
 		$ios_codes = array
 		(
-			'12.0' => 244,
-			'12.1' => 251,
-			'12.2' => 252,
-			'15.0' => 1901,
-			'15.1' => 2082,
-			'15.2' => 2142,
+			7 => array // router OS type
+			(
+				'12.0' => 254,
+				'12.1' => 255,
+				'12.2' => 256,
+				'12.3' => 257,
+				'12.4' => 258,
+				'15.0' => 2667,
+				'15.1' => 1963,
+				'15.2' => 2668,
+				'15.3' => 2669,
+				'15.4' => 2670,
+				'15.5' => 2671,
+			),
+			8 => array // switch OS type
+			(
+				'12.0' => 244,
+				'12.1' => 251,
+				'12.2' => 252,
+				'15.0' => 1901,
+				'15.1' => 2082,
+				'15.2' => 2142,
+			),
+			965 => array // wireless OS type
+			(
+				'12.3' => 1673,
+				'12.4' => 1674,
+			),
 		);
 		updateStickerForCell ($objectInfo, 5, $exact_release);
-		if (array_key_exists ($major_line, $ios_codes))
-			updateStickerForCell ($objectInfo, 4, $ios_codes[$major_line]);
+		if (isset ($ios_codes[$objectInfo['objtype_id']][$major_line]))
+			updateStickerForCell ($objectInfo, 4, $ios_codes[$objectInfo['objtype_id']][$major_line]);
 		$sysChassi = $device->snmpget ('1.3.6.1.4.1.9.3.6.3.0');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 		checkPIC ('1-29');
 		addDesiredPort ($desiredPorts, 'con0', '1-29', 'console', ''); // RJ-45 RS-232 console
-		if (preg_match ('/Cisco IOS Software, C2600/', $sysDescr))
+		// ISR routers (1841, 2800, 3800, 1900, 2900, 3900) and 2600 series
+		if (preg_match ('/Cisco IOS Software, (C2600|(1841|2800|3800|C1900|C2900|C3900e?) Software)/', $sysDescr))
 			addDesiredPort ($desiredPorts, 'aux0', '1-29', 'auxillary', ''); // RJ-45 RS-232 aux port
 		if ($sysObjectID == '9.1.956')
 		{
@@ -4842,7 +4866,7 @@ function doSwitchSNMPmining ($objectInfo, $device)
 			updateStickerForCell ($objectInfo, 4, $nxos_codes[$major_line]);
 		updateStickerForCell ($objectInfo, 5, $exact_release);
 		$sysChassi = $device->snmpget ('1.3.6.1.2.1.47.1.1.1.1.11.149');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 		checkPIC ('1-29');
 		addDesiredPort ($desiredPorts, 'con0', '1-29', 'console', ''); // RJ-45 RS-232 console
@@ -4915,7 +4939,7 @@ function doSwitchSNMPmining ($objectInfo, $device)
 		updateStickerForCell ($objectInfo, 5, $exact_release);
 		# FOUNDRY-SN-AGENT-MIB::snChasSerNum.0
 		$sysChassi = $device->snmpget ('enterprises.1991.1.1.1.1.2.0');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 
 		# Type of uplink module installed.
@@ -5381,7 +5405,7 @@ class APCPowerSwitch extends RTSNMPDevice
 
 	function getPortStatus($id)
 	{
-		return trim($this->snmpget("{$this->snmpMib}.1.1.12.3.3.1.1.4.$id"), 'INTEGER: ');
+		return str_replace('INTEGER: ', '', $this->snmpget("{$this->snmpMib}.1.1.12.3.3.1.1.4.$id"));
 	}
 
 	function getPortName($id)
