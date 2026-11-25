@@ -4529,81 +4529,90 @@ function exec8021QDeploy ($object_id, $do_push)
 
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	$vswitch = getVLANSwitchInfo ($object_id, 'FOR UPDATE');
-	$D = getStored8021QConfig ($vswitch['object_id'], 'desired');
-	$Dnew = $D;
-	$C = getStored8021QConfig ($vswitch['object_id'], 'cached');
-	$conflict = FALSE;
-	$ok_to_push = array();
-	foreach (get8021QSyncOptions ($vswitch, $D, $C, $R['portdata']) as $pn => $port)
+	try
 	{
-		// always update cache with new data from switch
-		switch ($port['status'])
+		$vswitch = getVLANSwitchInfo ($object_id, 'FOR UPDATE');
+		$D = getStored8021QConfig ($vswitch['object_id'], 'desired');
+		$Dnew = $D;
+		$C = getStored8021QConfig ($vswitch['object_id'], 'cached');
+		$conflict = FALSE;
+		$ok_to_push = array();
+		foreach (get8021QSyncOptions ($vswitch, $D, $C, $R['portdata']) as $pn => $port)
 		{
-		case 'ok_to_merge':
-			// FIXME: this can be logged
-			upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['both'], $C[$pn]);
-			break;
-		case 'ok_to_delete':
-			$nsaved += del8021QPort ($vswitch['object_id'], $pn);
-			unset ($Dnew[$pn]);
-			break;
-		case 'ok_to_add':
-			$nsaved += add8021QPort ($vswitch['object_id'], $pn, $port['right']);
-			$Dnew[$pn] = $port['right'];
-			break;
-		case 'delete_conflict':
-		case 'merge_conflict':
-		case 'add_conflict':
-		case 'martian_conflict':
-			$conflict = TRUE;
-			break;
-		case 'ok_to_pull':
-			// FIXME: this can be logged
-			$nsaved += upd8021QPort ('desired', $vswitch['object_id'], $pn, $port['right'], $D[$pn]);
-			upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['right'], $C[$pn]);
-			$Dnew[$pn] = $port['right'];
-			break;
-		case 'ok_to_push_with_merge':
-			upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['right'], $C[$pn]);
-			// fall through
-		case 'ok_to_push':
-			$ok_to_push[$pn] = $port['left'];
-			break;
+			// always update cache with new data from switch
+			switch ($port['status'])
+			{
+			case 'ok_to_merge':
+				// FIXME: this can be logged
+				upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['both'], $C[$pn]);
+				break;
+			case 'ok_to_delete':
+				$nsaved += del8021QPort ($vswitch['object_id'], $pn);
+				unset ($Dnew[$pn]);
+				break;
+			case 'ok_to_add':
+				$nsaved += add8021QPort ($vswitch['object_id'], $pn, $port['right']);
+				$Dnew[$pn] = $port['right'];
+				break;
+			case 'delete_conflict':
+			case 'merge_conflict':
+			case 'add_conflict':
+			case 'martian_conflict':
+				$conflict = TRUE;
+				break;
+			case 'ok_to_pull':
+				// FIXME: this can be logged
+				$nsaved += upd8021QPort ('desired', $vswitch['object_id'], $pn, $port['right'], $D[$pn]);
+				upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['right'], $C[$pn]);
+				$Dnew[$pn] = $port['right'];
+				break;
+			case 'ok_to_push_with_merge':
+				upd8021QPort ('cached', $vswitch['object_id'], $pn, $port['right'], $C[$pn]);
+				// fall through
+			case 'ok_to_push':
+				$ok_to_push[$pn] = $port['left'];
+				break;
+			}
 		}
-	}
-	// redo uplinks if some changes were pulled
-	if ($nsaved)
-	{
-		$domain_vlanlist = getDomainVLANList ($vswitch['domain_id']);
-		$Dnew = apply8021QOrder ($vswitch, $Dnew);
-		// Take new "desired" configuration and derive uplink port configuration
-		// from it. Then cancel changes to immune VLANs and save resulting
-		// changes (if any left).
-		$new_uplinks = filter8021QChangeRequests ($domain_vlanlist, $Dnew, produceUplinkPorts ($domain_vlanlist, $Dnew, $vswitch['object_id']));
-		$nsaved_uplinks += replace8021QPorts ('desired', $vswitch['object_id'], $Dnew, $new_uplinks);
-	}
+		// redo uplinks if some changes were pulled
+		if ($nsaved)
+		{
+			$domain_vlanlist = getDomainVLANList ($vswitch['domain_id']);
+			$Dnew = apply8021QOrder ($vswitch, $Dnew);
+			// Take new "desired" configuration and derive uplink port configuration
+			// from it. Then cancel changes to immune VLANs and save resulting
+			// changes (if any left).
+			$new_uplinks = filter8021QChangeRequests ($domain_vlanlist, $Dnew, produceUplinkPorts ($domain_vlanlist, $Dnew, $vswitch['object_id']));
+			$nsaved_uplinks += replace8021QPorts ('desired', $vswitch['object_id'], $Dnew, $new_uplinks);
+		}
 
-	$out_of_sync = FALSE;
-	$errno = E_8021Q_NOERROR;
-	if ($nsaved + $nsaved_uplinks || count ($ok_to_push))
-		$out_of_sync = TRUE;
-	if ($conflict)
-	{
-		$errno = E_8021Q_VERSION_CONFLICT;
-		$out_of_sync = TRUE;
-	}
-	setVLANSwitchError ($object_id, $errno);
+		$out_of_sync = FALSE;
+		$errno = E_8021Q_NOERROR;
+		if ($nsaved + $nsaved_uplinks || count ($ok_to_push))
+			$out_of_sync = TRUE;
+		if ($conflict)
+		{
+			$errno = E_8021Q_VERSION_CONFLICT;
+			$out_of_sync = TRUE;
+		}
+		setVLANSwitchError ($object_id, $errno);
 
-	$mutex_rev = $vswitch['mutex_rev'];
-	if ($vswitch['out_of_sync'] == "yes" && ! $out_of_sync)
-		detouchVLANSwitch ($object_id, $mutex_rev);
-	elseif ($vswitch['out_of_sync'] == "no" && $out_of_sync)
-	{
-		touchVLANSwitch ($object_id);
-		++$mutex_rev;
+		$mutex_rev = $vswitch['mutex_rev'];
+		if ($vswitch['out_of_sync'] == "yes" && ! $out_of_sync)
+			detouchVLANSwitch ($object_id, $mutex_rev);
+		elseif ($vswitch['out_of_sync'] == "no" && $out_of_sync)
+		{
+			touchVLANSwitch ($object_id);
+			++$mutex_rev;
+		}
+		$dbxlink->commit();
 	}
-	$dbxlink->commit();
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 
 	if ($out_of_sync && $do_push)
 	{
@@ -4620,10 +4629,19 @@ function exec8021QDeploy ($object_id, $do_push)
 
 		// update cache for ports deployed
 		$dbxlink->beginTransaction();
-		replace8021QPorts ('cached', $vswitch['object_id'], $R['portdata'], $ok_to_push);
-		setVLANSwitchError ($object_id, E_8021Q_NOERROR);
-		detouchVLANSwitch ($object_id, $mutex_rev);
-		$dbxlink->commit();
+		try
+		{
+			replace8021QPorts ('cached', $vswitch['object_id'], $R['portdata'], $ok_to_push);
+			setVLANSwitchError ($object_id, E_8021Q_NOERROR);
+			detouchVLANSwitch ($object_id, $mutex_rev);
+			$dbxlink->commit();
+		}
+		catch (Exception $e)
+		{
+			if ($dbxlink->inTransaction())
+				$dbxlink->rollBack();
+			throw $e;
+		}
 	}
 	// start downlink work only after unlocking current object to make deadlocks less likely to happen
 	// TODO: only process changed uplink ports
@@ -4649,32 +4667,41 @@ function saveDownlinksReverb ($object_id, $requested_changes)
 	$nsaved = 0;
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	if (NULL === $vswitch = getVLANSwitchInfo ($object_id, 'FOR UPDATE')) // not configured, bail out
+	try
 	{
-		$dbxlink->rollBack();
-		return;
+		if (NULL === $vswitch = getVLANSwitchInfo ($object_id, 'FOR UPDATE')) // not configured, bail out
+		{
+			$dbxlink->rollBack();
+			return;
+		}
+		$domain_vlanlist = getDomainVLANList ($vswitch['domain_id']);
+		// aplly VST to the smallest set necessary
+		$requested_changes = apply8021QOrder ($vswitch, $requested_changes);
+		$before = getStored8021QConfig ($object_id, 'desired', array_keys ($requested_changes));
+		$changes_to_save = array();
+		// first filter by wrt_vlans constraint
+		foreach ($requested_changes as $pn => $requested)
+			if (array_key_exists ($pn, $before) && $requested['vst_role'] == 'downlink')
+				$changes_to_save[$pn] = array
+				(
+					'vst_role' => 'downlink',
+					'mode' => 'trunk',
+					'allowed' => filterVLANList ($requested['allowed'], $requested['wrt_vlans']),
+					'native' => 0,
+				);
+		// immune VLANs filter
+		foreach (filter8021QChangeRequests ($domain_vlanlist, $before, $changes_to_save) as $pn => $finalconfig)
+			$nsaved += upd8021QPort ('desired', $vswitch['object_id'], $pn, $finalconfig, $before[$pn]);
+		if ($nsaved)
+			touchVLANSwitch ($vswitch['object_id']);
+		$dbxlink->commit();
 	}
-	$domain_vlanlist = getDomainVLANList ($vswitch['domain_id']);
-	// aplly VST to the smallest set necessary
-	$requested_changes = apply8021QOrder ($vswitch, $requested_changes);
-	$before = getStored8021QConfig ($object_id, 'desired', array_keys ($requested_changes));
-	$changes_to_save = array();
-	// first filter by wrt_vlans constraint
-	foreach ($requested_changes as $pn => $requested)
-		if (array_key_exists ($pn, $before) && $requested['vst_role'] == 'downlink')
-			$changes_to_save[$pn] = array
-			(
-				'vst_role' => 'downlink',
-				'mode' => 'trunk',
-				'allowed' => filterVLANList ($requested['allowed'], $requested['wrt_vlans']),
-				'native' => 0,
-			);
-	// immune VLANs filter
-	foreach (filter8021QChangeRequests ($domain_vlanlist, $before, $changes_to_save) as $pn => $finalconfig)
-		$nsaved += upd8021QPort ('desired', $vswitch['object_id'], $pn, $finalconfig, $before[$pn]);
-	if ($nsaved)
-		touchVLANSwitch ($vswitch['object_id']);
-	$dbxlink->commit();
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 	return $nsaved;
 }
 

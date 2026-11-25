@@ -2011,23 +2011,32 @@ function commitUpdatePortComment ($port_id, $port_reservation_comment)
 {
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	$prev_comment = getPortReservationComment ($port_id, 'FOR UPDATE');
-	$reservation_comment = nullIfEmptyStr ($port_reservation_comment);
-	usePreparedUpdateBlade
-	(
-		'Port',
-		array
+	try
+	{
+		$prev_comment = getPortReservationComment ($port_id, 'FOR UPDATE');
+		$reservation_comment = nullIfEmptyStr ($port_reservation_comment);
+		usePreparedUpdateBlade
 		(
-			'reservation_comment' => $reservation_comment,
-		),
-		array
-		(
-			'id' => $port_id,
-		)
-	);
-	if ($prev_comment !== $reservation_comment)
-		addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $prev_comment, $reservation_comment));
-	$dbxlink->commit();
+			'Port',
+			array
+			(
+				'reservation_comment' => $reservation_comment,
+			),
+			array
+			(
+				'id' => $port_id,
+			)
+		);
+		if ($prev_comment !== $reservation_comment)
+			addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $prev_comment, $reservation_comment));
+		$dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 }
 
 function commitUpdatePortOIF ($port_id, $port_type_id)
@@ -6020,21 +6029,30 @@ function commitUpdateVSTRules ($vst_id, $mutex_rev, $rules)
 {
 	global $dbxlink, $remote_username;
 	$dbxlink->beginTransaction();
-	$result = usePreparedSelectBlade
-	(
-		'SELECT mutex_rev, saved_by FROM VLANSwitchTemplate ' .
-		'WHERE id = ? FOR UPDATE',
-		array ($vst_id)
-	);
-	$vst = $result->fetch (PDO::FETCH_ASSOC);
-	unset ($result);
-	if ($vst['mutex_rev'] != $mutex_rev)
-		throw new InvalidRequestArgException ('mutex_rev', $mutex_rev, "already saved by {$vst['saved_by']}");
-	usePreparedDeleteBlade ('VLANSTRule', array ('vst_id' => $vst_id));
-	foreach ($rules as $rule)
-		usePreparedInsertBlade ('VLANSTRule', array_merge (array ('vst_id' => $vst_id), $rule));
-	usePreparedExecuteBlade ('UPDATE VLANSwitchTemplate SET mutex_rev=mutex_rev+1, saved_by=? WHERE id=?', array ($remote_username, $vst_id));
-	$dbxlink->commit();
+	try
+	{
+		$result = usePreparedSelectBlade
+		(
+			'SELECT mutex_rev, saved_by FROM VLANSwitchTemplate ' .
+			'WHERE id = ? FOR UPDATE',
+			array ($vst_id)
+		);
+		$vst = $result->fetch (PDO::FETCH_ASSOC);
+		unset ($result);
+		if ($vst['mutex_rev'] != $mutex_rev)
+			throw new InvalidRequestArgException ('mutex_rev', $mutex_rev, "already saved by {$vst['saved_by']}");
+		usePreparedDeleteBlade ('VLANSTRule', array ('vst_id' => $vst_id));
+		foreach ($rules as $rule)
+			usePreparedInsertBlade ('VLANSTRule', array_merge (array ('vst_id' => $vst_id), $rule));
+		usePreparedExecuteBlade ('UPDATE VLANSwitchTemplate SET mutex_rev=mutex_rev+1, saved_by=? WHERE id=?', array ($remote_username, $vst_id));
+		$dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 }
 
 // Return entity ID, if its 'name' column equals to provided string, or NULL otherwise (nothing
@@ -6404,27 +6422,45 @@ function commitModifyPatchCableAmount ($heap_id, $by_amount)
 {
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	usePreparedExecuteBlade
-	(
-		'UPDATE PatchCableHeap SET amount = amount + ? WHERE id = ? AND amount + ? >= 0',
-		array ($by_amount, $heap_id, $by_amount)
-	);
-	addPatchCableHeapLogEntry ($heap_id, "amount adjusted by {$by_amount}");
-	return $dbxlink->commit();
+	try
+	{
+		usePreparedExecuteBlade
+		(
+			'UPDATE PatchCableHeap SET amount = amount + ? WHERE id = ? AND amount + ? >= 0',
+			array ($by_amount, $heap_id, $by_amount)
+		);
+		addPatchCableHeapLogEntry ($heap_id, "amount adjusted by {$by_amount}");
+		return $dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 }
 
 function commitSetPatchCableAmount ($heap_id, $new_amount)
 {
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	usePreparedUpdateBlade
-	(
-		'PatchCableHeap',
-		array ('amount' => $new_amount),
-		array ('id' => $heap_id)
-	);
-	addPatchCableHeapLogEntry ($heap_id, "amount set to {$new_amount}");
-	return $dbxlink->commit();
+	try
+	{
+		usePreparedUpdateBlade
+		(
+			'PatchCableHeap',
+			array ('amount' => $new_amount),
+			array ('id' => $heap_id)
+		);
+		addPatchCableHeapLogEntry ($heap_id, "amount set to {$new_amount}");
+		return $dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 }
 
 function getPatchCableHeapLogEntries ($heap_id)

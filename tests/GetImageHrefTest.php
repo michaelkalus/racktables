@@ -76,6 +76,9 @@ class GetImageHrefTest extends RTTestCase
 		);
 	} # providerUnary()
 
+	/**
+	 * @group small
+	 */
 	public function testNullaryRTE(): void
 	{
 		$this->expectException (RackTablesError::class);

@@ -1137,61 +1137,70 @@ function processGridForm (&$rackData, $unchecked_state, $checked_state, $object_
 	$rack_name = $rackData['name'];
 	$rackchanged = FALSE;
 	$dbxlink->beginTransaction();
-	for ($unit_no = $rackData['height']; $unit_no > 0; $unit_no--)
+	try
 	{
-		for ($locidx = 0; $locidx < 3; $locidx++)
+		for ($unit_no = $rackData['height']; $unit_no > 0; $unit_no--)
 		{
-			if ($rackData[$unit_no][$locidx]['enabled'] != TRUE)
-				continue;
-			// detect a change
-			$state = $rackData[$unit_no][$locidx]['state'];
-			$newstate = isCheckSet ("atom_{$rack_id}_{$unit_no}_{$locidx}") ? $checked_state : $unchecked_state;
-			if ($state == $newstate)
-				continue;
-			$rackchanged = TRUE;
-			// and validate
-			$atom = $loclist[$locidx];
-			// The only changes allowed are those introduced by checkbox grid.
-			if
-			(
-				!($state == $checked_state && $newstate == $unchecked_state) &&
-				!($state == $unchecked_state && $newstate == $checked_state)
-			)
+			for ($locidx = 0; $locidx < 3; $locidx++)
 			{
-				showError ("{$rack_name}: Rack ID {$rack_id}, unit {$unit_no}, 'atom {$atom}', cannot change state from '{$state}' to '{$newstate}'");
-				$dbxlink->rollBack();
-				return FALSE;
-			}
-			// This code uses an unconditional DELETE followed by a conditional INSERT
-			// rather than ON DUPLICATE KEY UPDATE.
-			usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $rack_id, 'unit_no' => $unit_no, 'atom' => $atom));
-			if ($newstate != 'F')
-				usePreparedInsertBlade ('RackSpace', array ('rack_id' => $rack_id, 'unit_no' => $unit_no, 'atom' => $atom, 'state' => $newstate));
-			if ($newstate == 'T' && $object_id != 0)
-			{
-				// At this point respective row exists in RackSpace and has state set to "T".
-				usePreparedUpdateBlade
+				if ($rackData[$unit_no][$locidx]['enabled'] != TRUE)
+					continue;
+				// detect a change
+				$state = $rackData[$unit_no][$locidx]['state'];
+				$newstate = isCheckSet ("atom_{$rack_id}_{$unit_no}_{$locidx}") ? $checked_state : $unchecked_state;
+				if ($state == $newstate)
+					continue;
+				$rackchanged = TRUE;
+				// and validate
+				$atom = $loclist[$locidx];
+				// The only changes allowed are those introduced by checkbox grid.
+				if
 				(
-					'RackSpace',
-					array ('object_id' => $object_id),
-					array
+					!($state == $checked_state && $newstate == $unchecked_state) &&
+					!($state == $unchecked_state && $newstate == $checked_state)
+				)
+				{
+					showError ("{$rack_name}: Rack ID {$rack_id}, unit {$unit_no}, 'atom {$atom}', cannot change state from '{$state}' to '{$newstate}'");
+					$dbxlink->rollBack();
+					return FALSE;
+				}
+				// This code uses an unconditional DELETE followed by a conditional INSERT
+				// rather than ON DUPLICATE KEY UPDATE.
+				usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $rack_id, 'unit_no' => $unit_no, 'atom' => $atom));
+				if ($newstate != 'F')
+					usePreparedInsertBlade ('RackSpace', array ('rack_id' => $rack_id, 'unit_no' => $unit_no, 'atom' => $atom, 'state' => $newstate));
+				if ($newstate == 'T' && $object_id != 0)
+				{
+					// At this point respective row exists in RackSpace and has state set to "T".
+					usePreparedUpdateBlade
 					(
-						'rack_id' => $rack_id,
-						'unit_no' => $unit_no,
-						'atom' => $atom,
-					)
-				);
-				$rackData[$unit_no][$locidx]['object_id'] = $object_id;
+						'RackSpace',
+						array ('object_id' => $object_id),
+						array
+						(
+							'rack_id' => $rack_id,
+							'unit_no' => $unit_no,
+							'atom' => $atom,
+						)
+					);
+					$rackData[$unit_no][$locidx]['object_id'] = $object_id;
+				}
 			}
 		}
+		if ($rackchanged)
+		{
+			usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
+			$dbxlink->commit();
+			return TRUE;
+		}
+		$dbxlink->rollBack();
 	}
-	if ($rackchanged)
+	catch (Exception $e)
 	{
-		usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
-		$dbxlink->commit();
-		return TRUE;
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
 	}
-	$dbxlink->rollBack();
 	return FALSE;
 }
 
@@ -1295,27 +1304,36 @@ function updateObject ()
 
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	commitUpdateObject
-	(
-		$object_id,
-		$_REQUEST['object_name'],
-		$_REQUEST['object_label'],
-		isCheckSet ('object_has_problems', 'yesno'),
-		$_REQUEST['object_asset_no'],
-		$_REQUEST['object_comment']
-	);
-	updateObjectAttributes ($object_id);
-	$object = spotEntity ('object', $object_id);
-	if ($object_type_id != $object['objtype_id'])
+	try
 	{
-		if (! array_key_exists ($object_type_id, getObjectTypeChangeOptions ($object_id)))
-			throw new InvalidRequestArgException ('new type_id', $object_type_id, 'incompatible with requested attribute values');
-		usePreparedUpdateBlade ('Object', array ('objtype_id' => $object_type_id), array ('id' => $object_id));
+		commitUpdateObject
+		(
+			$object_id,
+			$_REQUEST['object_name'],
+			$_REQUEST['object_label'],
+			isCheckSet ('object_has_problems', 'yesno'),
+			$_REQUEST['object_asset_no'],
+			$_REQUEST['object_comment']
+		);
+		updateObjectAttributes ($object_id);
+		$object = spotEntity ('object', $object_id);
+		if ($object_type_id != $object['objtype_id'])
+		{
+			if (! array_key_exists ($object_type_id, getObjectTypeChangeOptions ($object_id)))
+				throw new InvalidRequestArgException ('new type_id', $object_type_id, 'incompatible with requested attribute values');
+			usePreparedUpdateBlade ('Object', array ('objtype_id' => $object_type_id), array ('id' => $object_id));
+		}
+		// Invalidate thumb cache of all racks objects could occupy.
+		foreach (getResidentRackIDs ($object_id) as $rack_id)
+			usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
+		$dbxlink->commit();
 	}
-	// Invalidate thumb cache of all racks objects could occupy.
-	foreach (getResidentRackIDs ($object_id) as $rack_id)
-		usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
-	$dbxlink->commit();
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 	rebuildTagChainForEntity ('object', $object_id, buildTagChainFromIds ($taglist), TRUE);
 	showFuncMessage (__FUNCTION__, 'OK');
 }
@@ -1976,34 +1994,43 @@ function updateTripletConfig()
 	{
 		global $dbxlink;
 		$dbxlink->beginTransaction();
-		$q = "SELECT * FROM $table WHERE";
-		$sep = '';
-		$params = array();
-		foreach ($key_fields as $field => $value)
+		try
 		{
-			$q .= " $sep $field = ?";
-			$params[] = $value;
-			$sep = 'AND';
-		}
-		$result = usePreparedSelectBlade ("$q FOR UPDATE", $params);
-		$row = $result->fetch (PDO::FETCH_ASSOC);
-		unset ($result);
-		if ($row)
-		{
-			if ($nchanged += usePreparedUpdateBlade ($table, $config_fields, $key_fields))
-				showSuccess ("$key config updated");
-		}
-		else
-		{
-			if (
-				$nchanged += ($table == 'VSEnabledIPs' ?
-					addSLBIPLink ($key_fields + $config_fields) :
-					addSLBPortLink ($key_fields + $config_fields)
+			$q = "SELECT * FROM $table WHERE";
+			$sep = '';
+			$params = array();
+			foreach ($key_fields as $field => $value)
+			{
+				$q .= " $sep $field = ?";
+				$params[] = $value;
+				$sep = 'AND';
+			}
+			$result = usePreparedSelectBlade ("$q FOR UPDATE", $params);
+			$row = $result->fetch (PDO::FETCH_ASSOC);
+			unset ($result);
+			if ($row)
+			{
+				if ($nchanged += usePreparedUpdateBlade ($table, $config_fields, $key_fields))
+					showSuccess ("$key config updated");
+			}
+			else
+			{
+				if (
+					$nchanged += ($table == 'VSEnabledIPs' ?
+						addSLBIPLink ($key_fields + $config_fields) :
+						addSLBPortLink ($key_fields + $config_fields)
+					)
 				)
-			)
-				showSuccess ("$key enabled");
+					showSuccess ("$key enabled");
+			}
+			$dbxlink->commit();
 		}
-		$dbxlink->commit();
+		catch (Exception $e)
+		{
+			if ($dbxlink->inTransaction())
+				$dbxlink->rollBack();
+			throw $e;
+		}
 	}
 	if (! $nchanged)
 		showNotice ("No changes made");
@@ -2021,9 +2048,18 @@ function removeTriplet()
 
 	global $dbxlink;
 	$dbxlink->beginTransaction();
-	usePreparedDeleteBlade ('VSEnabledIPs', $key_fields);
-	usePreparedDeleteBlade ('VSEnabledPorts', $key_fields);
-	$dbxlink->commit();
+	try
+	{
+		usePreparedDeleteBlade ('VSEnabledIPs', $key_fields);
+		usePreparedDeleteBlade ('VSEnabledPorts', $key_fields);
+		$dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 	showSuccess ('Triplet deleted');
 }
 
@@ -2050,7 +2086,7 @@ function createTriplet()
 				addSLBPortLink (array ('object_id' => $object_id, 'vs_id' => $vs_id, 'rspool_id' => $rspool_id, 'proto' => $port['proto'], 'vport' => $port['vport']));
 		$dbxlink->commit();
 	}
-	catch (RTDatabaseError $e)
+	catch (Exception $e)
 	{
 		$dbxlink->rollBack();
 		throw $e;
@@ -3304,6 +3340,12 @@ function importDPData()
 				$dbxlink->rollBack();
 				$nignored++;
 			}
+			catch (Exception $e)
+			{
+				if ($dbxlink->inTransaction())
+					$dbxlink->rollBack();
+				throw $e;
+			}
 		}
 	showFuncMessage (__FUNCTION__, 'OK', array ($nignored, $ndone));
 }
@@ -3598,56 +3640,64 @@ function doVSMigrate()
 	$plan = callHook ('buildVSMigratePlan', $vs_id, $old_vs_list);
 
 	$dbxlink->beginTransaction();
-
-	// remove all triplets
-	usePreparedDeleteBlade ('VSEnabledIPs', array ('vs_id' => $vs_id));
-	usePreparedDeleteBlade ('VSEnabledPorts', array ('vs_id' => $vs_id));
-
-	// remove all VIPs and ports that are in $plan and create new ones
-	foreach ($plan['vips'] as $vip)
+	try
 	{
-		usePreparedDeleteBlade ('VSIPs', array ('vs_id' => $vs_id, 'vip' => $vip['vip']));
-		usePreparedInsertBlade ('VSIPs', array ('vs_id' => $vs_id) + $vip);
-	}
-	foreach ($plan['ports'] as $port)
-	{
-		usePreparedDeleteBlade ('VSPorts', array ('vs_id' => $vs_id, 'proto' => $port['proto'], 'vport' => $port['vport']));
-		usePreparedInsertBlade ('VSPorts', array ('vs_id' => $vs_id) + $port);
-	}
+		// remove all triplets
+		usePreparedDeleteBlade ('VSEnabledIPs', array ('vs_id' => $vs_id));
+		usePreparedDeleteBlade ('VSEnabledPorts', array ('vs_id' => $vs_id));
 
-	// create triplets
-	foreach ($plan['triplets'] as $triplet)
-	{
-		$tr_key = array
-		(
-			'vs_id' => $triplet['vs_id'],
-			'object_id' => $triplet['object_id'],
-			'rspool_id' => $triplet['rspool_id'],
-		);
-
-		foreach ($triplet['ports'] as $port)
-			addSLBPortLink ($tr_key + $port);
-		foreach ($triplet['vips'] as $vip)
-			addSLBIPLink ($tr_key + $vip);
-	}
-
-	// update configs
-	usePreparedUpdateBlade ('VS', $plan['properties'], array ('id' => $vs_id));
-
-	// replace tags
-	global $taglist;
-	$chain = array();
-	foreach ($tag_ids as $tid)
-		if (! isset ($taglist[$tid]))
+		// remove all VIPs and ports that are in $plan and create new ones
+		foreach ($plan['vips'] as $vip)
 		{
-			$dbxlink->rollBack();
-			showError ("Unknown tag id $tid");
+			usePreparedDeleteBlade ('VSIPs', array ('vs_id' => $vs_id, 'vip' => $vip['vip']));
+			usePreparedInsertBlade ('VSIPs', array ('vs_id' => $vs_id) + $vip);
 		}
-		else
-			$chain[] = $taglist[$tid];
-	rebuildTagChainForEntity ('ipvs', $vs_id, $chain, TRUE);
+		foreach ($plan['ports'] as $port)
+		{
+			usePreparedDeleteBlade ('VSPorts', array ('vs_id' => $vs_id, 'proto' => $port['proto'], 'vport' => $port['vport']));
+			usePreparedInsertBlade ('VSPorts', array ('vs_id' => $vs_id) + $port);
+		}
 
-	$dbxlink->commit();
+		// create triplets
+		foreach ($plan['triplets'] as $triplet)
+		{
+			$tr_key = array
+			(
+				'vs_id' => $triplet['vs_id'],
+				'object_id' => $triplet['object_id'],
+				'rspool_id' => $triplet['rspool_id'],
+			);
+
+			foreach ($triplet['ports'] as $port)
+				addSLBPortLink ($tr_key + $port);
+			foreach ($triplet['vips'] as $vip)
+				addSLBIPLink ($tr_key + $vip);
+		}
+
+		// update configs
+		usePreparedUpdateBlade ('VS', $plan['properties'], array ('id' => $vs_id));
+
+		// replace tags
+		global $taglist;
+		$chain = array();
+		foreach ($tag_ids as $tid)
+			if (! isset ($taglist[$tid]))
+			{
+				$dbxlink->rollBack();
+				showError ("Unknown tag id $tid");
+			}
+			else
+				$chain[] = $taglist[$tid];
+		rebuildTagChainForEntity ('ipvs', $vs_id, $chain, TRUE);
+
+		$dbxlink->commit();
+	}
+	catch (Exception $e)
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+		throw $e;
+	}
 	showSuccess ("old VS configs were copied to VS group");
 	return buildRedirectURL (NULL, 'default');
 }
