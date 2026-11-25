@@ -598,25 +598,32 @@ function queryLDAPServer ($username, $password)
 		}
 	// preliminary decision may change during searching
 	$ret = array ('result' => 'ACK', 'displayed_name' => '', 'memberof' => array());
-	// Some servers deny anonymous search, thus search (if requested) only after binding.
-	// Displayed name only makes sense for authenticated users anyway.
+	// Some servers deny anonymous search, thus search (if possible) only after binding.
+	// Displayed name and group membership only make sense for authenticated users anyway.
 	if
 	(
-		isset ($LDAP_options['displayname_attrs']) &&
-		$LDAP_options['displayname_attrs'] != '' &&
 		isset ($LDAP_options['search_dn']) &&
 		$LDAP_options['search_dn'] != '' &&
 		isset ($LDAP_options['search_attr']) &&
 		$LDAP_options['search_attr'] != ''
 	)
 	{
+		$displayname_attrs = array();
+		if (isset ($LDAP_options['displayname_attrs']) && $LDAP_options['displayname_attrs'] != '')
+			$displayname_attrs = explode (' ', $LDAP_options['displayname_attrs']);
 		$results = @ldap_search
 		(
 			$connect,
 			$LDAP_options['search_dn'],
 			'(' . $LDAP_options['search_attr'] . '=' . ldap_escape ($username, '', LDAP_ESCAPE_FILTER) . ')',
-			array_merge (array ($LDAP_options['group_attr']), explode (' ', $LDAP_options['displayname_attrs']))
+			array_merge (array ($LDAP_options['group_attr']), $displayname_attrs)
 		);
+		if ($results === FALSE)
+		{
+			error_log ('RackTables: LDAP search for user attributes failed: ' . ldap_error ($connect));
+			@ldap_close ($connect);
+			return array ('result' => 'CAN');
+		}
 		if (@ldap_count_entries ($connect, $results) != 1)
 		{
 			@ldap_close ($connect);
@@ -625,7 +632,7 @@ function queryLDAPServer ($username, $password)
 		$info = @ldap_get_entries ($connect, $results);
 		ldap_free_result ($results);
 		$space = '';
-		foreach (explode (' ', $LDAP_options['displayname_attrs']) as $attr)
+		foreach ($displayname_attrs as $attr)
 			if (isset ($info[0][$attr]))
 			{
 				$ret['displayed_name'] .= $space . $info[0][$attr][0];
