@@ -649,88 +649,88 @@ function getVSLinkedObjects ($vs_id)
 // prevent linking two identical ip:port pairs, or two identical fwmarks to object
 function addSLBPortLink ($link_row)
 {
-	global $dbxlink;
-	$do_transaction = !isTransactionActive();
-	if ($do_transaction)
-		$dbxlink->beginTransaction();
-
-	// lock on port
-	$result = usePreparedSelectBlade
-	(
-		"SELECT vs_id, proto, vport FROM VSPorts WHERE proto = ? AND vport = ? FOR UPDATE",
-		array ($link_row['proto'], $link_row['vport'])
-	);
-	unset ($result);
-
-	// if this is a fwmark port, assure it is single link with given tag on that balancer
-	if ($link_row['proto'] == 'MARK')
+	// Undo the insert on any failure, also when called within a transaction.
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
 	{
+		// lock on port
 		$result = usePreparedSelectBlade
 		(
-			"SELECT COUNT(*) FROM VSEnabledPorts WHERE object_id = ? AND proto = ? AND vport = ?",
-			array ($link_row['object_id'], $link_row['proto'], $link_row['vport'])
+			"SELECT vs_id, proto, vport FROM VSPorts WHERE proto = ? AND vport = ? FOR UPDATE",
+			array ($link_row['proto'], $link_row['vport'])
 		);
-		if (0 < $result->fetchColumn())
-		{
-			if ($do_transaction)
-				$dbxlink->rollBack();
-			throw new RTDatabaseError ("Duplicate link of fwmark " . $link_row['vport'] . " to object #" . $link_row['object_id']);
-		}
 		unset ($result);
-	}
-	$ret = usePreparedInsertBlade ('VSEnabledPorts', $link_row);
-	if ($link_row['proto'] != 'MARK')
-	{
-		$result = usePreparedSelectBlade
-		(
-			"SELECT vip FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id)
-			WHERE vep.object_id = ? AND proto = ? AND vport = ?
-			GROUP BY vip HAVING COUNT(distinct vip) != COUNT(vip)",
-			array ($link_row['object_id'], $link_row['proto'], $link_row['vport'])
-		);
-		if ($row = $result->fetch (PDO::FETCH_ASSOC, 0))
+
+		// if this is a fwmark port, assure it is single link with given tag on that balancer
+		if ($link_row['proto'] == 'MARK')
 		{
+			$result = usePreparedSelectBlade
+			(
+				"SELECT COUNT(*) FROM VSEnabledPorts WHERE object_id = ? AND proto = ? AND vport = ?",
+				array ($link_row['object_id'], $link_row['proto'], $link_row['vport'])
+			);
+			if (0 < $result->fetchColumn())
+				throw new RTDatabaseError ("Duplicate link of fwmark " . $link_row['vport'] . " to object #" . $link_row['object_id']);
 			unset ($result);
-			if ($do_transaction)
-				$dbxlink->rollBack();
-			throw new RTDatabaseError (sprintf ("Duplicate link of %s [%s]:%s to object #%d", $link_row['proto'], ip_format ($row['vip']), $link_row['vport'], $link_row['object_id']));
+		}
+		$ret = usePreparedInsertBlade ('VSEnabledPorts', $link_row);
+		if ($link_row['proto'] != 'MARK')
+		{
+			$result = usePreparedSelectBlade
+			(
+				"SELECT vip FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id)
+				WHERE vep.object_id = ? AND proto = ? AND vport = ?
+				GROUP BY vip HAVING COUNT(distinct vip) != COUNT(vip)",
+				array ($link_row['object_id'], $link_row['proto'], $link_row['vport'])
+			);
+			if ($row = $result->fetch (PDO::FETCH_ASSOC, 0))
+			{
+				unset ($result);
+				throw new RTDatabaseError (sprintf ("Duplicate link of %s [%s]:%s to object #%d", $link_row['proto'], ip_format ($row['vip']), $link_row['vport'], $link_row['object_id']));
+			}
 		}
 	}
-	if ($do_transaction)
-		$dbxlink->commit();
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
+	endAtomicChange ($savepoint, TRUE);
 	return $ret;
 }
 
 // prevent linking two identical ip:port pairs to object
 function addSLBIPLink ($link_row)
 {
-	global $dbxlink;
-	$do_transaction = !isTransactionActive();
-	if ($do_transaction)
-		$dbxlink->beginTransaction();
-
-	// lock on vip
-	$result = usePreparedSelectBlade
-	(
-		"SELECT vs_id, vip FROM VSIPs WHERE vip = ? FOR UPDATE",
-		array ($link_row['vip'])
-	);
-	unset ($result);
-
-	$ret = usePreparedInsertBlade ('VSEnabledIPs', $link_row);
-	$result = usePreparedSelectBlade
-	(
-		"SELECT proto, vport FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id) WHERE vei.object_id = ? AND vip = ? GROUP BY proto, vport HAVING COUNT(*) > 1",
-		array ($link_row['object_id'], $link_row['vip'])
-	);
-	if ($row = $result->fetch (PDO::FETCH_ASSOC, 0))
+	// Undo the insert on any failure, also when called within a transaction.
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
 	{
+		// lock on vip
+		$result = usePreparedSelectBlade
+		(
+			"SELECT vs_id, vip FROM VSIPs WHERE vip = ? FOR UPDATE",
+			array ($link_row['vip'])
+		);
 		unset ($result);
-		if ($do_transaction)
-			$dbxlink->rollBack();
-		throw new RTDatabaseError (sprintf ("Duplicate link of %s [%s]:%s to object #%d", $row['proto'], ip_format ($link_row['vip']), $row['vport'], $link_row['object_id']));
+
+		$ret = usePreparedInsertBlade ('VSEnabledIPs', $link_row);
+		$result = usePreparedSelectBlade
+		(
+			"SELECT proto, vport FROM VSEnabledPorts vep INNER JOIN VSEnabledIPs vei USING (vs_id, object_id, rspool_id) WHERE vei.object_id = ? AND vip = ? GROUP BY proto, vport HAVING COUNT(*) > 1",
+			array ($link_row['object_id'], $link_row['vip'])
+		);
+		if ($row = $result->fetch (PDO::FETCH_ASSOC, 0))
+		{
+			unset ($result);
+			throw new RTDatabaseError (sprintf ("Duplicate link of %s [%s]:%s to object #%d", $row['proto'], ip_format ($link_row['vip']), $row['vport'], $link_row['object_id']));
+		}
 	}
-	if ($do_transaction)
-		$dbxlink->commit();
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
+	endAtomicChange ($savepoint, TRUE);
 	return $ret;
 }

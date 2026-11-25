@@ -2009,25 +2009,32 @@ function commitDeletePorts ($object_id, $port_ids = NULL)
 
 function commitUpdatePortComment ($port_id, $port_reservation_comment)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
-	$prev_comment = getPortReservationComment ($port_id, 'FOR UPDATE');
-	$reservation_comment = nullIfEmptyStr ($port_reservation_comment);
-	usePreparedUpdateBlade
-	(
-		'Port',
-		array
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
+	{
+		$prev_comment = getPortReservationComment ($port_id, 'FOR UPDATE');
+		$reservation_comment = nullIfEmptyStr ($port_reservation_comment);
+		usePreparedUpdateBlade
 		(
-			'reservation_comment' => $reservation_comment,
-		),
-		array
-		(
-			'id' => $port_id,
-		)
-	);
-	if ($prev_comment !== $reservation_comment)
-		addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $prev_comment, $reservation_comment));
-	$dbxlink->commit();
+			'Port',
+			array
+			(
+				'reservation_comment' => $reservation_comment,
+			),
+			array
+			(
+				'id' => $port_id,
+			)
+		);
+		if ($prev_comment !== $reservation_comment)
+			addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $prev_comment, $reservation_comment));
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 function commitUpdatePortOIF ($port_id, $port_type_id)
@@ -4138,6 +4145,10 @@ function commitUpdateAttrValue ($object_id, $attr_id, $value = '')
 
 function convertPDOException ($e)
 {
+	// The messages below name the column as e.g. "... column 'name' ...".
+	$column = '';
+	if (isset ($e->errorInfo[2]) && preg_match ("/\\bcolumn '([A-Za-z0-9_]+)'/i", $e->errorInfo[2], $m))
+		$column = " for column '{$m[1]}'";
 	switch ($e->getCode() . '-' . $e->errorInfo[1])
 	{
 	case '23000-1062':
@@ -4150,6 +4161,15 @@ function convertPDOException ($e)
 		break;
 	case 'HY000-1205':
 		$text = 'lock wait timeout';
+		break;
+	case '22001-1406': // Data too long for column 'name' at row 1
+		$text = 'data too long' . $column;
+		break;
+	case '22003-1264': // Out of range value for column 'uint_value' at row 1
+		$text = 'out of range value' . $column;
+		break;
+	case '23000-1048': // Column 'objtype_id' cannot be null
+		$text = 'value cannot be NULL' . $column;
 		break;
 	case '42000-1142':
 		return new RTDBTableAccessDenied ($e->getMessage());
@@ -6005,23 +6025,31 @@ function replace8021QPorts ($instance, $object_id, $before, $changes)
 
 function commitUpdateVSTRules ($vst_id, $mutex_rev, $rules)
 {
-	global $dbxlink, $remote_username;
-	$dbxlink->beginTransaction();
-	$result = usePreparedSelectBlade
-	(
-		'SELECT mutex_rev, saved_by FROM VLANSwitchTemplate ' .
-		'WHERE id = ? FOR UPDATE',
-		array ($vst_id)
-	);
-	$vst = $result->fetch (PDO::FETCH_ASSOC);
-	unset ($result);
-	if ($vst['mutex_rev'] != $mutex_rev)
-		throw new InvalidRequestArgException ('mutex_rev', $mutex_rev, "already saved by {$vst['saved_by']}");
-	usePreparedDeleteBlade ('VLANSTRule', array ('vst_id' => $vst_id));
-	foreach ($rules as $rule)
-		usePreparedInsertBlade ('VLANSTRule', array_merge (array ('vst_id' => $vst_id), $rule));
-	usePreparedExecuteBlade ('UPDATE VLANSwitchTemplate SET mutex_rev=mutex_rev+1, saved_by=? WHERE id=?', array ($remote_username, $vst_id));
-	$dbxlink->commit();
+	global $remote_username;
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
+	{
+		$result = usePreparedSelectBlade
+		(
+			'SELECT mutex_rev, saved_by FROM VLANSwitchTemplate ' .
+			'WHERE id = ? FOR UPDATE',
+			array ($vst_id)
+		);
+		$vst = $result->fetch (PDO::FETCH_ASSOC);
+		unset ($result);
+		if ($vst['mutex_rev'] != $mutex_rev)
+			throw new InvalidRequestArgException ('mutex_rev', $mutex_rev, "already saved by {$vst['saved_by']}");
+		usePreparedDeleteBlade ('VLANSTRule', array ('vst_id' => $vst_id));
+		foreach ($rules as $rule)
+			usePreparedInsertBlade ('VLANSTRule', array_merge (array ('vst_id' => $vst_id), $rule));
+		usePreparedExecuteBlade ('UPDATE VLANSwitchTemplate SET mutex_rev=mutex_rev+1, saved_by=? WHERE id=?', array ($remote_username, $vst_id));
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 // Return entity ID, if its 'name' column equals to provided string, or NULL otherwise (nothing
@@ -6389,29 +6417,45 @@ function getPatchCableOIFCompat()
 
 function commitModifyPatchCableAmount ($heap_id, $by_amount)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
-	usePreparedExecuteBlade
-	(
-		'UPDATE PatchCableHeap SET amount = amount + ? WHERE id = ? AND amount + ? >= 0',
-		array ($by_amount, $heap_id, $by_amount)
-	);
-	addPatchCableHeapLogEntry ($heap_id, "amount adjusted by {$by_amount}");
-	return $dbxlink->commit();
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
+	{
+		usePreparedExecuteBlade
+		(
+			'UPDATE PatchCableHeap SET amount = amount + ? WHERE id = ? AND amount + ? >= 0',
+			array ($by_amount, $heap_id, $by_amount)
+		);
+		addPatchCableHeapLogEntry ($heap_id, "amount adjusted by {$by_amount}");
+		endAtomicChange ($savepoint, TRUE);
+		return TRUE;
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 function commitSetPatchCableAmount ($heap_id, $new_amount)
 {
-	global $dbxlink;
-	$dbxlink->beginTransaction();
-	usePreparedUpdateBlade
-	(
-		'PatchCableHeap',
-		array ('amount' => $new_amount),
-		array ('id' => $heap_id)
-	);
-	addPatchCableHeapLogEntry ($heap_id, "amount set to {$new_amount}");
-	return $dbxlink->commit();
+	$savepoint = beginAtomicChange (__FUNCTION__);
+	try
+	{
+		usePreparedUpdateBlade
+		(
+			'PatchCableHeap',
+			array ('amount' => $new_amount),
+			array ('id' => $heap_id)
+		);
+		addPatchCableHeapLogEntry ($heap_id, "amount set to {$new_amount}");
+		endAtomicChange ($savepoint, TRUE);
+		return TRUE;
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 function getPatchCableHeapLogEntries ($heap_id)
