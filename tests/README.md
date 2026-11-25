@@ -32,9 +32,11 @@ next dump and the following tests start from a usable database.  The
 database user needs the same privileges as for the installation.  The triggers and views of the dumps are imported with the
 importing user as the definer.
 
-On MySQL 8.4 and later the upgrade from the dumps 0.20.7 to 0.21.1 has
-known failing statements (issue #20); the test reports these dumps as
-incomplete and fails on any other error.
+Besides the version and the stock dictionary, the test checks that the
+upgraded database defines the keys `Object.id-tid` and
+`TagTree.id-is_assignable` and their foreign keys as a fresh install does,
+and that every foreign key references a primary or unique key, which
+MySQL 8.4 requires to rebuild a table or to restore a dump.
 
 ## The Unit Testing Database
 

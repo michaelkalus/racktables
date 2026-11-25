@@ -4,6 +4,7 @@
 	bugfix: fix the 0.20.2 upgrade step on MySQL 8.4
 	bugfix: fix the 0.20.6 upgrade step on PHP 7 and later
 	bugfix: fix the 0.20.7, 0.21.1 and 0.21.2 upgrade steps on current MariaDB and MySQL
+	bugfix: make the legacy keys Object.id-tid and TagTree.id-is_assignable unique in every database, fixing upgrades and dump restores on MySQL 8.4
 	bugfix: do not redeclare array_first() and array_last() on PHP 8.5
 	update: PHP 8.1 compatibility (GH #282 by Virsacer)
 	update: PHP 8.2 compatibility (GH #285 by Edward Shornock)

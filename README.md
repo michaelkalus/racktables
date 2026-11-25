@@ -180,6 +180,14 @@ refuse to run on such a database with the message that the installation
 0.23.0-community", and their upgrader reports "Upgrade path not found" and
 changes nothing. To go back, restore the backup taken before the upgrade.
 
+Databases installed by older releases have two non-unique keys that foreign
+keys refer to. MySQL 8.4 refuses that by default, so it cannot restore a dump
+of such a database; this release makes the keys unique. To move a database to
+MySQL 8.4, upgrade it on the old server first and dump it afterwards. To
+restore an older dump on MySQL 8.4, run
+`SET SESSION restrict_fk_on_non_standard_key = OFF;` in the session that
+imports it, then upgrade.
+
 ### Upgrading to 0.22.0
 As of this release the minimum supported PHP version is 7.0.
 

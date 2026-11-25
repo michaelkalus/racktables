@@ -16,22 +16,15 @@ require_once '../wwwroot/inc/upgrade.php';
 // did not upgrade cleanly (see testUpgrade()).
 class UpgradeTest extends RTTestCase
 {
-	// Dumps whose upgrade path still has failing statements on servers that refuse foreign
-	// keys on non-unique keys (restrict_fk_on_non_standard_key=ON, the default since
-	// MySQL 8.4), see issue #20. These combinations are reported as incomplete as long as
-	// every failed statement matches one of $issue20_failures ("statement -- error"), and
-	// fail on any other error.
-	private static $issue20_versions = array
+	// Definitions that an upgraded database must share with a fresh install, as
+	// (table, start of the line in SHOW CREATE TABLE). Older releases created the
+	// two keys as non-unique, see issue #20.
+	private static $fresh_install_lines = array
 	(
-		'0.20.7', '0.20.8', '0.20.9', '0.20.10', '0.20.11', '0.20.12', '0.20.13', '0.20.14',
-		'0.21.0', '0.21.1',
-	);
-	// TagTree is referenced through its non-unique key id-is_assignable, which the server
-	// refuses to rebuild; the second error is a consequence of the first.
-	private static $issue20_failures = array
-	(
-		"/^ALTER TABLE TagTree ADD COLUMN (color|description) [^\\n]* -- Cannot drop index '<unknown key name>': needed in a foreign key constraint$/",
-		"/^ALTER TABLE TagTree ADD COLUMN description [^\\n]* -- Unknown column 'color' in 'TagTree'$/",
+		array ('Object', 'UNIQUE KEY `id-tid` '),
+		array ('TagTree', 'UNIQUE KEY `id-is_assignable` '),
+		array ('AttributeValue', 'CONSTRAINT `AttributeValue-FK-object` '),
+		array ('TagStorage', 'CONSTRAINT `TagStorage-FK-TagTree` '),
 	);
 
 	private static $admin_account = FALSE;
@@ -178,8 +171,7 @@ ENDOFCODE;
 		$this->assertNotNull ($path, "Empty upgrade path when upgrading from {$version}");
 
 		// Run the whole path and the dictionary reload before asserting, as the web
-		// upgrader does, so that a known failure in one batch does not hide an unknown
-		// one in a later batch.
+		// upgrader does, so that the report lists the failures of all batches.
 		$failures = array();
 		foreach (array_merge ($path, array ('dictionary')) as $batchid)
 		{
@@ -193,16 +185,6 @@ ENDOFCODE;
 		foreach ($failures as $batchid => $list)
 			$report .= "batch {$batchid}:\n" . implode ("\n", $list) . "\n";
 
-		if (count ($failures) && $restrict_fk && in_array ($version, self::$issue20_versions))
-		{
-			$unknown = array();
-			foreach ($failures as $list)
-				foreach ($list as $entry)
-					if (! self::matchesAny ($entry, self::$issue20_failures))
-						$unknown[] = $entry;
-			$this->assertEmpty ($unknown, "Upgrading from {$version} failed with errors other than the known ones of issue #20:\n{$report}");
-			$this->markTestIncomplete ("Upgrading from {$version} with restrict_fk_on_non_standard_key=ON fails as known from issue #20:\n{$report}");
-		}
 		$this->assertSame ('', $report, "Upgrading from {$version} failed:\n{$report}");
 
 		// Cheap structural checks of the result.
@@ -211,19 +193,85 @@ ENDOFCODE;
 		$result = $dbxlink->query ('SELECT COUNT(*) FROM Dictionary WHERE dict_key BETWEEN 1 AND 49999');
 		$this->assertEquals (count ($dictionary), $result->fetchColumn(), "Stock dictionary records after upgrading from {$version}");
 		$result->closeCursor();
-		// The 0.20.7 batch makes these keys UNIQUE as in a fresh install. Databases past
-		// 0.20.7 keep whatever they had, so check only the upgrade paths through 0.20.7.
-		if (in_array ('0.20.7', $path))
-			foreach (array ('Object' => 'id-tid', 'TagTree' => 'id-is_assignable') as $table => $key)
-			{
-				$result = usePreparedSelectBlade
-				(
-					'SELECT MAX(NON_UNIQUE) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?',
-					array ($db_name, $table, $key)
-				);
-				$this->assertSame ('0', (string) $result->fetchColumn(), "{$table}.{$key} must be a UNIQUE key after upgrading from {$version}");
-				$result->closeCursor();
-			}
+		foreach (self::$fresh_install_lines as $item)
+		{
+			list ($table, $prefix) = $item;
+			$expected = self::findLine (self::freshInstallTableSQL ($table), $prefix);
+			$this->assertNotNull ($expected, "{$prefix}in the install.php definition of {$table}");
+			$this->assertSame
+			(
+				$expected,
+				self::findLine (self::showCreateTable ($table), $prefix),
+				"Definition of {$table} after upgrading from {$version}"
+			);
+		}
+		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
+		// references anything but the full column list of a PRIMARY or UNIQUE key.
+		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");
+	}
+
+	// Returns the line that starts with $prefix from a CREATE TABLE statement,
+	// without the separating comma, or NULL.
+	private static function findLine ($create_sql, $prefix)
+	{
+		foreach (explode ("\n", $create_sql) as $line)
+		{
+			$line = rtrim (trim ($line), ',');
+			if (0 === strpos ($line, $prefix))
+				return $line;
+		}
+		return NULL;
+	}
+
+	private static function freshInstallTableSQL ($table)
+	{
+		require_once '../wwwroot/inc/install.php';
+		foreach (get_pseudo_file ('structure') as $sql)
+			if (preg_match ('/^\s*CREATE TABLE `' . preg_quote ($table, '/') . '` \(/', $sql))
+				return $sql;
+		throw new RuntimeException ("Table {$table} is not in the install.php schema");
+	}
+
+	private static function showCreateTable ($table)
+	{
+		global $dbxlink;
+		$result = $dbxlink->query ("SHOW CREATE TABLE `{$table}`");
+		$row = $result->fetch (PDO::FETCH_NUM);
+		$result->closeCursor();
+		return $row[1];
+	}
+
+	// Returns "table.constraint" for each foreign key whose referenced columns are not
+	// exactly the columns of a PRIMARY or UNIQUE key of the referenced table.
+	private static function foreignKeysOnNonUniqueKeys ()
+	{
+		$result = usePreparedSelectBlade
+		(
+			'SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME FROM information_schema.STATISTICS ' .
+			'WHERE TABLE_SCHEMA = DATABASE() AND NON_UNIQUE = 0 ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX'
+		);
+		$unique = array();
+		foreach ($result->fetchAll (PDO::FETCH_ASSOC) as $row)
+			$unique[$row['TABLE_NAME']][$row['INDEX_NAME']][] = $row['COLUMN_NAME'];
+		$result->closeCursor();
+		$result = usePreparedSelectBlade
+		(
+			'SELECT TABLE_NAME, CONSTRAINT_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE ' .
+			'WHERE TABLE_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY TABLE_NAME, CONSTRAINT_NAME, POSITION_IN_UNIQUE_CONSTRAINT'
+		);
+		$fks = array();
+		foreach ($result->fetchAll (PDO::FETCH_ASSOC) as $row)
+		{
+			$name = "{$row['TABLE_NAME']}.{$row['CONSTRAINT_NAME']}";
+			$fks[$name]['table'] = $row['REFERENCED_TABLE_NAME'];
+			$fks[$name]['columns'][] = $row['REFERENCED_COLUMN_NAME'];
+		}
+		$result->closeCursor();
+		$ret = array();
+		foreach ($fks as $name => $fk)
+			if (! isset ($unique[$fk['table']]) || ! in_array ($fk['columns'], $unique[$fk['table']], TRUE))
+				$ret[] = $name;
+		return $ret;
 	}
 
 	private static function findMySQLClient ()
@@ -327,13 +375,5 @@ ENDOFCODE;
 		if ($entry != '')
 			$ret[] = $entry;
 		return $ret;
-	}
-
-	private static function matchesAny ($text, $patterns)
-	{
-		foreach ($patterns as $pattern)
-			if (preg_match ($pattern, $text))
-				return TRUE;
-		return FALSE;
 	}
 }
