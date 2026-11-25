@@ -1288,6 +1288,15 @@ class PureFunctionTest extends RTTestCase
 			array ('SQLDateFromDateStr', '11/12/13', '%d/%m/%y', '2013-12-11'),
 			array ('SQLDateFromDateStr', '2.3.4', '%d.%m.%y', '2004-03-02'),
 			array ('SQLDateFromDateStr', '08.07.1983', '%d.%m.%Y', '1983-07-08'),
+			array ('SQLDateFromDateStr', '3 Feb 2001', '%d %b %Y', '2001-02-03'),
+			array ('SQLDateFromDateStr', 'February 3, 2001', '%B %e, %Y', '2001-02-03'),
+			array ('SQLDateFromDateStr', '12/31/99', '%D', '1999-12-31'),
+			array ('SQLDateFromDateStr', '2001-02-03', '%F', '2001-02-03'),
+			array ('SQLDateFromDateStr', '1.1.69', '%-d.%-m.%y', '1969-01-01'),
+			array ('SQLDateFromDateStr', '31.12.68', '%d.%m.%y', '2068-12-31'),
+			array ('SQLDateFromDateStr', '3 Feb 01 20', '%d %b %y %C', '2001-02-03'),
+			array ('SQLDateFromDateStr', '2001-02-03 19', '%Y-%m-%d %C', '1900-02-03'),
+			array ('SQLDateFromDateStr', '2004 060', '%Y %j', '2004-02-29'),
 
 			array ('cmpSQLDates', '1927-05-17', '2013-09-21', -1),
 			array ('cmpSQLDates', '1927-05-17', '2013-09-17', -1),
@@ -1732,6 +1741,14 @@ class PureFunctionTest extends RTTestCase
 		return array
 		(
 			array ('questionMarks', array (0)),
+
+			array ('SQLDateFromDateStr', array ('2001-02-29', '%Y-%m-%d')),
+			array ('SQLDateFromDateStr', array ('2001-13-01', '%Y-%m-%d')),
+			array ('SQLDateFromDateStr', array ('2001-02-03', '%d.%m.%Y')),
+			array ('SQLDateFromDateStr', array ('3 Fbr 2001', '%d %b %Y')),
+			array ('SQLDateFromDateStr', array ('2001-02-03', '%U')),
+			array ('SQLDateFromDateStr', array ('2001 366', '%Y %j')),
+			array ('SQLDateFromDateStr', array ('2001-02-03', '%Q')),
 
 			array ('array_values_same', array ('', array (1, 2, 3))),
 			array ('array_values_same', array (0, array ())),

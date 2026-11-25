@@ -6378,20 +6378,591 @@ function convertToIRAE ($iae, $override_argname = NULL)
 	return $iae->newIRAE ($override_argname);
 }
 
+# The DATETIME_FORMAT and DATEONLY_FORMAT configuration variables use the
+# strftime() syntax. As strptime() is not available on all platforms (e.g.
+# Windows) and both strftime() and strptime() are deprecated since PHP 8.1
+# and 8.2 respectively, the functions below do the same as these functions
+# of the GNU C library do in the C locale, using date() for the values.
+
+# A replacement for strftime(). All conversion specifications, flags, field
+# widths and modifiers work as in glibc, except %s (the number of seconds
+# since the Epoch), which glibc computed in the time zone of the process
+# rather than in the PHP time zone. As glibc does with a conversion it does
+# not know, %s is copied to the output as it is.
+function formatDatetimeStr ($format, $ts)
+{
+	$tm = explode (' ', date ('Y n j G i s w z I Z o W D l M F A T', $ts));
+	$ret = formatDatetimeStrTm ($format, $tm);
+	# PHP strftime() returned FALSE for an empty result or a result that
+	# did not fit into its buffer.
+	return $ret === FALSE ? '' : $ret;
+}
+
+# The implementation of formatDatetimeStr(), recursive for composite
+# conversion specifications such as %F, returns FALSE on overflow.
+function formatDatetimeStrTm ($format, $tm)
+{
+	$maxlen = 4095;
+	list ($year, $mon, $mday, $hour, $min, $sec, $wday, $yday, $isdst, $gmtoff,
+		$isoyear, $isoweek, $abday, $day, $abmon, $month, $ampm, $zone) = $tm;
+	$hour12 = $hour % 12 == 0 ? 12 : $hour % 12;
+	$ret = '';
+	$len = strlen ($format);
+	for ($i = 0; $i < $len; $i++)
+	{
+		if ($format[$i] != '%')
+		{
+			$ret .= $format[$i];
+			if (strlen ($ret) > $maxlen)
+				return FALSE;
+			continue;
+		}
+		$start = $i;
+		$pad = '';
+		$to_uppcase = FALSE;
+		$to_lowcase = FALSE;
+		$change_case = FALSE;
+		for ($i++; $i < $len && strpos ('_-0^#', $format[$i]) !== FALSE; $i++)
+			if ($format[$i] == '^')
+				$to_uppcase = TRUE;
+			elseif ($format[$i] == '#')
+				$change_case = TRUE;
+			else
+				$pad = $format[$i];
+		$width = -1;
+		if ($i < $len && $format[$i] >= '0' && $format[$i] <= '9')
+		{
+			$digits = strspn ($format, '0123456789', $i);
+			$width = (int) substr ($format, $i, min ($digits, 9));
+			if ($digits > 9)
+				$width = $maxlen + 1;
+			$i += $digits;
+		}
+		# Any field width this large makes the result too long.
+		if ($width > $maxlen)
+			return FALSE;
+		$modifier = '';
+		if ($i < $len && ($format[$i] == 'E' || $format[$i] == 'O'))
+			$modifier = $format[$i++];
+		$letter = $i < $len ? $format[$i] : '';
+		$str = NULL; # a string to output
+		$num = NULL; # a number to output with at least $min_digits digits
+		$min_digits = 1;
+		$spacepad = FALSE;
+		$subfmt = NULL;
+		$bad = FALSE;
+		switch ($letter)
+		{
+		case '%':
+			$bad = $modifier != '';
+			$str = '%';
+			break;
+		case 'a':
+		case 'A':
+			$bad = $modifier != '';
+			$str = $letter == 'a' ? $abday : $day;
+			if ($change_case && ! $bad)
+				$to_uppcase = TRUE;
+			break;
+		case 'b':
+		case 'h':
+		case 'B':
+			$bad = $modifier == 'E';
+			$str = $letter == 'B' ? $month : $abmon;
+			# glibc checks the modifier of %B before the # flag
+			if ($change_case && ($letter != 'B' || ! $bad))
+				$to_uppcase = TRUE;
+			break;
+		case 'c':
+			$bad = $modifier == 'O';
+			$subfmt = '%a %b %e %H:%M:%S %Y';
+			break;
+		case 'C':
+			$num = intval ($year / 100);
+			break;
+		case 'x':
+			$bad = $modifier == 'O';
+			$subfmt = '%m/%d/%y';
+			break;
+		case 'D':
+			$bad = $modifier != '';
+			$subfmt = '%m/%d/%y';
+			break;
+		case 'd':
+		case 'e':
+			$bad = $modifier == 'E';
+			$num = $mday;
+			$min_digits = 2;
+			$spacepad = $letter == 'e';
+			break;
+		case 'F':
+			$bad = $modifier != '';
+			$subfmt = '%Y-%m-%d';
+			break;
+		case 'H':
+		case 'k':
+			$bad = $modifier == 'E';
+			$num = $hour;
+			$min_digits = 2;
+			$spacepad = $letter == 'k';
+			break;
+		case 'I':
+		case 'l':
+			$bad = $modifier == 'E';
+			$num = $hour12;
+			$min_digits = 2;
+			$spacepad = $letter == 'l';
+			break;
+		case 'j':
+			$bad = $modifier == 'E';
+			$num = $yday + 1;
+			$min_digits = 3;
+			break;
+		case 'M':
+			$bad = $modifier == 'E';
+			$num = (int) $min;
+			$min_digits = 2;
+			break;
+		case 'm':
+			$bad = $modifier == 'E';
+			$num = $mon;
+			$min_digits = 2;
+			break;
+		case 'n':
+			$str = "\n";
+			break;
+		case 'P':
+		case 'p':
+			$str = $ampm;
+			if ($letter == 'P' || $change_case)
+			{
+				$to_lowcase = TRUE;
+				if ($change_case)
+					$to_uppcase = FALSE;
+			}
+			break;
+		case 'R':
+			$subfmt = '%H:%M';
+			break;
+		case 'r':
+			$subfmt = '%I:%M:%S %p';
+			break;
+		case 'S':
+			$bad = $modifier == 'E';
+			$num = (int) $sec;
+			$min_digits = 2;
+			break;
+		case 'X':
+			$bad = $modifier == 'O';
+			$subfmt = '%H:%M:%S';
+			break;
+		case 'T':
+			$subfmt = '%H:%M:%S';
+			break;
+		case 't':
+			$str = "\t";
+			break;
+		case 'u':
+			$num = ($wday + 6) % 7 + 1;
+			break;
+		case 'U':
+			$bad = $modifier == 'E';
+			$num = intval (($yday - $wday + 7) / 7);
+			$min_digits = 2;
+			break;
+		case 'V':
+			$bad = $modifier == 'E';
+			$num = (int) $isoweek;
+			$min_digits = 2;
+			break;
+		case 'g':
+			$bad = $modifier == 'E';
+			$num = $isoyear % 100;
+			$min_digits = 2;
+			break;
+		case 'G':
+			$bad = $modifier == 'E';
+			$num = (int) $isoyear;
+			break;
+		case 'W':
+			$bad = $modifier == 'E';
+			$num = intval (($yday - ($wday + 6) % 7 + 7) / 7);
+			$min_digits = 2;
+			break;
+		case 'w':
+			$bad = $modifier == 'E';
+			$num = (int) $wday;
+			break;
+		case 'Y':
+			$bad = $modifier == 'O';
+			$num = (int) $year;
+			break;
+		case 'y':
+			$num = $year % 100;
+			$min_digits = 2;
+			break;
+		case 'Z':
+			$str = $zone;
+			if ($change_case)
+			{
+				$to_lowcase = TRUE;
+				$to_uppcase = FALSE;
+			}
+			break;
+		case 'z':
+			# The sign goes through the field width as a separate field.
+			$ret .= formatDatetimeStrPad ($gmtoff < 0 ? '-' : '+', $width, $pad);
+			$diff = intval (abs ($gmtoff) / 60);
+			$num = intval ($diff / 60) * 100 + $diff % 60;
+			$min_digits = 4;
+			break;
+		case '': # % at the end of the format
+			$i--;
+			# fall through
+		default: # including %s
+			$bad = TRUE;
+		}
+		if ($bad) # copied back to the nearest %, as glibc does
+		{
+			$start = strrpos (substr ($format, 0, $i + 1), '%');
+			$str = substr ($format, $start, $i - $start + 1);
+		}
+		elseif ($subfmt !== NULL)
+		{
+			if (FALSE === $str = formatDatetimeStrTm ($subfmt, $tm))
+				return FALSE;
+			$str = formatDatetimeStrPad ($str, $width, $pad);
+			$ret .= $to_uppcase ? strtoupper ($str) : $str;
+			$str = NULL;
+		}
+		elseif ($num !== NULL)
+		{
+			if ($spacepad && $pad != '0' && $pad != '-')
+				$pad = '_';
+			$digits = max ($min_digits, $width);
+			$str = (string) $num;
+			$padding = $digits - strlen ($str);
+			if ($pad != '-' && $padding > 0)
+			{
+				if ($pad == '_')
+				{
+					$ret .= str_repeat (' ', $padding);
+					$width = $width > $padding ? $width - $padding : 0;
+				}
+				else
+				{
+					$ret .= str_repeat ('0', $padding);
+					$width = 0;
+				}
+			}
+		}
+		if ($str !== NULL)
+		{
+			$str = formatDatetimeStrPad ($str, $width, $pad);
+			if ($to_lowcase)
+				$str = strtolower ($str);
+			elseif ($to_uppcase)
+				$str = strtoupper ($str);
+			$ret .= $str;
+		}
+		if (strlen ($ret) > $maxlen)
+			return FALSE;
+	}
+	return $ret;
+}
+
+# Pad a field to the given width the way glibc strftime() does.
+function formatDatetimeStrPad ($str, $width, $pad)
+{
+	$delta = $width - strlen ($str);
+	if ($delta <= 0)
+		return $str;
+	return str_repeat ($pad == '0' ? '0' : ' ', $delta) . $str;
+}
+
+# Prepare a format for parseDatetimeStr(): expand composite conversion
+# specifications, drop flags and field widths (glibc strptime() ignores
+# them), replace every white-space character, %n and %t with a space and
+# keep any other conversion specification as % and a letter. Anything that
+# cannot be parsed the same way as strptime() did causes InvalidArgException.
+function normalizeDatetimeFormat ($format)
+{
+	$composite = array
+	(
+		'D' => '%m/%d/%y',
+		'F' => '%Y-%m-%d',
+		'T' => '%H:%M:%S',
+		'R' => '%H:%M',
+		'r' => '%I:%M:%S %p',
+		'x' => '%m/%d/%y',
+		'X' => '%H:%M:%S',
+		'c' => '%a %b %e %H:%M:%S %Y',
+	);
+	$ret = '';
+	$len = strlen ($format);
+	for ($i = 0; $i < $len; $i++)
+	{
+		$c = $format[$i];
+		if ($c != '%')
+		{
+			$ret .= strpos (" \t\n\r\v\f", $c) === FALSE ? $c : ' ';
+			continue;
+		}
+		$i++;
+		$i += strspn ($format, '-_0^#', $i);
+		$i += strspn ($format, '0123456789', $i);
+		$letter = $i < $len ? $format[$i] : '';
+		if ($letter != '' && strpos ('YymdeHkIlMSbhBaApCjuwVgGZz%', $letter) !== FALSE)
+			$ret .= '%' . $letter;
+		elseif (array_key_exists ($letter, $composite))
+			$ret .= normalizeDatetimeFormat ($composite[$letter]);
+		elseif ($letter == 'n' || $letter == 't')
+			$ret .= ' ';
+		else
+			throw new InvalidArgException ('format', $format, "unsupported conversion specification '%" . $letter . "'");
+	}
+	return $ret;
+}
+
+# A replacement for strptime() that works as glibc strptime() does in the
+# C locale, see normalizeDatetimeFormat() for the supported subset. Return an
+# array with the same tm_* keys as strptime() does (tm_wday and tm_yday
+# excluded) or FALSE if the string does not match the format. As with
+# strptime(), any unparsed data at the end of the string is not an error.
+function parseDatetimeStr ($s, $format)
+{
+	$numbers = array # min, max, max digits
+	(
+		'Y' => array (0, 9999, 4),
+		'y' => array (0, 99, 2),
+		'm' => array (1, 12, 2),
+		'd' => array (1, 31, 2),
+		'e' => array (1, 31, 2),
+		'H' => array (0, 23, 2),
+		'k' => array (0, 23, 2),
+		'I' => array (1, 12, 2),
+		'l' => array (1, 12, 2),
+		'M' => array (0, 59, 2),
+		'S' => array (0, 61, 2),
+		'C' => array (0, 99, 2),
+		'j' => array (1, 366, 3),
+		'u' => array (1, 7, 1),
+		'w' => array (0, 6, 1),
+		'V' => array (0, 53, 2),
+		'g' => array (0, 99, 2),
+	);
+	$names = array
+	(
+		'month' => array ('January', 'February', 'March', 'April', 'May', 'June',
+			'July', 'August', 'September', 'October', 'November', 'December'),
+		'weekday' => array ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'),
+		'ampm' => array ('AM', 'PM'),
+	);
+	$spaces = " \t\n\r\v\f";
+	$ret = array
+	(
+		'tm_sec' => 0,
+		'tm_min' => 0,
+		'tm_hour' => 0,
+		'tm_mday' => 0,
+		'tm_mon' => 0,
+		'tm_year' => 0,
+	);
+	$yday = 0;
+	$have_I = $is_pm = $have_wday = $have_yday = $have_mon = $have_mday = FALSE;
+	$want_century = $want_xday = FALSE;
+	$century = -1;
+	$format = normalizeDatetimeFormat ($format);
+	$flen = strlen ($format);
+	$s = (string) $s;
+	$len = strlen ($s);
+	$pos = 0;
+	for ($i = 0; $i < $flen; $i++)
+	{
+		if ($format[$i] == ' ') # matches zero or more white-space characters
+		{
+			$pos += strspn ($s, $spaces, $pos);
+			continue;
+		}
+		if ($format[$i] == '%' && $format[$i + 1] != '%')
+			$letter = $format[++$i];
+		else
+		{
+			if ($format[$i] == '%')
+				$i++;
+			if ($pos >= $len || $s[$pos] !== $format[$i])
+				return FALSE;
+			$pos++;
+			continue;
+		}
+		if (array_key_exists ($letter, $numbers))
+		{
+			list ($min, $max, $digits) = $numbers[$letter];
+			$pos += strspn ($s, $spaces, $pos);
+			if ($pos >= $len || $s[$pos] < '0' || $s[$pos] > '9')
+				return FALSE;
+			# Stop early if the next digit would make the value too large,
+			# e.g. '45' for %d is 4 followed by '5'.
+			$val = 0;
+			do
+			{
+				$val = $val * 10 + (int) $s[$pos++];
+			}
+			while (--$digits > 0 && $val * 10 <= $max && $pos < $len && $s[$pos] >= '0' && $s[$pos] <= '9');
+			if ($val < $min || $val > $max)
+				return FALSE;
+			switch ($letter)
+			{
+			case 'Y':
+				$ret['tm_year'] = $val - 1900;
+				$want_century = FALSE;
+				$want_xday = TRUE;
+				break;
+			case 'y': # 69~99 -> 1969~1999, 00~68 -> 2000~2068
+				$ret['tm_year'] = $val >= 69 ? $val : $val + 100;
+				$want_century = TRUE;
+				$want_xday = TRUE;
+				break;
+			case 'C':
+				$century = $val;
+				$want_xday = TRUE;
+				break;
+			case 'm':
+				$ret['tm_mon'] = $val - 1;
+				$have_mon = TRUE;
+				$want_xday = TRUE;
+				break;
+			case 'd':
+			case 'e':
+				$ret['tm_mday'] = $val;
+				$have_mday = TRUE;
+				$want_xday = TRUE;
+				break;
+			case 'j':
+				$yday = $val - 1;
+				$have_yday = TRUE;
+				break;
+			case 'H':
+			case 'k':
+				$ret['tm_hour'] = $val;
+				$have_I = FALSE;
+				break;
+			case 'I':
+			case 'l':
+				$ret['tm_hour'] = $val % 12;
+				$have_I = TRUE;
+				break;
+			case 'M':
+				$ret['tm_min'] = $val;
+				break;
+			case 'S':
+				$ret['tm_sec'] = $val;
+				break;
+			case 'u':
+			case 'w':
+				$have_wday = TRUE;
+				break;
+			# %V and %g do not determine anything
+			}
+			continue;
+		}
+		switch ($letter)
+		{
+		case 'G': # digits that do not determine anything
+			if ($pos >= $len || $s[$pos] < '0' || $s[$pos] > '9')
+				return FALSE;
+			$pos += strspn ($s, '0123456789', $pos);
+			continue 2;
+		case 'Z': # a time zone name, ignored
+			$pos += strspn ($s, $spaces, $pos);
+			$pos += strcspn ($s, $spaces, $pos);
+			continue 2;
+		case 'z': # a time zone offset, validated and ignored
+			$pos += strspn ($s, $spaces, $pos);
+			if ($pos < $len && $s[$pos] == 'Z')
+			{
+				$pos++;
+				continue 2;
+			}
+			if ($pos >= $len || ($s[$pos] != '+' && $s[$pos] != '-'))
+				return FALSE;
+			$pos++;
+			$val = $n = 0;
+			while ($n < 4 && $pos < $len && $s[$pos] >= '0' && $s[$pos] <= '9')
+			{
+				$val = $val * 10 + (int) $s[$pos++];
+				$n++;
+				if ($n == 2 && $pos + 1 < $len && $s[$pos] == ':' && $s[$pos + 1] >= '0' && $s[$pos + 1] <= '9')
+					$pos++;
+			}
+			if ($n != 2 && ($n != 4 || $val % 100 >= 60))
+				return FALSE;
+			continue 2;
+		}
+		# A full or an abbreviated name, case-insensitive.
+		$list = $names[$letter == 'p' ? 'ampm' : (strpos ('aA', $letter) !== FALSE ? 'weekday' : 'month')];
+		$found = NULL;
+		foreach ($list as $index => $name)
+			foreach (array ($name, substr ($name, 0, 3)) as $candidate)
+				if (0 == strcasecmp ((string) substr ($s, $pos, strlen ($candidate)), $candidate))
+				{
+					$found = $index;
+					$pos += strlen ($candidate);
+					break 2;
+				}
+		if ($found === NULL)
+			return FALSE;
+		if ($letter == 'p')
+			$is_pm = $found == 1;
+		elseif (strpos ('aA', $letter) !== FALSE)
+			$have_wday = TRUE;
+		else
+		{
+			$ret['tm_mon'] = $found;
+			$have_mon = TRUE;
+			$want_xday = TRUE;
+		}
+	}
+	if ($have_I && $is_pm)
+		$ret['tm_hour'] += 12;
+	if ($century != -1)
+		$ret['tm_year'] = ($want_century ? $ret['tm_year'] % 100 : 0) + ($century - 19) * 100;
+	if ($want_xday && ! $have_wday && ! ($have_mon && $have_mday) && $have_yday)
+	{
+		# The month and the day from the day of the year. The table is
+		# glibc __mon_yday[2][13], a search past the end of the first row
+		# continues in the second row as it did in glibc.
+		$mon_yday = array
+		(
+			0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365,
+			0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366,
+		);
+		$y = $ret['tm_year'] + 1900;
+		$offset = ($y % 4 == 0 && ($y % 100 != 0 || $y % 400 == 0)) ? 13 : 0;
+		for ($t_mon = 0; $mon_yday[$offset + $t_mon] <= $yday; $t_mon++);
+		if (! $have_mon)
+			$ret['tm_mon'] = $t_mon - 1;
+		if (! $have_mday)
+			$ret['tm_mday'] = $yday - $mon_yday[$offset + $t_mon - 1] + 1;
+	}
+	$ret['unparsed'] = (string) substr ($s, $pos);
+	return $ret;
+}
+
 # Produce a textual date/time from a given UNIX timestamp
 # If timestamp is omitted, time() value is used
 function datetimestrFromTimestamp ($ts = NULL)
 {
 	if (! isset ($ts))
 		$ts = time();
-	return strftime (getConfigVar ('DATETIME_FORMAT'), $ts);
+	return formatDatetimeStr (getConfigVar ('DATETIME_FORMAT'), $ts);
 }
 
 # vice versa
 function timestampFromDatetimestr ($s)
 {
 	$format = getConfigVar ('DATETIME_FORMAT');
-	if (FALSE === $tmp = strptime ($s, $format))
+	if (FALSE === $tmp = parseDatetimeStr ($s, $format))
 		throw new InvalidArgException ('s', $s, "not a date in format '{$format}'");
 	$ret = mktime
 	(
@@ -6415,7 +6986,7 @@ function SQLDateFromDateStr ($s, $format = NULL)
 {
 	if ($format === NULL)
 		$format = getConfigVar ('DATEONLY_FORMAT');
-	if (FALSE === $tmp = strptime ($s, $format))
+	if (FALSE === $tmp = parseDatetimeStr ($s, $format))
 		throw new InvalidArgException ('s', $s, "not a date in format '{$format}'");
 	$y = $tmp['tm_year'] + 1900;
 	$m = $tmp['tm_mon'] + 1;
