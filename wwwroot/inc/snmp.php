@@ -88,6 +88,15 @@ $iftable_processors['generic-gi-any-1000T'] = array
 	'try_next_proc' => FALSE,
 );
 
+$iftable_processors['generic-gi-any-1000SFP'] = array
+(
+	'pattern' => '@^gi(\d+)$@',
+	'replacement' => 'gi\\1',
+	'dict_key' => '4-1077',
+	'label' => '\\1',
+	'try_next_proc' => FALSE,
+);
+
 $iftable_processors['generic-gi-1-to-2-1000T'] = array
 (
 	'pattern' => '@^gi(\d+)$@',
@@ -2735,7 +2744,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	),
 	'9.1.749' => array
 	(
-		'dict_key' => 989,
+		'dict_key' => 1056,
 		'text' => 'WS-CBS3030-DEL: 10 internal/10-100-1000T(X) + 2 RJ-45/10-100-1000T(X) + 4 SFP/1000',
 		'processors' => array ('catalyst-blade-11-to-12-1000T', 'catalyst-blade-13-to-16-1000SFP', 'catalyst-blade-any-bp/1000T'),
 	),
@@ -3222,7 +3231,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'9.6.1.83.10.5' => array
 	(
 		'dict_key' => 2376,
-		'text' => 'SG 300-10SFP: 8 RJ-45/10/100/1000T(X) + 2 combo-gig',
+		'text' => 'SG 300-10SFP: 8 SFP/1000 + 2 combo-gig',
 		'processors' => array
 		(
 			'generic-gi-9-to-10-combo-1000SFP',
@@ -3478,7 +3487,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-9-to-10-combo-1000SFP',
-			'generic-gi-9-to-10-1000T',
+			'generic-gi-9-to-10-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3490,7 +3499,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-17-to-18-combo-1000SFP',
-			'generic-gi-17-to-18-1000T',
+			'generic-gi-17-to-18-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3502,7 +3511,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3514,7 +3523,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3526,7 +3535,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3538,7 +3547,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3550,7 +3559,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3562,7 +3571,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3909,7 +3918,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'171.10.63.6' => array
 	(
 		'dict_key' => 614,
-		'text' => '24-Port Fast Ethernet L2 Managed PoE Switch with 2 x 1000BASE-T and 2 x Combo 1000BASE-T/SFP ports ',
+		'text' => '24-Port Fast Ethernet L2 Managed PoE Switch with 2 x 1000BASE-T and 2 x Combo 1000BASE-T/SFP ports',
 		'processors' => array ('Dlink-3028-25-to-26-Combo', 'Dlink-3028-25-to-28-1000T', 'Dlink-3028-100TX'),
 	),
 	'171.10.63.8' => array
@@ -4510,19 +4519,19 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	),
 	'11.2.3.7.11.145' => array
 	(
-		'dict_key' => 3654,
+		'dict_key' => 3721,
 		'text' => 'HP Aruba 2530 48 PoE+ Switch, (48) RJ-45 10/100 PoE+ ports, (2) autosensing 10/100/1000 ports, (2) fixed Gigabit Ethernet SFP ports',
 		'processors' => array ('procurve-51-to-52-1000SFP', 'procurve-49-to-50-1000T', 'procurve-chassis-100TX'),
 	),
 	'11.2.3.7.11.146' => array
 	(
-		'dict_key' => 3655,
+		'dict_key' => 3722,
 		'text' => 'HP Aruba 2530 24 PoE+ Switch, (24) RJ-45 10/100 PoE+ ports, (2) autosensing 10/100/1000 ports, (2) fixed Gigabit Ethernet SFP ports',
 		'processors' => array ('procurve-27-to-28-1000SFP', 'procurve-25-to-26-1000T', 'procurve-chassis-100TX'),
 	),
 	'25506.11.1.181' => array
 	(
-		'dict_key' => 3656,
+		'dict_key' => 3723,
 		'text' => 'HP 1950 48G 2SFP+ 2XGT Switch, (48) RJ-45 auto-negotiating 10/100/1000 PoE+ ports, (2) SFP+ fixed 1000/10000 SFP+ ports, (2) RJ-45 1/10GBASE-T ports',
 		'processors' => array ('procurve-49-to-50-10GBase-T', 'procurve-51-to-52-10000SFP+', 'procurve-any-1000T'),
 	),
@@ -4613,19 +4622,19 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'11.2.3.7.11.69' => array
 	(
 		'dict_key' => 872,
-		'text' => ' J9049A: 24 RJ-45/10-100-1000T',
+		'text' => 'J9049A: 24 RJ-45/10-100-1000T',
 		'processors' => array ('procurve-21-to-24-combo-1000SFP', 'procurve-chassis-1000T'),
 	),
 	'25506.11.1.189' => array
 	(
 		'dict_key' => 2466,
-		'text' => 'HP EI%GPASS%5130-48G-PoE+-4SFP+ (JG937A)',
+		'text' => 'HP EI 5130-48G-PoE+-4SFP+ (JG937A)',
 		'processors' => array ('h3c-any-Gb', 'h3c-any-SFP+'),
 	),
 	'25506.11.1.36' => array
 	(
 		'dict_key' => 3748,
-		'text' => 'HP%GPASS%HP A5120-48G-PoE+ EI (JG237A)',
+		'text' => 'HP A5120-48G-PoE+ EI (JG237A)',
 		'processors' => array ('h3c-49-to-52-SFP', 'h3c-any-Gb', 'h3c-any-SFP+'),
 	),
 );
@@ -4774,24 +4783,48 @@ function doSwitchSNMPmining ($objectInfo, $device)
 	case preg_match ('/^9\.5\.18$/', $sysObjectID):
 		$exact_release = preg_replace ('/^.*, Version ([^ ]+), .*$/', '\\1', $sysDescr);
 		$major_line = preg_replace ('/^([[:digit:]]+\.[[:digit:]]+)[^[:digit:]].*/', '\\1', $exact_release);
+		// SW type values per object type, each in its own chapter
 		$ios_codes = array
 		(
-			'12.0' => 244,
-			'12.1' => 251,
-			'12.2' => 252,
-			'15.0' => 1901,
-			'15.1' => 2082,
-			'15.2' => 2142,
+			7 => array // router OS type
+			(
+				'12.0' => 254,
+				'12.1' => 255,
+				'12.2' => 256,
+				'12.3' => 257,
+				'12.4' => 258,
+				'15.0' => 2667,
+				'15.1' => 1963,
+				'15.2' => 2668,
+				'15.3' => 2669,
+				'15.4' => 2670,
+				'15.5' => 2671,
+			),
+			8 => array // switch OS type
+			(
+				'12.0' => 244,
+				'12.1' => 251,
+				'12.2' => 252,
+				'15.0' => 1901,
+				'15.1' => 2082,
+				'15.2' => 2142,
+			),
+			965 => array // wireless OS type
+			(
+				'12.3' => 1673,
+				'12.4' => 1674,
+			),
 		);
 		updateStickerForCell ($objectInfo, 5, $exact_release);
-		if (array_key_exists ($major_line, $ios_codes))
-			updateStickerForCell ($objectInfo, 4, $ios_codes[$major_line]);
+		if (isset ($ios_codes[$objectInfo['objtype_id']][$major_line]))
+			updateStickerForCell ($objectInfo, 4, $ios_codes[$objectInfo['objtype_id']][$major_line]);
 		$sysChassi = $device->snmpget ('1.3.6.1.4.1.9.3.6.3.0');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 		checkPIC ('1-29');
 		addDesiredPort ($desiredPorts, 'con0', '1-29', 'console', ''); // RJ-45 RS-232 console
-		if (preg_match ('/Cisco IOS Software, C2600/', $sysDescr))
+		// ISR routers (1841, 2800, 3800, 1900, 2900, 3900) and 2600 series
+		if (preg_match ('/Cisco IOS Software, (C2600|(1841|2800|3800|C1900|C2900|C3900e?) Software)/', $sysDescr))
 			addDesiredPort ($desiredPorts, 'aux0', '1-29', 'auxillary', ''); // RJ-45 RS-232 aux port
 		if ($sysObjectID == '9.1.956')
 		{
@@ -4833,7 +4866,7 @@ function doSwitchSNMPmining ($objectInfo, $device)
 			updateStickerForCell ($objectInfo, 4, $nxos_codes[$major_line]);
 		updateStickerForCell ($objectInfo, 5, $exact_release);
 		$sysChassi = $device->snmpget ('1.3.6.1.2.1.47.1.1.1.1.11.149');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 		checkPIC ('1-29');
 		addDesiredPort ($desiredPorts, 'con0', '1-29', 'console', ''); // RJ-45 RS-232 console
@@ -4906,7 +4939,7 @@ function doSwitchSNMPmining ($objectInfo, $device)
 		updateStickerForCell ($objectInfo, 5, $exact_release);
 		# FOUNDRY-SN-AGENT-MIB::snChasSerNum.0
 		$sysChassi = $device->snmpget ('enterprises.1991.1.1.1.1.2.0');
-		if ($sysChassi !== FALSE || $sysChassi !== NULL)
+		if ($sysChassi !== FALSE && $sysChassi !== NULL)
 			updateStickerForCell ($objectInfo, 1, str_replace ('"', '', substr ($sysChassi, strlen ('STRING: '))));
 
 		# Type of uplink module installed.
@@ -5372,7 +5405,7 @@ class APCPowerSwitch extends RTSNMPDevice
 
 	function getPortStatus($id)
 	{
-		return trim($this->snmpget("{$this->snmpMib}.1.1.12.3.3.1.1.4.$id"), 'INTEGER: ');
+		return str_replace('INTEGER: ', '', $this->snmpget("{$this->snmpMib}.1.1.12.3.3.1.1.4.$id"));
 	}
 
 	function getPortName($id)
