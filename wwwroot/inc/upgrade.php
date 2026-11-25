@@ -211,6 +211,14 @@ MySQL 8.4, upgrade it on the old server first and dump it afterwards. To
 restore an older dump on MySQL 8.4, run
 "SET SESSION restrict_fk_on_non_standard_key = OFF;" in the session that
 imports it, then upgrade.
+
+Passwords of local accounts are now stored with password_hash() instead of
+unsalted SHA-1. The upgrade widens the column, and no action is needed: an
+existing SHA-1 hash keeps working and is replaced the next time its user logs
+in. Configuration - User accounts - Edit lists the accounts that still have
+an SHA-1 hash; setting a new password there replaces it at once.
+A new password can be at most 72 bytes long; an account whose password is
+longer keeps its SHA-1 hash until a shorter password is set.
 ENDOFTEXT
 ,
 );
@@ -1458,6 +1466,8 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
   LEFT JOIN `Object` L ON L.id = LL.parent_entity_id
   WHERE O.objtype_id = 1560
 ";
+			// issue #25: room for password_hash() results
+			$query[] = "ALTER TABLE UserAccount MODIFY COLUMN user_password_hash varchar(255) DEFAULT NULL";
 			$query[] = "UPDATE Config SET varvalue = '0.23.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
@@ -1510,11 +1520,13 @@ function executeUpgradeBatch ($batchid)
 function authenticate_admin ($username, $password)
 {
 	global $dbxlink;
-	$prepared = $dbxlink->prepare ('SELECT COUNT(*) FROM UserAccount WHERE user_id=1 AND user_name=? AND user_password_hash=?');
-	if (!$prepared->execute (array ($username, sha1 ($password))))
+	// This works with a legacy hash in the column of RackTables 0.22.0 and earlier
+	// as well as after the upgrade, and never changes the stored hash.
+	$prepared = $dbxlink->prepare ('SELECT user_password_hash FROM UserAccount WHERE user_id=1 AND user_name=?');
+	if (!$prepared->execute (array ($username)))
 		die ('SQL query failed in ' . __FUNCTION__);
 	$rows = $prepared->fetchAll (PDO::FETCH_NUM);
-	return $rows[0][0] == 1;
+	return count ($rows) == 1 && passwordMatchesHash ($password, $rows[0][0]);
 }
 
 // Database version detector. Should behave corretly on any

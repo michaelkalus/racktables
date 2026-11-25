@@ -498,7 +498,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		usePreparedInsertBlade ('VS', array ('name' => self::RAW));
 		$this->vs_id = lastInsertID();
 		$this->pool_id = commitCreateRSPool (self::RAW);
-		$this->user_id = commitCreateUserAccount (self::RAW, '', sha1 ('x'));
+		$this->user_id = commitCreateUserAccount (self::RAW, '', makePasswordHash ('x'));
 		usePreparedInsertBlade ('Chapter', array ('name' => self::RAW));
 		$this->chapter_id = lastInsertID();
 		$object_id = $this->addObject (self::RAW, 4);
@@ -576,7 +576,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 	{
 		$object_id = $this->addObject (self::RAW, 4);
 		$this->assertEscaped ('">', '</a>', mkCellA (spotEntity ('object', $object_id)));
-		$this->user_id = commitCreateUserAccount (self::RAW, '', sha1 ('x'));
+		$this->user_id = commitCreateUserAccount (self::RAW, '', makePasswordHash ('x'));
 		$this->assertEscaped ('">User ', '</a>', mkCellA (spotEntity ('user', $this->user_id)));
 	}
 
@@ -617,7 +617,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 	{
 		global $pageno, $tabno;
 		require_once '../wwwroot/inc/interface-config.php';
-		$this->user_id = commitCreateUserAccount (self::RAW, self::RAW, sha1 ('x'));
+		$this->user_id = commitCreateUserAccount (self::RAW, self::RAW, makePasswordHash ('x'));
 		$pageno = 'user';
 		$tabno = 'default';
 		$this->setArg ('user_id', $this->user_id);
@@ -627,9 +627,13 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 
 		$pageno = 'userlist';
 		$tabno = 'edit';
+		// also the list of accounts with a legacy password hash
+		usePreparedUpdateBlade ('UserAccount', array ('user_password_hash' => sha1 ('x')), array ('user_id' => $this->user_id));
 		$output = getOutputOf ('renderUserListEditor');
 		$this->assertEscaped ("name=username value='", "'", $output);
 		$this->assertEscaped ("name=realname value='", "'", $output);
+		$this->assertMatchesRegularExpression ('/old \\(SHA-1\\) format: [^<]*' . preg_quote (self::ESCAPED, '/') . '/', $output);
+		$this->assertStringNotContainsString (self::RAW, $output);
 	}
 
 	// VS group name in the summary, VS configuration in the edit form of a

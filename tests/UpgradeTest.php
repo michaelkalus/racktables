@@ -165,6 +165,10 @@ ENDOFCODE;
 
 		// the DB was deleted & re-created, so the current connection is invalid; re-connect
 		connectDB();
+		// The upgrader authenticates the administrator on the old schema (the dumps
+		// have the password "admin" as an SHA-1 hash in a char(40) column).
+		$this->assertTrue (authenticate_admin ('admin', 'admin'), "upgrader login before upgrading from {$version}");
+		$this->assertFalse (authenticate_admin ('admin', 'wrong password'));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -193,6 +197,23 @@ ENDOFCODE;
 		$result = $dbxlink->query ('SELECT COUNT(*) FROM Dictionary WHERE dict_key BETWEEN 1 AND 49999');
 		$this->assertEquals (count ($dictionary), $result->fetchColumn(), "Stock dictionary records after upgrading from {$version}");
 		$result->closeCursor();
+		// The password hash column holds password_hash() results (issue #25), the
+		// legacy hash is kept, and the upgrader authenticates with either form.
+		$result = usePreparedSelectBlade
+		(
+			'SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+			array ($db_name, 'UserAccount', 'user_password_hash')
+		);
+		$row = $result->fetch (PDO::FETCH_NUM);
+		$result->closeCursor();
+		$this->assertSame ('varchar(255)', $row[0], "UserAccount.user_password_hash type after upgrading from {$version}");
+		$this->assertSame ('YES', $row[1], "UserAccount.user_password_hash nullability after upgrading from {$version}");
+		$this->assertContains ($row[2], array (NULL, 'NULL'), "UserAccount.user_password_hash default after upgrading from {$version}");
+		$this->assertSame (sha1 ('admin'), spotEntity ('user', 1, TRUE)['user_password_hash'], "administrator password hash after upgrading from {$version}");
+		$this->assertTrue (authenticate_admin ('admin', 'admin'), "upgrader login after upgrading from {$version}");
+		usePreparedUpdateBlade ('UserAccount', array ('user_password_hash' => makePasswordHash ('admin')), array ('user_id' => 1));
+		$this->assertTrue (authenticate_admin ('admin', 'admin'), "upgrader login with a new hash after upgrading from {$version}");
+		$this->assertFalse (authenticate_admin ('admin', 'wrong password'));
 		foreach (self::$fresh_install_lines as $item)
 		{
 			list ($table, $prefix) = $item;

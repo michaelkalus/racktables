@@ -19,6 +19,9 @@
 	bugfix: restrict port link, object link, file link and RS pool operations to the current entity
 	bugfix: check the patch cable heap permission in the port link popup
 	bugfix: store IPv4 virtual service tags under realm ipv4vs
+	update: store passwords with password_hash(), replace SHA-1 hashes on login (Mantis#1267)
+	bugfix: keep the password when a user account is saved with a blank password field
+	bugfix: hash new passwords as entered, not HTML-escaped
 	bugfix: do not send sshnokey credentials as session input
 	bugfix: do not fail the Objects list on a rack without a row (Mantis#1787)
 	bugfix: show the pages of a rack without a row and of its objects, allow assigning a row to it (Mantis#1787)
