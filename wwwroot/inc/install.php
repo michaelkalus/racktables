@@ -467,7 +467,9 @@ function congrats ()
 	echo 'enter the system. Authenticate with <strong>admin</strong> username.<br>RackTables project has a ';
 	echo "<a href='https://wiki.racktables.org/index.php?title=RackTablesAdminGuide'>";
 	echo "wiki</a> and a ";
-	echo "<a href='https://www.freelists.org/list/racktables-users'>mailing list</a> for users. Have fun.<br>";
+	echo "<a href='https://www.freelists.org/list/racktables-users'>mailing list</a> for users. ";
+	echo "Please report problems with this release of the community fork in its ";
+	echo "<a href='https://github.com/michaelkalus/racktables/issues'>issue tracker</a>. Have fun.<br>";
 	return TRUE;
 }
 

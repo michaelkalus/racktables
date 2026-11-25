@@ -1,3 +1,61 @@
+0.23.0-community
+	update: first release of the community fork, numbered 0.23.0-community; 0.22.x is left to upstream
+	bugfix: fix installation on MySQL 8.4 (Mantis#2105) (GH #291 by Nuno Tavares)
+	bugfix: fix the 0.20.2 upgrade step on MySQL 8.4
+	bugfix: fix the 0.20.6 upgrade step on PHP 7 and later
+	bugfix: fix the 0.20.7, 0.21.1 and 0.21.2 upgrade steps on current MariaDB and MySQL
+	bugfix: do not redeclare array_first() and array_last() on PHP 8.5
+	update: PHP 8.1 compatibility (GH #282 by Virsacer)
+	update: PHP 8.2 compatibility (GH #285 by Edward Shornock)
+	update: remove the remaining PHP 8.x deprecations
+	update: parse and format dates without strptime() and strftime() (Mantis#1981)
+	bugfix: resolve PDO MySQL attributes at run time, $pdo_bufsize no longer fails with mysqlnd
+	bugfix: escape search terms on the search results page (CVE-2023-49453) (Mantis#2111)
+	bugfix: escape stored text on the search results page and on entity pages
+	bugfix: escape stored text in the IP address and SLB forms, restrict wiki link schemes
+	bugfix: fix script injection through port names in the 802.1Q MAC list popups
+	bugfix: escape the user name in LDAP search filters
+	bugfix: restrict port link, object link, file link and RS pool operations to the current entity
+	bugfix: check the patch cable heap permission in the port link popup
+	bugfix: store IPv4 virtual service tags under realm ipv4vs
+	bugfix: do not send sshnokey credentials as session input
+	bugfix: do not fail the Objects list on a rack without a row (Mantis#1787)
+	bugfix: find addresses of /32 and /128 networks in their network (Mantis#1605)
+	bugfix: fix searching for a string with three dots that is not an IPv4 address (Mantis#2069)
+	bugfix: make the fallback ip6_parse() accept only valid IPv6 addresses
+	bugfix: reject NUL bytes and non-string input in the IP parse functions
+	bugfix: do not reserve Subnet-Router anycast on IPv6 /127 and /128
+	bugfix: allow '@' in autotag names for user@REALM accounts (Mantis#1211)
+	bugfix: allow a backslash in autotag names for DOMAIN\user accounts
+	bugfix: load RackTables' own inc/ files by full path (Mantis#1261)
+	bugfix: encode query parameters in the breadcrumb links
+	bugfix: ignore the ssh "closed by remote host" message for FTOS 8 (Mantis#855)
+	update: add SNMP sync support for Cisco 2851 (Mantis#1707)
+	bugfix: make rack update and object deletion atomic
+	bugfix: check parent locations and make location, row and rack changes atomic
+	bugfix: show the matched value of object fields in search results (Mantis#1449)
+	bugfix: do not double-encode stored references in display helpers (Mantis#1837)
+	bugfix: read LDAP group membership without displayname_attrs (Mantis#1225)
+	bugfix: show the helpdesk banner on all error pages (Mantis#2071)
+	bugfix: report an unreadable secret.php instead of an empty error page (Mantis#1791)
+	bugfix: show Dell PowerEdge M610x as a full height blade (Mantis#1571)
+	bugfix: do not report ssh login banners as sshnokey errors (Mantis#1333)
+	bugfix: keep Live PTR import away from reserved addresses (Mantis#1077)
+	bugfix: look up sysObjectID in numeric form for SNMP sync (Mantis#1481) (Mantis#1503) (Mantis#1685)
+	update: show tags in name order in the tag picker (Mantis#1763)
+	bugfix: allow deleting an IP network that another network contains (Mantis#911)
+	bugfix: move the 802.1Q configuration of a port when it is renamed (Mantis#1007)
+	bugfix: send the RS pool with the VS group link form of the RS pool page
+	bugfix: fix inconsistent known switches entries, IOS software type and aux port
+	bugfix: release file links and tags of deleted entities, refuse circular locations
+	bugfix: fix minor defects of port operations and the IP allocation warning
+	bugfix: translate common database errors, roll back transactions on any error, make bulk object adds atomic
+	bugfix: unescape LDAP group DNs and fix LDAP cache edge cases
+	bugfix: fix the configuration popups of the 802.1Q sync preview
+	bugfix: escape stored text on the NAT pages and in operation messages
+	bugfix: make the SNMP port list sync atomic, delete the 802.1Q configuration of removed ports
+	update: make the test suite independent of test order and MySQL
+	update: make the upgrade test run on PHPUnit 9 and current servers
 0.22.1
 	bugfix: squelch some warnings with PHP 8.0 (GH #280 by Dirk Meyer)
 	bugfix: fix warnings from shellcheck 0.9.0 in git-commit
