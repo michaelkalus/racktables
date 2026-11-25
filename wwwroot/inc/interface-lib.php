@@ -1286,11 +1286,15 @@ function enableTagsPicker ()
 	if (! $taglist_inserted)
 	{
 		$taglist_filtered = array();
+		$sort_index = 0;
 		foreach ($taglist as $key => $taginfo) # remove unused fields
 		{
 			$taglist_filtered[$key] = array_sub ($taginfo, array("tag", "is_assignable", "trace"));
 			if ($taginfo['color'] != NULL)
 				$taglist_filtered[$key]['tagclass'] = getTagClass ($taginfo);
+			# A JavaScript object iterates integer keys in ascending order,
+			# so pass the name order of getTagList() explicitly.
+			$taglist_filtered[$key]['sort_index'] = $sort_index++;
 		}
 		addJSText ('var taglist = ' . json_encode ($taglist_filtered) . ';');
 		$taglist_inserted = TRUE;

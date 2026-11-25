@@ -20,6 +20,23 @@ $(document).ready(function() {
 	});
 });
 
+var tag_collator = (typeof(Intl) != 'undefined' && typeof(Intl.Collator) != 'undefined') ?
+	new Intl.Collator(undefined, {sensitivity: 'base'}) : null;
+
+// Compare two tag names: by the server order (sort_index, which follows the
+// database collation) when both tags have it, otherwise case-insensitive and
+// locale-aware.
+function compareTagNames(a, b, taglist, tags_name_to_id) {
+	var a_info = taglist[tags_name_to_id[a]];
+	var b_info = taglist[tags_name_to_id[b]];
+	if (a_info && b_info && typeof(a_info['sort_index']) != 'undefined' && typeof(b_info['sort_index']) != 'undefined')
+		return a_info['sort_index'] - b_info['sort_index'];
+	var result = tag_collator ? tag_collator.compare(a, b) : a.toLowerCase().localeCompare(b.toLowerCase());
+	if (result == 0 && a != b)
+		result = a < b ? -1 : 1;
+	return result;
+}
+
 function getTagChild(tag, tags_trace, tags_name_to_id) {
 	var result = [];
 	if (Object.keys(tags_trace).length > 0) {
@@ -61,41 +78,30 @@ function suggest_search (term) {
 		if (typeof(this.options.tags_trace) != 'undefined' &&  Object.keys(this.options.tags_trace).length > 0) {
 			if (typeof(this.tagInput) != 'undefined')
 				this.tagInput.autocomplete('widget').addClass('indented');
-			var roots = [];
-			var tree_styles = {};
-			tree_styles[0] = [];
-			for (tag in this.options.tags_trace) // root tags
-				if (this.options.tags_trace[tag].length == 0) {
-					roots.push(tag);
-					tree_styles[0].push(this.options.tags_name_to_id[tag]);
-				}
-			var changes = 1;
-			var i = 0;
-			var taglist_tmp = $.extend(1, this.options.taglist);
-			while (changes) {
-				i++;
-				tree_styles[i] = [];
-				changes = 0;
-				for (tag_id in taglist_tmp)
-				{
-					if (taglist_tmp[tag_id]['trace'].length == i)
-					{
-						var tag = this.options.tags_to_name[tag_id];
-						tag_parent_id = this.options.taglist[tag_id]['trace'].slice(-1)[0];
-						tag_parent = this.options.tags_to_name[tag_parent_id];
-						index = roots.indexOf(tag_parent);
-						roots.splice(index + 1, 0, tag);
-						delete taglist_tmp[tag_id];
-						tree_styles[i].push(tag_id);
-						changes = 1;
-					}
-				}
-			}
-			results = roots;
+			var tags_trace = this.options.tags_trace;
+			var tags_name_to_id = this.options.tags_name_to_id;
+			var names = [];
+			var children = {}; // parent tag id ('' for root tags) => child tag names in name order
+			for (var tag in tags_trace)
+				names.push(tag);
+			names.sort(this.options.compare_tags);
+			$.each(names, function(i, tag) {
+				var parent_id = tags_trace[tag].length ? tags_trace[tag].slice(-1)[0] : '';
+				if (typeof(children[parent_id]) == 'undefined')
+					children[parent_id] = [];
+				children[parent_id].push(tag);
+			});
+			var addSubtree = function(parent_id) { // depth first, each tag followed by its subtree
+				$.each(children[parent_id] || [], function(i, tag) {
+					results.push(tag);
+					addSubtree(tags_name_to_id[tag]);
+				});
+			};
+			addSubtree('');
 		}
 		else {
 			$.each(this.options.all_tags, function(i, v) {results.push(v)});
-			results.sort();
+			results.sort(this.options.compare_tags);
 		}
 	}
 	else if (term.slice(-1) == "/" || term.slice(-1) == "\\") {
@@ -109,7 +115,7 @@ function suggest_search (term) {
 			}
 			results = getTagChild(found_tags[0], this.options.tags_trace, this.options.tags_name_to_id);
 		}
-		results.sort();
+		results.sort(this.options.compare_tags);
 	}
 	else {
 		var wildcard = false;
@@ -124,7 +130,7 @@ function suggest_search (term) {
 		}
 		if (! wildcard)
 			results = results.slice(0, suggest_size); // cutting
-		results.sort();
+		results.sort(this.options.compare_tags);
 	}
 	
 	return results;
@@ -142,6 +148,10 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 	var all_tags = [];
 	var available_tags = [];
 	var selected = [];
+
+	function compareTags(a, b) {
+		return compareTagNames(a, b, taglist, tags_name_to_id);
+	}
 
 	function getHelp(tag) {
 		s = [];
@@ -182,7 +192,7 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 		tag = tags_to_name[tag_id];
 		selected.splice($.inArray(tag, selected), 1);
 		available_tags.push(tag);
-		available_tags.sort();
+		available_tags.sort(compareTags);
 		if (tag_limit != 0 && $(ul).tagit("assignedTags").length < tag_limit) {
 			$(ul).tagit("setStatus", true);
 			if (typeof(expand_all_btn) != 'undefined')
@@ -223,6 +233,7 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 	});
 	$.each(taglist, function (index, value) {tags_to_name[index] = value['tag'];});
 	$.each(taglist, function (index, value) {all_tags.push(value['tag']);});
+	all_tags.sort(compareTags);
 
 	var oldresizeMenu = $.ui.autocomplete.prototype._resizeMenu;
 	$.ui.autocomplete.prototype._resizeMenu = function() {
@@ -304,6 +315,7 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 		if (typeof value["is_assignable"] == "undefined" || value["is_assignable"] == "yes") 
 			available_tags.push(value['tag']);
 	});
+	available_tags.sort(compareTags);
 	
 
 	function autocomplete_open(event, ui) {
@@ -371,6 +383,7 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 			tags_to_name: tags_to_name,
 			tags_name_to_id: tags_name_to_id,
 			taglist: taglist,
+			compare_tags: compareTags,
 		});
 		$(ul).closest("form").find("input:hidden[name='" + value_name + "[]" + "']").remove(); // remove extra data
 		$.each(preselect, function(index, value) {
@@ -406,6 +419,7 @@ function generateTagList(input, ul, taglist, preselect, value_name, tag_limit, e
 			open: autocomplete_open,
 			available_tags: available_tags,
 			all_tags: all_tags,
+			compare_tags: compareTags,
 			create: function(event, ui){
 				$(this).data("autocomplete")._renderItem = function(event, ui) {
 					renderItem.call(this, event, ui);
