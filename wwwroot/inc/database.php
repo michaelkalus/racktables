@@ -1516,21 +1516,43 @@ function commitCleanRack ($rack_id)
 // Drop the rack
 function commitDeleteRack ($rack_id)
 {
-	$rack = spotEntity ('rack', $rack_id);
-	releaseFiles ('rack', $rack_id);
-	destroyTagsForEntity ('rack', $rack_id);
-	usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $rack_id));
-	commitDeleteObject ($rack_id);
-	resetRackSortOrder ($rack['row_id']);
+	// Do not release anything of the rack if the deletion fails.
+	$savepoint = beginAtomicChange ('commitDeleteRack');
+	try
+	{
+		$rack = spotEntity ('rack', $rack_id);
+		releaseFiles ('rack', $rack_id);
+		destroyTagsForEntity ('rack', $rack_id);
+		usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $rack_id));
+		commitDeleteObject ($rack_id);
+		resetRackSortOrder ($rack['row_id']);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 // Drop the row with all racks inside
 function commitDeleteRow ($row_id)
 {
-	$racks = getRacks ($row_id);
-	foreach ($racks as $rack)
-		commitDeleteRack ($rack['id']);
-	commitDeleteObject ($row_id);
+	// Do not delete any of the racks if the deletion fails.
+	$savepoint = beginAtomicChange ('commitDeleteRow');
+	try
+	{
+		$racks = getRacks ($row_id);
+		foreach ($racks as $rack)
+			commitDeleteRack ($rack['id']);
+		commitDeleteObject ($row_id);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 // Returns mounted devices count in all racks inside the specified row
