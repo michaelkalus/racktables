@@ -4527,8 +4527,8 @@ function createIPv6Prefix ($range = '', $name = '', $is_connected = FALSE, $tagl
 	$network_id = lastInsertID();
 	lastCreated ('ipv6net', lastInsertID());
 
-	# RFC3513 2.6.1 - Subnet-Router anycast
-	if ($is_connected)
+	# RFC3513 2.6.1 - Subnet-Router anycast, not used on /127 (RFC6164) or /128
+	if ($is_connected && $mask < 127)
 		updateV6Address ($net['ip_bin'], 'Subnet-Router anycast', 'yes');
 	produceTagsForNewRecord ('ipv6net', $taglist, $network_id);
 	if ($vlan_ck != NULL)
