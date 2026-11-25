@@ -1383,18 +1383,29 @@ function releaseFiles ($entity_realm, $entity_id)
 // There are times when you want to delete all traces of an object
 function commitDeleteObject ($object_id)
 {
-	// Reset most of stuff
-	commitResetObject ($object_id);
-	// Object itself
-	usePreparedDeleteBlade ('Object', array ('id' => $object_id));
-	// Dangling links
-	usePreparedExecuteBlade
-	(
-		'DELETE FROM EntityLink WHERE ' .
-		"(parent_entity_type IN ('rack', 'row', 'location') AND parent_entity_id = ?) OR " .
-		"(child_entity_type IN ('rack', 'row', 'location') AND child_entity_id = ?)",
-		array ($object_id, $object_id)
-	);
+	// Do not leave a half-reset object behind if the deletion fails.
+	$savepoint = beginAtomicChange ('commitDeleteObject');
+	try
+	{
+		// Reset most of stuff
+		commitResetObject ($object_id);
+		// Object itself
+		usePreparedDeleteBlade ('Object', array ('id' => $object_id));
+		// Dangling links
+		usePreparedExecuteBlade
+		(
+			'DELETE FROM EntityLink WHERE ' .
+			"(parent_entity_type IN ('rack', 'row', 'location') AND parent_entity_id = ?) OR " .
+			"(child_entity_type IN ('rack', 'row', 'location') AND child_entity_id = ?)",
+			array ($object_id, $object_id)
+		);
+		endAtomicChange ($savepoint, TRUE);
+	}
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 function commitResetObject ($object_id)
@@ -1448,37 +1459,48 @@ function commitUpdateRack ($rack_id, $new_row_id, $new_name, $new_height, $new_h
 	if ($check_row['count'] > 0)
 		throw new InvalidArgException ('new_height', $new_height, 'Cannot shrink rack, objects are still mounted there');
 
-	// Determine if the row changed
-	$old_rack = spotEntity ('rack', $rack_id);
-	$old_row_id = $old_rack['row_id'];
-	if ($old_row_id != $new_row_id)
+	// Do not leave a moved but otherwise unchanged rack behind if the update fails.
+	$savepoint = beginAtomicChange ('commitUpdateRack');
+	try
 	{
-		// Move it to the specified row
-		usePreparedUpdateBlade
-		(
-			'EntityLink',
-			array ('parent_entity_id' => $new_row_id),
-			array ('child_entity_type' => 'rack', 'child_entity_id' => $rack_id)
-		);
+		// Determine if the row changed
+		$old_rack = spotEntity ('rack', $rack_id);
+		$old_row_id = $old_rack['row_id'];
+		if ($old_row_id != $new_row_id)
+		{
+			// Move it to the specified row
+			usePreparedUpdateBlade
+			(
+				'EntityLink',
+				array ('parent_entity_id' => $new_row_id),
+				array ('child_entity_type' => 'rack', 'child_entity_id' => $rack_id)
+			);
 
-		// Set the sort_order attribute so it's placed at the end of the new row
-		$rowInfo = getRowInfo ($new_row_id);
-		usePreparedUpdateBlade
-		(
-			'AttributeValue',
-			array ('uint_value' => $rowInfo['count']),
-			array ('object_id' => $rack_id, 'attr_id' => 29)
-		);
+			// Set the sort_order attribute so it's placed at the end of the new row
+			$rowInfo = getRowInfo ($new_row_id);
+			usePreparedUpdateBlade
+			(
+				'AttributeValue',
+				array ('uint_value' => $rowInfo['count']),
+				array ('object_id' => $rack_id, 'attr_id' => 29)
+			);
 
-		// Reset the sort order of the old row
-		resetRackSortOrder ($old_row_id);
+			// Reset the sort order of the old row
+			resetRackSortOrder ($old_row_id);
+		}
+
+		// Update the height
+		commitUpdateAttrValue ($rack_id, 27, $new_height);
+
+		// Update the rack
+		commitUpdateObject ($rack_id, $new_name, NULL, $new_has_problems, $new_asset_no, $new_comment);
+		endAtomicChange ($savepoint, TRUE);
 	}
-
-	// Update the height
-	commitUpdateAttrValue ($rack_id, 27, $new_height);
-
-	// Update the rack
-	commitUpdateObject ($rack_id, $new_name, NULL, $new_has_problems, $new_asset_no, $new_comment);
+	catch (Exception $e)
+	{
+		endAtomicChange ($savepoint, FALSE);
+		throw $e;
+	}
 }
 
 // Unmount all objects from the rack
@@ -5881,6 +5903,48 @@ function isTransactionActive()
 	catch (PDOException $e)
 	{
 		return TRUE;
+	}
+}
+
+// Start a change that endAtomicChange() either keeps or undoes as a whole.
+// Inside an active transaction use a savepoint, so that a failure undoes only
+// this change and the caller keeps control of its transaction. Returns the
+// savepoint name, or NULL if a new transaction was started.
+function beginAtomicChange ($savepoint)
+{
+	global $dbxlink;
+	if (! isTransactionActive())
+	{
+		$dbxlink->beginTransaction();
+		return NULL;
+	}
+	$dbxlink->exec ("SAVEPOINT {$savepoint}");
+	return $savepoint;
+}
+
+function endAtomicChange ($savepoint, $success)
+{
+	global $dbxlink;
+	if ($success)
+	{
+		if ($savepoint === NULL)
+			$dbxlink->commit();
+		else
+			$dbxlink->exec ("RELEASE SAVEPOINT {$savepoint}");
+		return;
+	}
+	try
+	{
+		if ($savepoint === NULL)
+			$dbxlink->rollBack();
+		else
+			$dbxlink->exec ("ROLLBACK TO SAVEPOINT {$savepoint}");
+	}
+	catch (PDOException $e)
+	{
+		// The server may have rolled back the whole transaction already
+		// (e.g. a deadlock), then there is nothing left to undo here and
+		// the caller must see the original error, not this one.
 	}
 }
 
