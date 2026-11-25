@@ -67,25 +67,6 @@ $opspec_list['object-ports-useup'] = array
 		array ('url_argname' => 'object_id', 'assertion' => 'natural'), # preserve context
 	),
 );
-$opspec_list['object-ports-delPort'] = array
-(
-	'table' => 'Port',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'port_id', 'table_colname' => 'id', 'assertion' => 'natural'),
-		array ('url_argname' => 'object_id', 'assertion' => 'natural'),
-	),
-);
-$opspec_list['object-ports-deleteAll'] = array
-(
-	'table' => 'Port',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'object_id', 'assertion' => 'natural'),
-	),
-);
 $opspec_list['location-log-del'] = array
 (
 	'table' => 'ObjectLog',
@@ -751,6 +732,19 @@ function assertPortOfCurrentObject ($argname)
 	if ($result->fetchColumn() != 1)
 		throw new InvalidRequestArgException ($argname, $port_id, 'not a port of this object');
 	return $port_id;
+}
+
+function deletePortForObject ()
+{
+	if (commitDeletePorts (getBypassValue(), array (assertPortOfCurrentObject ('port_id'))))
+		showOneLiner (49);
+	else
+		showError ('the port does not exist any more');
+}
+
+function deleteAllPortsForObject ()
+{
+	showOneLiner (38, array (commitDeletePorts (getBypassValue())));
 }
 
 function editPortForObject ()
@@ -3707,12 +3701,19 @@ function tableHandler()
 		$retcode = 48;
 		break;
 	case 'DELETE':
-		usePreparedDeleteBlade
+		// Unlike an UPDATE, which affects no rows when it changes nothing,
+		// a DELETE that affects no rows has found nothing to delete.
+		$deleted = usePreparedDeleteBlade
 		(
 			$opspec['table'],
 			buildOpspecColumns ($opspec, 'arglist'),
 			array_fetch ($opspec, 'conjunction', 'AND')
 		);
+		if (! $deleted)
+		{
+			showError ('no matching record found, nothing was deleted');
+			return;
+		}
 		$retcode = 49;
 		break;
 	case 'UPDATE':
