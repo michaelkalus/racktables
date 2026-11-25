@@ -385,12 +385,19 @@ function makeGatewayParams ($object_id, /*array(&)*/$ref_settings, /*array(&)*/$
 			$params_from_settings[] = $settings['hostname'];
 			break;
 		case 'sshnokey':
-			$prepend_credentials = TRUE;
-			$params_from_settings['proto'] = 'proto';
+			# The gateway logs in through SSH itself, so the credentials are not
+			# sent to the device as input lines. The password is not passed as a
+			# command-line argument either: it goes as the first line of the
+			# standard input, which the gateway reads before connecting.
+			$params_from_settings['port'] = 'port';
 			$params_from_settings['prompt'] = 'prompt';
 			$params_from_settings['prompt-delay'] = 'prompt_delay';
 			$params_from_settings['username'] = 'username';
-			$params_from_settings['password'] = 'password';
+			if (isset ($settings['password']))
+			{
+				$params_from_settings[] = '--password-stdin';
+				$commands = $settings['password'] . "\n" . $commands;
+			}
 			$params_from_settings[] = $settings['hostname'];
 			break;
 		case 'ssh':
@@ -579,6 +586,10 @@ function queryTerminal ($object_id, $commands, $tolerate_remote_errors = TRUE)
 	// override default settings
 	if (is_callable ('terminal_settings'))
 		call_user_func ('terminal_settings', $objectInfo, array (&$settings));
+	# ProCurve asks to press any key after the SSH login. This used to be
+	# answered by the credentials lines that are no longer sent with sshnokey.
+	if ($breed == 'hpprocurveN1178' && $settings['protocol'] == 'sshnokey')
+		$commands = "\n" . $commands;
 	// make gateway-specific CLI params out of settings
 	$params = callHook ('makeGatewayParams', $object_id, array (&$settings), array (&$commands));
 	// call gateway

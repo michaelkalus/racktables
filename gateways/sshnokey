@@ -24,6 +24,7 @@ my $op_help;
 my $op_port;
 my $op_username;
 my $op_password;
+my $op_password_stdin;
 my $op_connect_timeout = 2;
 my $op_timeout = 10;
 my $op_prompt;
@@ -36,7 +37,8 @@ GetOptions (
     'prompt-delay:f' => \$op_delay,
     'prompt:s' => \$op_prompt,
     'username:s' => \$op_username,
-    'password:s' => \$op_password
+    'password:s' => \$op_password,
+    'password-stdin' => \$op_password_stdin
 );
 if ($op_help) {
     &display_help;
@@ -46,19 +48,27 @@ my $op_host = $ARGV[0];
 defined $op_host or die "ERROR: please specify remote host (-h for help)";
 defined $op_prompt or die "ERROR: please specify prompt regexp (-h for help)";
 my $prompt_re = qr/$op_prompt/;
+if ($op_password_stdin) {
+    # the first line of the input is the password, the commands follow it
+    $op_password = <STDIN>;
+    defined $op_password or die "ERROR: no password in standard input";
+    $op_password =~ s/[\015\012]+$//;
+}
 
 sub display_help {
     print <<END;
 OpenSSH-Hardened telnet batch client for RackTables.
 Takes commands list in standard input and gives the responses via standard output.
-Login credentials are not specially handled and should be placed as first lines of input
 Usage:
-$0 {hostname} [--port={port}] [--connect-timeout={seconds}] --prompt={regexp} [--timeout={seconds}] --username={username} --password={password} --prompt-delay={prompt_delay}
+$0 {hostname} [--port={port}] [--connect-timeout={seconds}] --prompt={regexp} [--timeout={seconds}] --username={username} [--password-stdin | --password={password}] --prompt-delay={prompt_delay}
 
 port: TCP port number to connect to
 connect-timeout: timeout for giving up connecting process, seconds
 prompt: command prompt regexp for interactive telnet (auth prompts too)
 timeout: wait time for activity of remote telnet peer in seconds
+username, password: SSH login credentials, they are not sent to the remote shell
+password-stdin: read the password from the first line of standard input
+  (--password is visible to other local users in the process list)
 NOTE: this help may be incorrect - functionality within RackTables was tested.
 
 END
