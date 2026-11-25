@@ -4,7 +4,8 @@ This repository is a community-maintained fork of
 repository and is not affiliated with or endorsed by the original authors. It
 was created because upstream is no longer actively maintained, and its purpose
 is to keep RackTables working on current PHP and MySQL/MariaDB releases and to
-fix reported bugs and security issues.
+fix reported bugs and security issues. Its releases are numbered
+`0.23.0-community` and later; version numbers 0.22.x are left to upstream.
 
 Please report bugs in this fork via its
 [GitHub issues](https://github.com/michaelkalus/racktables/issues). Reports
@@ -163,9 +164,21 @@ and initialize the application.
 3. Open the RackTables page in a browser. The software will detect version
    mismatch and display a message telling to log in as admin to finish
    the upgrade.
-4. Do that and report any errors to the bug tracker or the mailing list.
+4. Do that and report any errors to the
+   [issue tracker of this fork](https://github.com/michaelkalus/racktables/issues).
 
 ## Release notes
+
+### Upgrading to 0.23.0-community
+This is the first release of the community fork. A database of RackTables
+0.22.0 or of an earlier release is upgraded as usual (see above).
+
+A database upgraded by the fork cannot be used with upstream RackTables code
+again. Upstream releases do not know the version `0.23.0-community`: they
+refuse to run on such a database with the message that the installation
+"seems to be just upgraded to version 0.22.0, while the database version is
+0.23.0-community", and their upgrader reports "Upgrade path not found" and
+changes nothing. To go back, restore the backup taken before the upgrade.
 
 ### Upgrading to 0.22.0
 As of this release the minimum supported PHP version is 7.0.

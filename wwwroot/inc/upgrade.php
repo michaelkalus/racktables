@@ -193,6 +193,18 @@ ENDOFTEXT
 As of this release the minimum supported PHP version is 7.0.
 ENDOFTEXT
 ,
+
+	'0.23.0-community' => <<<'ENDOFTEXT'
+This is the first release of the RackTables community fork
+(https://github.com/michaelkalus/racktables). A database of RackTables 0.22.0
+or of an earlier release is upgraded as usual.
+
+A database upgraded to this version cannot be used with upstream RackTables
+code again: upstream releases do not know this version and refuse to run on
+it. Keep a backup of the database taken before the upgrade if you may want to
+go back.
+ENDOFTEXT
+,
 );
 
 // This function currently implements a convention that to upgrade any release R1
@@ -227,6 +239,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.21.5',
 		'0.22.0',
 		'0.22.1',
+		'0.23.0-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1409,6 +1422,9 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			break;
 		case '0.22.1':
 			$query[] = "UPDATE Config SET varvalue = '0.22.1' WHERE varname = 'DB_VERSION'";
+			break;
+		case '0.23.0-community':
+			$query[] = "UPDATE Config SET varvalue = '0.23.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
 			$query = reloadDictionary();
