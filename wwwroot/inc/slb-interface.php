@@ -191,7 +191,7 @@ function renderSLBTriplets ($cell)
 			}
 			echo "<td class=slbconf>" . htmlspecialchars ($slb->slb['vsconfig']) . "</td>";
 			echo "<td class=slbconf>" . htmlspecialchars ($slb->slb['rsconfig']) . "</td>";
-			echo "<td class=slbconf>" . htmlspecialchars ($slb->slb['prio']) . "</td>";
+			echo "<td class=slbconf>" . htmlspecialchars ((string) $slb->slb['prio']) . "</td>";
 			echo "</tr>\n";
 			$order = $nextorder[$order];
 		}
@@ -245,7 +245,7 @@ function renderSLBTripletsEdit ($cell)
 			renderSLBEntityCell ($cells[1]);
 			echo '</td><td>';
 			echo "<textarea name=rsconfig rows=5 cols=70>" . stringForTextarea ($slb->slb['rsconfig']) . "</textarea><br>RS config &uarr;";
-			echo "<div style='float:left; margin-top:10px'><label><input name=prio type=text size=10 value=\"" . htmlspecialchars ($slb->slb['prio']) . "\"> &larr; Priority</label></div>";
+			echo "<div style='float:left; margin-top:10px'><label><input name=prio type=text size=10 value=\"" . htmlspecialchars ((string) $slb->slb['prio']) . "\"> &larr; Priority</label></div>";
 			echo '</td></tr></form>';
 			$order = $nextorder[$order];
 		}

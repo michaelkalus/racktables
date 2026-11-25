@@ -174,8 +174,13 @@ $log_messages = array(); // messages waiting for displaying
 
 function defineIfNotDefined ($constant, $value, $case_insensitive = FALSE)
 {
-	if (defined ($constant) === FALSE)
-		define ($constant, $value, $case_insensitive);
+	if (defined ($constant) === TRUE)
+		return;
+	// Since PHP 8 passing the 3rd argument of define() at all is deprecated.
+	if ($case_insensitive)
+		define ($constant, $value, TRUE);
+	else
+		define ($constant, $value);
 }
 
 // For backward compatibility only, remove later.
@@ -207,7 +212,7 @@ function isNaturalNumber ($arg)
 
 function isHTMLColor ($color)
 {
-	return 1 == preg_match ('/^[0-9A-F]{6}$/i', $color);
+	return 1 == preg_match ('/^[0-9A-F]{6}$/i', $color ?? '');
 }
 
 function isValidVLANID ($x)
@@ -1017,7 +1022,7 @@ function ip6_mask ($prefix_len)
 // an empty string or raise an exception on invalid input.
 function l2addressForDatabase ($string)
 {
-	$string = strtoupper (trim ($string));
+	$string = strtoupper (trim ($string ?? ''));
 	$ret = '';
 	switch (TRUE)
 	{
@@ -1344,7 +1349,7 @@ function string_insert_hrefs ($p_string)
 	# mailto: link, making sure that we skip processing of any existing anchor
 	# tags, to avoid parts of URLs such as https://user@example.com/ or
 	# http://user:password@example.com/ to be not treated as an email.
-	$t_pieces = preg_split ($s_anchor_regex, $p_string, NULL, PREG_SPLIT_DELIM_CAPTURE);
+	$t_pieces = preg_split ($s_anchor_regex, $p_string, -1, PREG_SPLIT_DELIM_CAPTURE);
 	$p_string = '';
 	foreach ($t_pieces as $piece)
 		if (preg_match ($s_anchor_regex, $piece))
@@ -3163,7 +3168,7 @@ function cookOptgroups ($recordList, $object_type_id = 0, $existing_value = 0)
 
 function dos2unix ($text)
 {
-	return str_replace ("\r\n", "\n", $text);
+	return str_replace ("\r\n", "\n", $text ?? '');
 }
 
 function unix2dos ($text)
@@ -3458,8 +3463,10 @@ function getUnlinkedPortTypeOptions ($port_iif_id)
 		$compat = getPortInterfaceCompat();
 	}
 
-	if (isset ($cache[$port_iif_id]))
-		return $cache[$port_iif_id];
+	// NULL as an array key means '' but is deprecated since PHP 8.5.
+	$cache_key = $port_iif_id ?? '';
+	if (isset ($cache[$cache_key]))
+		return $cache[$cache_key];
 
 	$ret = array();
 	$seen_oifs = array();
@@ -3487,7 +3494,7 @@ function getUnlinkedPortTypeOptions ($port_iif_id)
 		$ret[$optgroup][$row['iif_id'] . '-' . $row['oif_id']] = $name;
 	}
 
-	$cache[$port_iif_id] = $ret;
+	$cache[$cache_key] = $ret;
 	return $ret;
 }
 
@@ -5396,7 +5403,7 @@ function setMessage ($type, $message, $direct_rendering)
 			case 'warning':
 				$code = 200;
 				break;
-			case 'success';
+			case 'success':
 				$code = 0;
 				break;
 			case 'neutral':

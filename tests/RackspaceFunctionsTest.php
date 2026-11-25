@@ -12,7 +12,7 @@ class RackspaceFunctionsTest extends RTTestCase
 	public static function setUpBeforeClass () : void
 	{
 		// This method is static and thus cannot call myString(), which uses $this.
-		self::$row_name = sprintf ('testrow-%s-%u', get_class(), getmypid());
+		self::$row_name = sprintf ('testrow-%s-%u', __CLASS__, getmypid());
 		self::$row_id = commitAddObject (self::$row_name, NULL, 1561, NULL);
 	}
 

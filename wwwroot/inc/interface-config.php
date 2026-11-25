@@ -1097,7 +1097,7 @@ function renderGraphCycleResolver()
 	// $fieldmap below does not contain 'parent_id' as it is done by the SELECT.
 	switch ($pageno)
 	{
-		case 'tagtree';
+		case 'tagtree':
 			global $taglist;
 			$nodelist = $taglist;
 			$textfield = 'tag';

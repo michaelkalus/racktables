@@ -292,11 +292,13 @@ function printRackThumbImage ($rack_id, $scale = 1, $object_id = NULL)
 	{
 		$resized = imagecreate ($totalwidth * $scale, $totalheight * $scale);
 		imagecopyresized ($resized, $img, 0, 0, 0, 0, $totalwidth * $scale, $totalheight * $scale, $totalwidth, $totalheight);
-		imagedestroy ($img);
+		if (PHP_VERSION_ID < 80000)
+			imagedestroy ($img);
 		$img = $resized;
 	}
 	imagepng ($img);
-	imagedestroy ($img);
+	if (PHP_VERSION_ID < 80000)
+		imagedestroy ($img);
 }
 
 function renderProgressBarImage ($done)
@@ -329,7 +331,8 @@ function renderProgressBarImage ($done)
 	}
 	header("Content-Type: image/png");
 	imagepng ($img);
-	imagedestroy ($img);
+	if (PHP_VERSION_ID < 80000)
+		imagedestroy ($img);
 }
 
 function renderProgressBar4Image ($px1, $px2, $px3)
@@ -390,7 +393,8 @@ function renderProgressBar4Image ($px1, $px2, $px3)
 	}
 	header("Content-Type: image/png");
 	imagepng ($img);
-	imagedestroy ($img);
+	if (PHP_VERSION_ID < 80000)
+		imagedestroy ($img);
 }
 
 // XXX: deprecated
@@ -417,18 +421,20 @@ function renderImagePreview ($file_id)
 	if ($width > getConfigVar ('PREVIEW_IMAGE_MAXPXS') || $height > getConfigVar ('PREVIEW_IMAGE_MAXPXS'))
 	{
 		$ratio = getConfigVar ('PREVIEW_IMAGE_MAXPXS') / max ($width, $height);
-		$newwidth = $width * $ratio;
-		$newheight = $height * $ratio;
+		$newwidth = (int) ($width * $ratio);
+		$newheight = (int) ($height * $ratio);
 		$resampled = imagecreatetruecolor ($newwidth, $newheight);
 		imagecopyresampled ($resampled, $image, 0, 0, 0, 0, $newwidth, $newheight, $width, $height);
-		imagedestroy ($image);
+		if (PHP_VERSION_ID < 80000)
+			imagedestroy ($image);
 		$image = $resampled;
 		unset ($resampled);
 	}
 	header ('Content-Type: image/jpeg');
 	ob_start();
 	imagejpeg ($image);
-	imagedestroy ($image);
+	if (PHP_VERSION_ID < 80000)
+		imagedestroy ($image);
 	commitAddFileCache ($file_id, ob_get_flush());
 }
 

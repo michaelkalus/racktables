@@ -180,6 +180,10 @@ class ERetryNeeded extends RackTablesError
 
 class InvalidArgException extends RackTablesError
 {
+	public $name;
+	public $value;
+	public $reason;
+
 	// derive an instance of InvalidRequestArgException
 	public function newIRAE ($argname = NULL)
 	{

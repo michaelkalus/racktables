@@ -89,7 +89,7 @@ function renderPopupTripletForm ($triplet, $port, $vip, $row)
 	else
 	{
 		echo '<input type=hidden name=vip value="'  . htmlspecialchars (ip_format ($vip['vip']), ENT_QUOTES) . '">';
-		echo '<p><label>Priority:<br><input type=text name=prio value="'  . htmlspecialchars (is_array ($row) ? $row['prio'] : '', ENT_QUOTES) . '"></label>';
+		echo '<p><label>Priority:<br><input type=text name=prio value="'  . htmlspecialchars (is_array ($row) ? (string) $row['prio'] : '', ENT_QUOTES) . '"></label>';
 	}
 	echo '<p><label>VS config:<br>';
 	echo '<textarea name=vsconfig rows=3 cols=80>' . (is_array ($row) ? stringForTextarea ($row['vsconfig']) : '') . '</textarea></label>';

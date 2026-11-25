@@ -1211,7 +1211,7 @@ function stringForTextInputValue ($string, $maxlen = 30)
 {
 	if ($maxlen != 0)
 		$string = mb_substr ($string ?? "", 0, $maxlen);
-	return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8');
+	return htmlspecialchars ($string ?? '', ENT_QUOTES, 'UTF-8');
 }
 
 // "<TEXTAREA>%s</TEXTAREA>"
