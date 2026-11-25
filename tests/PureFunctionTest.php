@@ -563,11 +563,17 @@ class PureFunctionTest extends RTTestCase
 			array ('array_first', array (FALSE, NULL, 0), FALSE),
 			array ('array_first', array (-1, 0, 1), -1),
 			array ('array_first', array (), NULL), // not an exception in the current implementation
+			array ('array_first', array (5 => 'a', 2 => 'b', 9 => 'c'), 'a'), // order of elements, not of keys
+			array ('array_first', array ('x' => 10, 'y' => 20), 10),
+			array ('array_first', array (NULL, 1), NULL),
 
 			array ('array_last', array (1, 2, 3), 3),
 			array ('array_last', array (FALSE, NULL, 0), 0),
 			array ('array_last', array (-1, 0, 1), 1),
 			array ('array_last', array (), NULL), // not an exception in the current implementation
+			array ('array_last', array (5 => 'a', 9 => 'c', 2 => 'b'), 'b'), // order of elements, not of keys
+			array ('array_last', array ('x' => 10, 'y' => 20), 20),
+			array ('array_last', array (1, NULL), NULL),
 
 			// implicit 2nd argument
 			array ('groupIntsToRanges', array(), array()),
