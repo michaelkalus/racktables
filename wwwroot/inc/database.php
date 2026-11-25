@@ -5158,10 +5158,19 @@ function fetchLDAPCacheRow ($username, $extrasql = '')
 	$row = $result->fetch (PDO::FETCH_ASSOC);
 	if ($row)
 	{
-		$members = unserialize (base64_decode ($row['memberof']));
+		// The row that acquireLDAPCache() inserts holds no data yet.
+		$members = $row['memberof'] == '' ? array() : unserialize (base64_decode ($row['memberof']));
 		$row['memberof'] = is_array ($members) ? $members : array();
 	}
 	return $row;
+}
+
+// LDAPCache.presented_username is char(64) in a utf8 (3-byte) table. A name
+// that does not fit would be truncated or refused by the server, so it must
+// not be used as a cache key.
+function fitsLDAPCacheUsername ($username)
+{
+	return preg_match ('/^[\x{0}-\x{FFFF}]{0,64}\z/u', $username) === 1;
 }
 
 // locks LDAPCache row for given username or throws an exception
@@ -5176,6 +5185,7 @@ function acquireLDAPCache ($username, $max_tries = 2)
 
 	if ($row = fetchLDAPCacheRow ($username, 'FOR UPDATE'))
 		return $row;
+	$dbxlink->rollBack();
 
 	// Maybe another instance deleted the row before this instance had locked it. Try again.
 	if ($max_tries > 0)
@@ -5189,6 +5199,21 @@ function releaseLDAPCache ()
 {
 	global $dbxlink;
 	$dbxlink->commit();
+}
+
+// Undo acquireLDAPCache() after an error before releaseLDAPCache(). Do not
+// let a failure here replace the original error.
+function abortLDAPCache ()
+{
+	global $dbxlink;
+	try
+	{
+		if ($dbxlink->inTransaction())
+			$dbxlink->rollBack();
+	}
+	catch (PDOException $e)
+	{
+	}
 }
 
 // This actually changes only last_retry.

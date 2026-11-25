@@ -952,6 +952,15 @@ class PureFunctionTest extends RTTestCase
 			array ('getLDAPGroupNameFromDN', 'CN=bad\\4', NULL),
 			array ('getLDAPGroupNameFromDN', 'CN=bad\\', NULL),
 			array ('getLDAPGroupNameFromDN', '', NULL),
+
+			// LDAPCache.presented_username is char(64) in a 3-byte utf8 table.
+			array ('fitsLDAPCacheUsername', 'jdoe', TRUE),
+			array ('fitsLDAPCacheUsername', str_repeat ('a', 64), TRUE),
+			array ('fitsLDAPCacheUsername', str_repeat ('a', 65), FALSE),
+			array ('fitsLDAPCacheUsername', str_repeat ("\u{10d}", 64), TRUE),
+			array ('fitsLDAPCacheUsername', str_repeat ("\u{10d}", 65), FALSE),
+			array ('fitsLDAPCacheUsername', "jd\u{1f600}", FALSE),
+			array ('fitsLDAPCacheUsername', "jd\xff", FALSE),
 		);
 	}
 

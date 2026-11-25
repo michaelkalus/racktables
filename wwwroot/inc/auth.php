@@ -356,6 +356,9 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 			throw new RackTablesError ('LDAP misconfiguration: refresh/retry/expiry mismatch', RackTablesError::MISCONFIGURED);
 		if ($LDAP_options['cache_expiry'] == 0) // immediate expiry set means disabled cache
 			return authenticated_via_ldap_nocache ($username, $password, $ldap_displayname);
+		// A name that cannot be a cache key is checked with the server each time.
+		if (! fitsLDAPCacheUsername ($username))
+			return authenticated_via_ldap_nocache ($username, $password, $ldap_displayname);
 		// authenticated_via_ldap_cache()'s way of locking can sometimes result in
 		// a PDO error condition that convertPDOException() was not able to dispatch.
 		// To avoid reaching printPDOException() (which prints backtrace with password
@@ -364,12 +367,18 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 	}
 	catch (PDOException $e)
 	{
+		abortLDAPCache();
 		if (isset ($debug_mode) && $debug_mode)
 			// in debug mode re-throw DB exception as-is
 			throw $e;
 		else
 			// re-create exception to hide private data from its backtrace
 			throw new RackTablesError ('LDAP caching error', RackTablesError::DB_WRITE_FAILED);
+	}
+	catch (Exception $e)
+	{
+		abortLDAPCache();
+		throw $e;
 	}
 }
 
