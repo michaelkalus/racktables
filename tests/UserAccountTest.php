@@ -2,15 +2,20 @@
 
 class UserAccountTest extends RTTestCase
 {
-	const PSWDHASH = 'f7563fd105b011264532ef2d405082015bed948e';
+	private static $PSWDHASH;
 	const REALNAME = 'Test User Account';
 	private $user_name;
 	private $user_id;
 
+	public static function setUpBeforeClass () : void
+	{
+		self::$PSWDHASH = makePasswordHash ('test password');
+	}
+
 	public function setUp () : void
 	{
 		$this->user_name = $this->myString ('testuser');
-		$this->user_id = commitCreateUserAccount ($this->user_name, self::REALNAME, self::PSWDHASH);
+		$this->user_id = commitCreateUserAccount ($this->user_name, self::REALNAME, self::$PSWDHASH);
 	}
 
 	public function tearDown () : void
@@ -37,18 +42,19 @@ class UserAccountTest extends RTTestCase
 		$this->assertNull (getUserIDByUsername ('x' . $this->user_name));
 		$user = spotEntity ('user', $this->user_id);
 		$this->assertEquals ($this->user_name, $user['user_name']);
-		$this->assertEquals (self::PSWDHASH, $user['user_password_hash']);
+		$this->assertEquals (self::$PSWDHASH, $user['user_password_hash']);
 		$this->assertEquals (self::REALNAME, $user['user_realname']);
 
 		$this->user_name = 'x' . $this->user_name;
-		commitUpdateUserAccount ($this->user_id, $this->user_name, 'x' . self::REALNAME, sha1 (self::PSWDHASH));
+		$new_hash = makePasswordHash ('other password');
+		commitUpdateUserAccount ($this->user_id, $this->user_name, 'x' . self::REALNAME, $new_hash);
 
 		$this->assertArrayHasKey ($this->user_id, getAccountSearchResult ($this->user_name));
 		$this->assertEquals ($this->user_id, getUserIDByUsername ($this->user_name));
 		$this->assertNull (getUserIDByUsername ('x' . $this->user_name));
 		$user = spotEntity ('user', $this->user_id, TRUE);
 		$this->assertEquals ($this->user_name, $user['user_name']);
-		$this->assertEquals (sha1 (self::PSWDHASH), $user['user_password_hash']);
+		$this->assertEquals ($new_hash, $user['user_password_hash']);
 		$this->assertEquals ('x' . self::REALNAME, $user['user_realname']);
 	}
 
@@ -58,7 +64,7 @@ class UserAccountTest extends RTTestCase
 	public function testDuplicate ()
 	{
 		$this->expectException (RTDatabaseError::class);
-		commitCreateUserAccount ($this->user_name, 'x' . self::REALNAME, sha1 (self::PSWDHASH));
+		commitCreateUserAccount ($this->user_name, 'x' . self::REALNAME, makePasswordHash ('other password'));
 	}
 
 	/**
@@ -85,7 +91,7 @@ class UserAccountTest extends RTTestCase
 	public function testDelete1 ()
 	{
 		$this->expectException (EntityNotFoundException::class);
-		$user2_id = commitCreateUserAccount ($this->user_name . 'x', self::REALNAME, self::PSWDHASH);
+		$user2_id = commitCreateUserAccount ($this->user_name . 'x', self::REALNAME, self::$PSWDHASH);
 		commitDeleteUserAccount ($user2_id);
 		spotEntity ('user', $user2_id, TRUE);
 	}
@@ -116,7 +122,7 @@ class UserAccountTest extends RTTestCase
 		usePreparedInsertBlade ('TagTree', array ('tag' => $this->myString ('tag')));
 		$tag_id = lastInsertID();
 		$file_id = commitAddFile ($this->myString ('file'), 'text/plain', 'test', '');
-		$user2_id = commitCreateUserAccount ($this->user_name . 'x', self::REALNAME, self::PSWDHASH);
+		$user2_id = commitCreateUserAccount ($this->user_name . 'x', self::REALNAME, self::$PSWDHASH);
 		usePreparedInsertBlade ('FileLink', array ('file_id' => $file_id, 'entity_type' => 'user', 'entity_id' => $user2_id));
 		usePreparedInsertBlade ('TagStorage', array ('entity_realm' => 'user', 'entity_id' => $user2_id, 'tag_id' => $tag_id));
 		commitDeleteUserAccount ($user2_id);

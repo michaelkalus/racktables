@@ -1057,9 +1057,9 @@ function createUser ()
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
 	assertStringArg ('username');
 	assertStringArg ('realname', TRUE);
-	assertStringArg ('password');
+	// Hash the password as received, as the login does (not the HTML-escaped $_REQUEST value).
+	$password = makePasswordHash (assertStringArg ('password'));
 	$username = $_REQUEST['username'];
-	$password = sha1 ($_REQUEST['password']);
 	$user_id = commitCreateUserAccount ($username, $_REQUEST['realname'], $password);
 	if (isset ($_REQUEST['taglist']))
 		produceTagsForNewRecord ('user', $_REQUEST['taglist'], $user_id);
@@ -1070,12 +1070,14 @@ function updateUser ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
 	$username = genericAssertion ('username', 'string');
+	// A blank password field keeps the current password.
+	$password = genericAssertion ('password', 'string0');
 	commitUpdateUserAccount
 	(
 		genericAssertion ('user_id', 'natural'),
 		$username,
 		genericAssertion ('realname', 'string0'),
-		sha1 (genericAssertion ('password', 'string0'))
+		$password === '' ? '' : makePasswordHash ($password)
 	);
 	showFuncMessage (__FUNCTION__, 'OK', array ($username));
 }
@@ -2299,22 +2301,23 @@ function changeMyPassword ()
 		showFuncMessage (__FUNCTION__, 'ERR1');
 		return;
 	}
-	assertStringArg ('oldpassword');
-	assertStringArg ('newpassword1');
-	assertStringArg ('newpassword2');
+	// Use the passwords as received, as the login does (not the HTML-escaped $_REQUEST values).
+	$oldpassword = assertStringArg ('oldpassword');
+	$newpassword1 = assertStringArg ('newpassword1');
+	$newpassword2 = assertStringArg ('newpassword2');
 	$remote_userid = getUserIDByUsername ($remote_username);
 	$userinfo = spotEntity ('user', $remote_userid);
-	if ($userinfo['user_password_hash'] != sha1 ($_REQUEST['oldpassword']))
+	if (! passwordMatchesHash ($oldpassword, $userinfo['user_password_hash']))
 	{
 		showFuncMessage (__FUNCTION__, 'ERR2');
 		return;
 	}
-	if ($_REQUEST['newpassword1'] != $_REQUEST['newpassword2'])
+	if ($newpassword1 !== $newpassword2)
 	{
 		showFuncMessage (__FUNCTION__, 'ERR3');
 		return;
 	}
-	commitUpdateUserAccount ($remote_userid, $userinfo['user_name'], $userinfo['user_realname'], sha1 ($_REQUEST['newpassword1']));
+	commitUpdateUserAccount ($remote_userid, $userinfo['user_name'], $userinfo['user_realname'], makePasswordHash ($newpassword1));
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 

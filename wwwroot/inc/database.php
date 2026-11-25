@@ -3614,8 +3614,8 @@ WHERE
 // throws an exception if error occurred
 function commitCreateUserAccount ($username, $realname, $password_hash)
 {
-	if (! preg_match ('/^[0-9a-f]{40}$/', $password_hash))
-		throw new InvalidArgException ('password_hash', $password_hash, 'not a 20-octet hex string');
+	if (! isModernPasswordHash ($password_hash))
+		throw new InvalidArgException ('password_hash', $password_hash, 'not a password_hash() result');
 	usePreparedInsertBlade
 	(
 		'UserAccount',
@@ -3641,8 +3641,8 @@ function commitUpdateUserAccount ($id, $new_username, $new_realname, $new_passwo
 	);
 	if ($new_password_hash != '')
 	{
-		if (! preg_match ('/^[0-9a-f]{40}$/', $new_password_hash))
-			throw new InvalidArgException ('new_password_hash', $new_password_hash, 'not a 20-octet hex string');
+		if (! isModernPasswordHash ($new_password_hash))
+			throw new InvalidArgException ('new_password_hash', $new_password_hash, 'not a password_hash() result');
 		$set_columns['user_password_hash'] = $new_password_hash;
 	}
 	$userinfo = spotEntity ('user', $id);

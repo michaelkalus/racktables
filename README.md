@@ -19,7 +19,8 @@ Changes compared to upstream:
 * searching for a string with three dots that is not an IPv4 address no longer fails;
 * addresses of /32 and /128 networks are found in their network;
 * the Objects list no longer fails when a rack has no row;
-* autotags of user names may contain `@`, for user@REALM accounts.
+* autotags of user names may contain `@`, for user@REALM accounts;
+* passwords of local accounts are stored with `password_hash()` instead of unsalted SHA-1.
 
 Some of these changes were adopted from unmerged upstream pull requests and
 keep the authorship of their original authors. The licence is unchanged:
@@ -187,6 +188,14 @@ MySQL 8.4, upgrade it on the old server first and dump it afterwards. To
 restore an older dump on MySQL 8.4, run
 `SET SESSION restrict_fk_on_non_standard_key = OFF;` in the session that
 imports it, then upgrade.
+
+Passwords of local accounts are now stored with password_hash() instead of
+unsalted SHA-1. The upgrade widens the column, and no action is needed: an
+existing SHA-1 hash keeps working and is replaced the next time its user logs
+in. *Configuration - User accounts - Edit* lists the accounts that still have
+an SHA-1 hash; setting a new password there replaces it at once.
+A new password can be at most 72 bytes long; an account whose password is
+longer keeps its SHA-1 hash until a shorter password is set.
 
 ### Upgrading to 0.22.0
 As of this release the minimum supported PHP version is 7.0.

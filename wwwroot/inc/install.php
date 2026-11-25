@@ -434,7 +434,16 @@ function init_database_dynamic ()
 {
 	connect_to_db_or_die();
 	global $dbxlink;
-	if (! isset ($_REQUEST['password']) || empty ($_REQUEST['password']))
+	// bcrypt ignores everything after a NUL byte and after the first 72 bytes,
+	// ask again as for an empty password
+	if
+	(
+		! isset ($_REQUEST['password']) ||
+		! is_string ($_REQUEST['password']) ||
+		empty ($_REQUEST['password']) ||
+		FALSE !== strpos ($_REQUEST['password'], "\0") ||
+		strlen ($_REQUEST['password']) > 72
+	)
 	{
 		$result = $dbxlink->query ('select count(user_id) from UserAccount where user_id = 1');
 		$row = $result->fetch (PDO::FETCH_NUM);
@@ -451,11 +460,10 @@ function init_database_dynamic ()
 	}
 	else
 	{
-		// Never send cleartext password over the wire.
-		$hash = sha1 ($_REQUEST['password']);
-		$query = "INSERT INTO `UserAccount` (`user_id`, `user_name`, `user_password_hash`, `user_realname`) " .
-			"VALUES (1,'admin','{$hash}','RackTables Administrator')";
-		$result = $dbxlink->exec ($query);
+		$hash = password_hash ($_REQUEST['password'], PASSWORD_DEFAULT);
+		$prepared = $dbxlink->prepare ("INSERT INTO `UserAccount` (`user_id`, `user_name`, `user_password_hash`, `user_realname`) " .
+			"VALUES (1,'admin',?,'RackTables Administrator')");
+		$prepared->execute (array ($hash));
 		echo "Administrator password has been set successfully.<br>";
 		return TRUE;
 	}
@@ -1072,7 +1080,7 @@ function get_pseudo_file ($name)
 		$query[] = "CREATE TABLE `UserAccount` (
   `user_id` int(10) unsigned NOT NULL auto_increment,
   `user_name` char(64) NOT NULL default '',
-  `user_password_hash` char(40) default NULL,
+  `user_password_hash` varchar(255) default NULL,
   `user_realname` char(64) default NULL,
   PRIMARY KEY  (`user_id`),
   UNIQUE KEY `user_name` (`user_name`)
