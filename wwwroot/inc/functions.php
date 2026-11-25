@@ -2529,14 +2529,15 @@ function ip6_parse ($ip)
 			break;
 
 		$result = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"; // 16 bytes
-		// remove one of double beginning/tailing colons
-		if (substr ($ip, 0, 2) == '::')
-			$ip = substr ($ip, 1);
-		elseif (substr ($ip, -2, 2) == '::')
-			$ip = substr ($ip, 0, strlen ($ip) - 1);
-
-		$tokens = explode (':', $ip);
-		$last_token = $tokens[count ($tokens) - 1];
+		// accept exactly what inet_pton() accepts: the groups before and after
+		// at most one '::', each group 1-4 hex digits, no empty groups
+		$halves = explode ('::', $ip);
+		if (count ($halves) > 2)
+			break; // more than one '::'
+		foreach ($halves as $h => $half)
+			$halves[$h] = $half === '' ? array() : explode (':', $half);
+		$h = count ($halves) - 1;
+		$last_token = count ($halves[$h]) ? $halves[$h][count ($halves[$h]) - 1] : '';
 		$split = explode ('.', $last_token);
 		if (count ($split) == 4)
 		{
@@ -2547,32 +2548,24 @@ function ip6_parse ($ip)
 			$hex_tokens = array();
 			$hex_tokens[] = dechex ($split[0] * 256 + $split[1]);
 			$hex_tokens[] = dechex ($split[2] * 256 + $split[3]);
-			array_splice ($tokens, -1, 1, $hex_tokens);
+			array_splice ($halves[$h], -1, 1, $hex_tokens);
 		}
-		if (count ($tokens) > 8)
-			break;
-		for ($i = 0; $i < count ($tokens); $i++)
-		{
-			if ($tokens[$i] != '')
+		$ntokens = 0;
+		foreach ($halves as $half)
+			foreach ($half as $token)
 			{
-				if (! set_word_value ($result, $i, $tokens[$i]))
-					break;
+				if (! preg_match ('/^[0-9a-fA-F]{1,4}$/D', $token))
+					break 3;
+				$ntokens++;
 			}
-			else
-			{
-				$k = 8; //index in result string (last word)
-				for ($j = count ($tokens) - 1; $j > $i; $j--) // $j is an index in $tokens for reverse walk
-					if ($tokens[$j] == '')
-						break;
-					elseif (! set_word_value ($result, --$k, $tokens[$j]))
-						break;
-				if ($i != $j)
-					break; //error, more than 1 '::' range
-				break;
-			}
-		}
-		if (! isset ($k) && count ($tokens) != 8)
+		// without '::' there must be 8 groups, '::' stands for at least one group
+		if (count ($halves) == 1 ? $ntokens != 8 : $ntokens > 7)
 			break;
+		foreach ($halves[0] as $i => $token)
+			set_word_value ($result, $i, $token);
+		if (count ($halves) == 2)
+			foreach ($halves[1] as $i => $token)
+				set_word_value ($result, 8 - count ($halves[1]) + $i, $token);
 		return $result;
 	} while (FALSE);
 
