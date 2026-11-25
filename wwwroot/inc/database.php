@@ -4138,6 +4138,10 @@ function commitUpdateAttrValue ($object_id, $attr_id, $value = '')
 
 function convertPDOException ($e)
 {
+	// The messages below name the column as e.g. "... column 'name' ...".
+	$column = '';
+	if (isset ($e->errorInfo[2]) && preg_match ("/\\bcolumn '([A-Za-z0-9_]+)'/i", $e->errorInfo[2], $m))
+		$column = " for column '{$m[1]}'";
 	switch ($e->getCode() . '-' . $e->errorInfo[1])
 	{
 	case '23000-1062':
@@ -4150,6 +4154,15 @@ function convertPDOException ($e)
 		break;
 	case 'HY000-1205':
 		$text = 'lock wait timeout';
+		break;
+	case '22001-1406': // Data too long for column 'name' at row 1
+		$text = 'data too long' . $column;
+		break;
+	case '22003-1264': // Out of range value for column 'uint_value' at row 1
+		$text = 'out of range value' . $column;
+		break;
+	case '23000-1048': // Column 'objtype_id' cannot be null
+		$text = 'value cannot be NULL' . $column;
 		break;
 	case '42000-1142':
 		return new RTDBTableAccessDenied ($e->getMessage());

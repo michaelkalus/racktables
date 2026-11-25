@@ -4,6 +4,8 @@
 //   - porta != portb
 //   - porta < portb
 //   - porta is compatibile with portb
+// A trigger refuses a row by setting a NOT NULL column to NULL, the blades
+// report the resulting error as RTDatabaseError.
 class LinkTriggerTest extends RTTestCase
 {
 	protected static $autoports_config_var;
@@ -61,7 +63,7 @@ class LinkTriggerTest extends RTTestCase
 	 */
 	public function testCreateLinkToSelf ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'Link',
@@ -74,7 +76,7 @@ class LinkTriggerTest extends RTTestCase
 	 */
 	public function testUpdateLinkToSelf ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'Link',
@@ -135,7 +137,7 @@ class LinkTriggerTest extends RTTestCase
 	 */
 	public function testCreateLinkBetweenIncompatiblePorts ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'Link',
@@ -148,7 +150,7 @@ class LinkTriggerTest extends RTTestCase
 	 */
 	public function testUpdateLinkBetweenIncompatiblePorts ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'Link',

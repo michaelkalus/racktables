@@ -4,6 +4,8 @@
 //   - if parent and child entities are the same, parent_id != child_id
 //   - if both parent and child are objects, an ObjectParentCompat rule must exist
 //   - in some scenarios, only one-to-one links are allowed
+// A trigger refuses a row by setting a NOT NULL column to NULL, the blades
+// report the resulting error as RTDatabaseError.
 class EntityLinkTriggerTest extends RTTestCase
 {
 	protected static $objtypea_id, $objtypeb_id, $objtypec_id, $objtyped_id;
@@ -93,7 +95,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testLinkObjectToSelfByInsert ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -110,7 +112,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testLinkObjectToSelfByUpdate ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -186,7 +188,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testCreateLinkBetweenIncompatibleObjects ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -203,7 +205,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testUpdateLinkBetweenIncompatibleObjects ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -243,7 +245,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testLinkLocationToMultipleLocations ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -322,7 +324,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testLinkRowToMultipleLocations ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -371,7 +373,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testInvalidateRowLink ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -420,7 +422,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testLinkRackToMultipleRows ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
@@ -469,7 +471,7 @@ class EntityLinkTriggerTest extends RTTestCase
 	 */
 	public function testInvalidateRackLink ()
 	{
-		$this->expectException (PDOException::class);
+		$this->expectException (RTDatabaseError::class);
 		usePreparedInsertBlade
 		(
 			'EntityLink',
