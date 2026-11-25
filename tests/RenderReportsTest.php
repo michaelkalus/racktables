@@ -40,6 +40,38 @@ class RenderReportsTest extends RTTestCase
 		$this->assertStringContainsString ($rack_name, $output);
 	}
 
+	// The tags, files and zero-U objects of a rack without a row belong to an
+	// existing rack, they must not be reported as orphans.
+	/**
+	 * @group small
+	 */
+	public function testIntegrityRackWithoutRowRelatives ()
+	{
+		global $interface_requires;
+		requireExtraFiles ($interface_requires, 'reports', 'integrity');
+		$rack_id = commitAddObject ($this->myString ('rack'), NULL, 1560, NULL);
+		$object_id = commitAddObject ($this->myString ('switch'), NULL, 8, NULL);
+		usePreparedInsertBlade ('TagTree', array ('tag' => $this->myString ('tag')));
+		$tag_id = lastInsertID();
+		$file_id = commitAddFile ($this->myString ('file'), 'text/plain', 'test', '');
+		try
+		{
+			addTagForEntity ('rack', $rack_id, $tag_id);
+			commitLinkEntities ('rack', $rack_id, 'object', $object_id);
+			usePreparedInsertBlade ('FileLink', array ('file_id' => $file_id, 'entity_type' => 'rack', 'entity_id' => $rack_id));
+			$output = getOutputOf ('renderDataIntegrityReport');
+		}
+		finally
+		{
+			commitDeleteObject ($object_id);
+			commitDeleteObject ($rack_id);
+			commitDeleteFile ($file_id);
+			usePreparedDeleteBlade ('TagTree', array ('id' => $tag_id));
+		}
+		$this->assertStringContainsString ('Racks without a row (1)', $output);
+		$this->assertStringNotContainsString ('Missing', $output);
+	}
+
 	public function providerReportFunctions ()
 	{
 		$ret = array();

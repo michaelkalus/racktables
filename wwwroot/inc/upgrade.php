@@ -193,6 +193,34 @@ ENDOFTEXT
 As of this release the minimum supported PHP version is 7.0.
 ENDOFTEXT
 ,
+
+	'0.23.0-community' => <<<'ENDOFTEXT'
+This is the first release of the RackTables community fork
+(https://github.com/michaelkalus/racktables). A database of RackTables 0.22.0
+or of an earlier release is upgraded as usual.
+
+A database upgraded to this version cannot be used with upstream RackTables
+code again: upstream releases do not know this version and refuse to run on
+it. Keep a backup of the database taken before the upgrade if you may want to
+go back.
+
+Databases installed by older releases have two non-unique keys that foreign
+keys refer to. MySQL 8.4 refuses that by default, so it cannot restore a dump
+of such a database; this release makes the keys unique. To move a database to
+MySQL 8.4, upgrade it on the old server first and dump it afterwards. To
+restore an older dump on MySQL 8.4, run
+"SET SESSION restrict_fk_on_non_standard_key = OFF;" in the session that
+imports it, then upgrade.
+
+Passwords of local accounts are now stored with password_hash() instead of
+unsalted SHA-1. The upgrade widens the column, and no action is needed: an
+existing SHA-1 hash keeps working and is replaced the next time its user logs
+in. Configuration - User accounts - Edit lists the accounts that still have
+an SHA-1 hash; setting a new password there replaces it at once.
+A new password can be at most 72 bytes long; an account whose password is
+longer keeps its SHA-1 hash until a shorter password is set.
+ENDOFTEXT
+,
 );
 
 // This function currently implements a convention that to upgrade any release R1
@@ -227,6 +255,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.21.5',
 		'0.22.0',
 		'0.22.1',
+		'0.23.0-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1293,6 +1322,8 @@ ENDOFTRIGGER;
 		case '0.21.0':
 			$query[] = "UPDATE Port SET label = NULL WHERE label = ''";
 			$query[] = "DELETE FROM RackThumbnail";
+			// MySQL 8.4 does not rebuild TagTree while its key is non-unique (issue #20).
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('TagTree')));
 			$query[] = "ALTER TABLE TagTree ADD COLUMN color mediumint unsigned DEFAULT NULL AFTER tag";
 
 			$query[] = "
@@ -1361,6 +1392,8 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			$query[] = "ALTER TABLE IPv6Allocation MODIFY type ENUM('regular','shared','virtual','router','point2point','sharedrouter') NOT NULL DEFAULT 'regular'";
 			$query[] = "INSERT INTO Chapter (`id`, `sticky`, `name`) VALUES (39,'no','UPS models')";
 			$query[] = "INSERT INTO AttributeMap (`objtype_id`,`attr_id`,`chapter_id`) VALUES (12,2,39)"; // UPS (UPS models) -> HW type
+			// Same as in the 0.21.0 batch, for databases that start the upgrade past it.
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('TagTree')));
 			$query[] = "ALTER TABLE TagTree ADD COLUMN description char(255) DEFAULT NULL AFTER color";
 
 			// new iif_type SFP28
@@ -1409,6 +1442,33 @@ INSERT INTO `Config` (varname, varvalue, vartype, emptyok, is_hidden, is_userdef
 			break;
 		case '0.22.1':
 			$query[] = "UPDATE Config SET varvalue = '0.22.1' WHERE varname = 'DB_VERSION'";
+			break;
+		case '0.23.0-community':
+			// issue #20: make the legacy keys of Object and TagTree UNIQUE in every database
+			$query = array_merge ($query, getUniqueLegacyKeyQueries (array ('Object', 'TagTree')));
+			// issue #23: keep a rack that is not linked to any row in the Rack view
+			$query[] = "
+CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_problems, O.comment,
+  AV_H.uint_value AS height,
+  AV_S.uint_value AS sort_order,
+  RT.thumb_data,
+  R.id AS row_id,
+  R.name AS row_name,
+  L.id AS location_id,
+  L.name AS location_name
+  FROM `Object` O
+  LEFT JOIN `AttributeValue` AV_H ON O.id = AV_H.object_id AND AV_H.attr_id = 27
+  LEFT JOIN `AttributeValue` AV_S ON O.id = AV_S.object_id AND AV_S.attr_id = 29
+  LEFT JOIN `RackThumbnail` RT ON O.id = RT.rack_id
+  LEFT JOIN `EntityLink` RL ON O.id = RL.child_entity_id  AND RL.parent_entity_type = 'row' AND RL.child_entity_type = 'rack'
+  LEFT JOIN `Object` R ON R.id = RL.parent_entity_id
+  LEFT JOIN `EntityLink` LL ON R.id = LL.child_entity_id AND LL.parent_entity_type = 'location' AND LL.child_entity_type = 'row'
+  LEFT JOIN `Object` L ON L.id = LL.parent_entity_id
+  WHERE O.objtype_id = 1560
+";
+			// issue #25: room for password_hash() results
+			$query[] = "ALTER TABLE UserAccount MODIFY COLUMN user_password_hash varchar(255) DEFAULT NULL";
+			$query[] = "UPDATE Config SET varvalue = '0.23.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
 			$query = reloadDictionary();
@@ -1460,11 +1520,13 @@ function executeUpgradeBatch ($batchid)
 function authenticate_admin ($username, $password)
 {
 	global $dbxlink;
-	$prepared = $dbxlink->prepare ('SELECT COUNT(*) FROM UserAccount WHERE user_id=1 AND user_name=? AND user_password_hash=?');
-	if (!$prepared->execute (array ($username, sha1 ($password))))
+	// This works with a legacy hash in the column of RackTables 0.22.0 and earlier
+	// as well as after the upgrade, and never changes the stored hash.
+	$prepared = $dbxlink->prepare ('SELECT user_password_hash FROM UserAccount WHERE user_id=1 AND user_name=?');
+	if (!$prepared->execute (array ($username)))
 		die ('SQL query failed in ' . __FUNCTION__);
 	$rows = $prepared->fetchAll (PDO::FETCH_NUM);
-	return $rows[0][0] == 1;
+	return count ($rows) == 1 && passwordMatchesHash ($password, $rows[0][0]);
 }
 
 // Database version detector. Should behave corretly on any
@@ -1638,6 +1700,64 @@ echo '</body></html>';
 function extendPortCompatQuery()
 {
 	return "INSERT INTO PortCompat SELECT pc1.type2, pc1.type1 FROM PortCompat pc1 LEFT JOIN PortCompat pc2 ON pc1.type1 = pc2.type2 AND pc1.type2 = pc2.type1 WHERE pc2.type1 IS NULL";
+}
+
+// Older releases created the keys Object.id-tid and TagTree.id-is_assignable as
+// non-unique. Both are referenced by a foreign key, which MySQL 8.4 refuses for a
+// non-unique key: it does not rebuild such a table (ADD COLUMN, CONVERT TO) and
+// cannot restore a dump of such a database. Returns the queries that make the key
+// of each given table UNIQUE (as in a fresh install, the key contains the primary
+// key) while its foreign key is dropped, then re-create the foreign key as a fresh
+// install defines it. The queries depend on the current state: nothing for a key
+// that is UNIQUE with its foreign key in place, and only the missing steps after
+// an interrupted run, so any batch can use this at any point of the upgrade path.
+function getUniqueLegacyKeyQueries ($tables)
+{
+	global $dbxlink;
+	$keys = array
+	(
+		'Object' => array
+		(
+			'key' => 'id-tid',
+			'columns' => '`id`,`objtype_id`',
+			'child' => 'AttributeValue',
+			'fk' => 'AttributeValue-FK-object',
+			'fk_def' => 'FOREIGN KEY (`object_id`, `object_tid`) REFERENCES `Object` (`id`, `objtype_id`) ON DELETE CASCADE ON UPDATE CASCADE',
+		),
+		'TagTree' => array
+		(
+			'key' => 'id-is_assignable',
+			'columns' => '`id`,`is_assignable`',
+			'child' => 'TagStorage',
+			'fk' => 'TagStorage-FK-TagTree',
+			'fk_def' => 'FOREIGN KEY (`tag_id`, `tag_is_assignable`) REFERENCES `TagTree` (`id`, `is_assignable`)',
+		),
+	);
+	$query = array();
+	foreach ($tables as $table)
+	{
+		$k = $keys[$table];
+		// NULL when the key does not exist
+		$prepared = $dbxlink->prepare ('SELECT MAX(NON_UNIQUE) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?');
+		$prepared->execute (array ($table, $k['key']));
+		$non_unique = $prepared->fetchColumn();
+		unset ($prepared);
+		$prepared = $dbxlink->prepare ("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'");
+		$prepared->execute (array ($k['child'], $k['fk']));
+		$fk_exists = $prepared->fetchColumn() > 0;
+		unset ($prepared);
+		$is_unique = $non_unique !== NULL && $non_unique == 0;
+		if ($is_unique && $fk_exists)
+			continue;
+		if ($fk_exists)
+			$query[] = "ALTER TABLE `{$k['child']}` DROP FOREIGN KEY `{$k['fk']}`";
+		if ($non_unique === NULL)
+			$query[] = "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$k['key']}` ({$k['columns']})";
+		elseif (! $is_unique)
+			$query[] = "ALTER TABLE `{$table}` DROP KEY `{$k['key']}`, ADD UNIQUE KEY `{$k['key']}` ({$k['columns']})";
+		$query[] = "ALTER TABLE `{$k['child']}` ADD CONSTRAINT `{$k['fk']}` {$k['fk_def']}";
+	}
+	return $query;
 }
 
 function convertSLBTablesToBinIPs()

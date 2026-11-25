@@ -714,5 +714,88 @@ function authenticated_via_database ($userinfo, $password)
 {
 	if (!isset ($userinfo['user_id'])) // not a local account
 		return FALSE;
-	return $userinfo['user_password_hash'] == sha1 ($password);
+	$stored = $userinfo['user_password_hash'];
+	if (isPasswordCheckInSession ($userinfo['user_id'], $stored, $password))
+		return TRUE;
+	if (! passwordMatchesHash ($password, $stored))
+		return FALSE;
+	if (passwordHashNeedsUpgrade ($stored))
+		$stored = upgradeStoredPasswordHash ($userinfo['user_id'], $stored, $password);
+	savePasswordCheckInSession ($userinfo['user_id'], $stored, $password);
+	return TRUE;
+}
+
+// Replace a stored hash that has just been verified with a new one and return
+// the value that is stored now. The row is changed only if it still holds the
+// verified hash. This code runs only after init.php has checked that the
+// database has been upgraded (which widens the column), the upgrader does not
+// call it. If the write fails anyway, the old hash stays in place and the
+// authentication is not affected.
+function upgradeStoredPasswordHash ($user_id, $old_hash, $password)
+{
+	try
+	{
+		$new_hash = makePasswordHash ($password);
+		$nrows = usePreparedUpdateBlade
+		(
+			'UserAccount',
+			array ('user_password_hash' => $new_hash),
+			array ('user_id' => $user_id, 'user_password_hash' => $old_hash)
+		);
+	}
+	catch (Exception $e)
+	{
+		return $old_hash;
+	}
+	return $nrows == 1 ? $new_hash : $old_hash;
+}
+
+// HTTP basic authentication sends the password with every request, and the
+// verification of a password_hash() result is slow on purpose. For a client
+// that keeps the PHP session cookie the last successful verification is
+// remembered in the session as a keyed hash of the user ID and the password,
+// with a key derived from the stored hash. The password is still compared on every
+// request against that value, and a new password or a new stored hash makes
+// the remembered value useless.
+// The key also contains the database password from secret.php, which is neither
+// in the database nor in the session storage, so that a copy of both does not
+// allow testing passwords faster than the stored hash does. Without a database
+// password nothing is remembered (NULL).
+function passwordCheckSessionValue ($user_id, $stored, $password)
+{
+	global $db_password;
+	if (! isset ($db_password) || ! is_string ($db_password) || $db_password === '')
+		return NULL;
+	$key = hash_hmac ('sha256', $stored, $db_password, TRUE);
+	return hash_hmac ('sha256', $user_id . "\0" . $password, $key);
+}
+
+function isPasswordCheckInSession ($user_id, $stored, $password)
+{
+	if
+	(
+		! isset ($_COOKIE[session_name()]) ||
+		! (isLegacyPasswordHash ($stored) || isModernPasswordHash ($stored)) ||
+		! is_string ($password) || $password === ''
+	)
+		return FALSE;
+	$expected = passwordCheckSessionValue ($user_id, $stored, $password);
+	if ($expected === NULL)
+		return FALSE;
+	startROSession();
+	return isset ($_SESSION['password_check']) &&
+		is_string ($_SESSION['password_check']) &&
+		hash_equals ($_SESSION['password_check'], $expected);
+}
+
+function savePasswordCheckInSession ($user_id, $stored, $password)
+{
+	if (! isset ($_COOKIE[session_name()]))
+		return;
+	$value = passwordCheckSessionValue ($user_id, $stored, $password);
+	if ($value === NULL)
+		return;
+	startSession();
+	$_SESSION['password_check'] = $value;
+	session_commit();
 }

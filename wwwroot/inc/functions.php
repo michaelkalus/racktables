@@ -7401,6 +7401,64 @@ function startROSession()
 	session_commit();
 }
 
+// The password of a local account is stored either as a legacy unsalted SHA-1
+// hash (exactly 40 lowercase hex digits, written by RackTables 0.22.0 and
+// earlier) or as a password_hash() result (begins with "$" and names an
+// algorithm that PHP knows). The two forms cannot be mistaken for each other,
+// and any other stored value matches no password.
+function isLegacyPasswordHash ($stored)
+{
+	return is_string ($stored) && 1 === preg_match ('/^[0-9a-f]{40}$/D', $stored);
+}
+
+function isModernPasswordHash ($stored)
+{
+	if (! is_string ($stored) || $stored === '' || $stored[0] !== '$' || strlen ($stored) > 255)
+		return FALSE;
+	$info = password_get_info ($stored);
+	return $info['algoName'] !== 'unknown';
+}
+
+// Returns a new hash of the password to store.
+function makePasswordHash ($password)
+{
+	// The password is not passed to the exception, which may display it.
+	if (! is_string ($password) || $password === '')
+		throw new InvalidArgException ('password', '', 'must be a non-empty string');
+	// bcrypt ignores everything after a NUL byte (and PHP 8.4 refuses it).
+	if (FALSE !== strpos ($password, "\0"))
+		throw new InvalidArgException ('password', '', 'must not contain a NUL byte');
+	// bcrypt ignores everything after the first 72 bytes.
+	if (strlen ($password) > 72)
+		throw new InvalidArgException ('password', '', 'must not be longer than 72 bytes');
+	$ret = password_hash ($password, PASSWORD_DEFAULT);
+	if (! isModernPasswordHash ($ret))
+		throw new RackTablesError ('password_hash() failed', RackTablesError::INTERNAL);
+	return $ret;
+}
+
+function passwordMatchesHash ($password, $stored)
+{
+	if (! is_string ($password) || $password === '')
+		return FALSE;
+	if (isLegacyPasswordHash ($stored))
+		return hash_equals ($stored, sha1 ($password));
+	if (isModernPasswordHash ($stored))
+		return FALSE === strpos ($password, "\0") && strlen ($password) <= 72 && password_verify ($password, $stored);
+	return FALSE;
+}
+
+// TRUE if a stored hash that has just been verified should be replaced with
+// a new makePasswordHash() result.
+function passwordHashNeedsUpgrade ($stored)
+{
+	if (isLegacyPasswordHash ($stored))
+		return TRUE;
+	if (isModernPasswordHash ($stored))
+		return password_needs_rehash ($stored, PASSWORD_DEFAULT);
+	return FALSE;
+}
+
 // removes a VLAN from ports that contain it, but keep a VLAN amongst others in a range
 function pinpointDeleteVlan ($domain_id, $vlan_id)
 {

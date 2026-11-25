@@ -44,6 +44,14 @@ function renderUserListEditor ()
 		printNewItemTR();
 	$accounts = listCells ('user');
 	startPortlet ('Manage existing (' . count ($accounts) . ')');
+	$legacy = array();
+	foreach ($accounts as $account)
+		if (isLegacyPasswordHash ($account['user_password_hash']))
+			$legacy[] = stringForLabel ($account['user_name'], 0);
+	if (count ($legacy))
+		echo '<p align=center>' . count ($legacy) . ' account(s) still have a password hash of the old (SHA-1) format: ' .
+			implode (', ', $legacy) . '.<br>Such a hash is replaced when the user logs in next time, ' .
+			'or when a new password is set here.</p>';
 	echo '<table cellspacing=0 cellpadding=5 align=center class=widetable>';
 	echo '<tr><th>&nbsp;</th><th>Username</th><th>Real name</th><th>New password (use old if blank)</th><th>&nbsp;</th></tr>';
 	foreach ($accounts as $account)

@@ -108,7 +108,7 @@ function renderInterfaceHTML ($pageno, $tabno, $payload)
 	showLogoutURL();
 	echo '">logout</a> ]</div>'; // greeting
 	echo getConfigVar ('enterprise') . ' RackTables ';
-	echo '<a href="https://racktables.org/" title="Visit RackTables site">' . CODE_VERSION . '</a>';
+	echo '<a href="https://github.com/michaelkalus/racktables" title="Visit the RackTables community fork">' . CODE_VERSION . '</a>';
 	renderQuickLinks();
 	echo '</div>'; // mainheader
 	echo '<div class=menubar>';
@@ -422,6 +422,12 @@ function getRackThumbLink ($rack, $scale = 1, $object_id = NULL)
 	return mkA ($img, 'rack', $rack['id']);
 }
 
+// Link to the row of the given rack, or plain text for a rack that is not linked to any row.
+function mkRackRowA ($rack)
+{
+	return $rack['row_id'] === NULL ? '(no row)' : mkA ($rack['row_name'], 'row', $rack['row_id']);
+}
+
 function renderRackspace ()
 {
 	global $pageno;
@@ -478,6 +484,25 @@ function renderRackspace ()
 			);
 			$rackCount += count($rackList);
 		}
+		// racks that are not linked to any row
+		$rackList = array();
+		foreach (applyCellFilter ('rack', $cellfilter) as $rack_id => $rack)
+			if ($rack['row_id'] === NULL)
+				$rackList[$rack_id] = $rack;
+		if (count ($rackList))
+		{
+			$found_racks = array_merge ($found_racks, $rackList);
+			$rows[] = array
+			(
+				'location_id' => NULL,
+				'location_tree' => '',
+				'href_location_tree' => '',
+				'row_id' => NULL,
+				'row_name' => '(no row)',
+				'racks' => $rackList,
+			);
+			$rackCount += count ($rackList);
+		}
 
 		// sort by location, then by row
 		usort ($rows, 'rackspaceCmp');
@@ -507,7 +532,10 @@ function renderRackspace ()
 						continue;
 					$rackListIdx = 0;
 					echo "<tr class=row_{$order}><th class=tdleft>{$row['href_location_tree']}</th>";
-					echo "<th class=tdleft><a href='".makeHref(array('page'=>'row', 'row_id'=>$row['row_id']))."{$cellfilter['urlextra']}'>{$row['row_name']}</a></th>";
+					if ($row['row_id'] === NULL)
+						echo "<th class=tdleft>{$row['row_name']}</th>";
+					else
+						echo "<th class=tdleft><a href='".makeHref(array('page'=>'row', 'row_id'=>$row['row_id']))."{$cellfilter['urlextra']}'>{$row['row_name']}</a></th>";
 					echo "<th class=tdleft><table border=0 cellspacing=5><tr>";
 					if (! count ($rackList))
 						echo '<td>(empty row)</td>';
@@ -964,7 +992,7 @@ function renderRack ($rack_id, $hl_obj_id = 0)
 	$prev_id = $neighbors['prev'];
 	$next_id = $neighbors['next'];
 	echo "<center><table border=0><tr valign=middle>";
-	echo '<td><h2>' . mkA ($rackData['row_name'], 'row', $rackData['row_id']) . ' :</h2></td>';
+	echo '<td><h2>' . mkRackRowA ($rackData) . ' :</h2></td>';
 	if ($prev_id != NULL)
 		echo '<td>' . mkA (getImageHREF ('prev', 'previous rack'), 'rack', $prev_id) . '</td>';
 	echo '<td><h2>' . mkA ($rackData['name'], 'rack', $rackData['id']) . '</h2></td>';
@@ -1200,13 +1228,17 @@ function renderEditRackForm ($rack_id)
 	printOpFormIntro ('updateRack');
 	echo '<table border=0 align=center>';
 	echo "<tr><td>&nbsp;</td><th class=tdright>Rack row:</th><td class=tdleft>";
+	$rows = array();
 	foreach (listCells ('row') as $row_id => $rowInfo)
 	{
 		$trail = getLocationTrail ($rowInfo['location_id'], FALSE);
 		$rows[$row_id] = empty ($trail) ? $rowInfo['name'] : $rowInfo['name'] . ' [' . $trail . ']';
 	}
 	natcasesort ($rows);
-	printSelect ($rows, array ('name' => 'row_id'), $rack['row_id']);
+	// A rack that is not linked to any row keeps that state until a row is chosen.
+	if ($rack['row_id'] === NULL)
+		$rows = array ('' => '(no row)') + $rows;
+	printSelect ($rows, array ('name' => 'row_id'), $rack['row_id'] === NULL ? '' : $rack['row_id']);
 	echo "</td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='{$rack['name']}'></td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Height (required):</th><td class=tdleft><input type=text name=height value='{$rack['height']}'></td></tr>\n";
@@ -1277,7 +1309,7 @@ function populateRackPower ($rackData, &$summary)
 function renderRackInfoPortlet ($rackData)
 {
 	$summary = array();
-	$summary['Rack row'] = mkA ($rackData['row_name'], 'row', $rackData['row_id']);
+	$summary['Rack row'] = mkRackRowA ($rackData);
 	$summary['Name'] = $rackData['name'];
 	$summary['Height'] = $rackData['height'];
 	if ($rackData['asset_no'] != '')
@@ -1636,7 +1668,9 @@ function renderRackMultiSelect ($sname, $racks, $selected)
 	$rdata = array();
 	foreach ($racks as $rack)
 	{
-		if ('' != $trail = getLocationTrail ($rack['location_id'], FALSE))
+		if ($rack['row_id'] === NULL)
+			$row_name = '(no row)';
+		elseif ('' != $trail = getLocationTrail ($rack['location_id'], FALSE))
 			$row_name = $trail . ' : ' . $rack['row_name'];
 		else
 			$row_name = $rack['row_name'];
@@ -2269,7 +2303,7 @@ function renderRackSpaceForObject ($object_id)
 			mergeGridFormToRack ($rackData);
 		echo '<td valign=bottom>';
 		echo '<center><h2 style="margin:0px">';
-		echo mkA ($rackData['row_name'], 'row', $rackData['row_id']);
+		echo mkRackRowA ($rackData);
 		echo ' : ';
 		echo mkA ($rackData['name'], 'rack', $rackData['id']);
 		echo '</h2>';
@@ -5387,13 +5421,13 @@ function showPathAndSearch ($pageno, $tabno)
 			{
 				$rack = spotEntity ('rack', $object['rack_id']);
 				$items[] = mkCellA ($rack);
-				$items[] = mkA ($rack['row_name'], 'row', $rack['row_id']);
+				$items[] = mkRackRowA ($rack);
 				if ($rack['location_id'] && ('' != $trail = getLocationTrail ($rack['location_id'])))
 					$items[] = $trail;
 			}
 			break;
 		case 'row':
-			if ('' != $trail = getLocationTrail ($title['params']['location_id']))
+			if (isset ($title['params']['location_id']) && '' != $trail = getLocationTrail ($title['params']['location_id']))
 				$items[] = $trail;
 			break;
 		case 'location':
@@ -5541,6 +5575,13 @@ function dynamic_title_decoder_throwing ($path_position)
 		{
 		case 'rack':
 			$rack = spotEntity ('rack', genericAssertion ('rack_id', 'natural'));
+			// a rack that is not linked to any row has no row page to link to
+			if ($rack['row_id'] === NULL)
+				return array
+				(
+					'name' => '(no row)',
+					'params' => array ('page' => 'rackspace'),
+				);
 			return array
 			(
 				'name' => $rack['row_name'],

@@ -434,7 +434,16 @@ function init_database_dynamic ()
 {
 	connect_to_db_or_die();
 	global $dbxlink;
-	if (! isset ($_REQUEST['password']) || empty ($_REQUEST['password']))
+	// bcrypt ignores everything after a NUL byte and after the first 72 bytes,
+	// ask again as for an empty password
+	if
+	(
+		! isset ($_REQUEST['password']) ||
+		! is_string ($_REQUEST['password']) ||
+		empty ($_REQUEST['password']) ||
+		FALSE !== strpos ($_REQUEST['password'], "\0") ||
+		strlen ($_REQUEST['password']) > 72
+	)
 	{
 		$result = $dbxlink->query ('select count(user_id) from UserAccount where user_id = 1');
 		$row = $result->fetch (PDO::FETCH_NUM);
@@ -451,11 +460,10 @@ function init_database_dynamic ()
 	}
 	else
 	{
-		// Never send cleartext password over the wire.
-		$hash = sha1 ($_REQUEST['password']);
-		$query = "INSERT INTO `UserAccount` (`user_id`, `user_name`, `user_password_hash`, `user_realname`) " .
-			"VALUES (1,'admin','{$hash}','RackTables Administrator')";
-		$result = $dbxlink->exec ($query);
+		$hash = password_hash ($_REQUEST['password'], PASSWORD_DEFAULT);
+		$prepared = $dbxlink->prepare ("INSERT INTO `UserAccount` (`user_id`, `user_name`, `user_password_hash`, `user_realname`) " .
+			"VALUES (1,'admin',?,'RackTables Administrator')");
+		$prepared->execute (array ($hash));
 		echo "Administrator password has been set successfully.<br>";
 		return TRUE;
 	}
@@ -467,7 +475,9 @@ function congrats ()
 	echo 'enter the system. Authenticate with <strong>admin</strong> username.<br>RackTables project has a ';
 	echo "<a href='https://wiki.racktables.org/index.php?title=RackTablesAdminGuide'>";
 	echo "wiki</a> and a ";
-	echo "<a href='https://www.freelists.org/list/racktables-users'>mailing list</a> for users. Have fun.<br>";
+	echo "<a href='https://www.freelists.org/list/racktables-users'>mailing list</a> for users. ";
+	echo "Please report problems with this release of the community fork in its ";
+	echo "<a href='https://github.com/michaelkalus/racktables/issues'>issue tracker</a>. Have fun.<br>";
 	return TRUE;
 }
 
@@ -1070,7 +1080,7 @@ function get_pseudo_file ($name)
 		$query[] = "CREATE TABLE `UserAccount` (
   `user_id` int(10) unsigned NOT NULL auto_increment,
   `user_name` char(64) NOT NULL default '',
-  `user_password_hash` char(40) default NULL,
+  `user_password_hash` varchar(255) default NULL,
   `user_realname` char(64) default NULL,
   PRIMARY KEY  (`user_id`),
   UNIQUE KEY `user_name` (`user_name`)
@@ -1371,7 +1381,7 @@ WHERE O.objtype_id = 1562";
   LEFT JOIN `AttributeValue` AV_S ON O.id = AV_S.object_id AND AV_S.attr_id = 29
   LEFT JOIN `RackThumbnail` RT ON O.id = RT.rack_id
   LEFT JOIN `EntityLink` RL ON O.id = RL.child_entity_id  AND RL.parent_entity_type = 'row' AND RL.child_entity_type = 'rack'
-  INNER JOIN `Object` R ON R.id = RL.parent_entity_id
+  LEFT JOIN `Object` R ON R.id = RL.parent_entity_id
   LEFT JOIN `EntityLink` LL ON R.id = LL.child_entity_id AND LL.parent_entity_type = 'location' AND LL.child_entity_type = 'row'
   LEFT JOIN `Object` L ON L.id = LL.parent_entity_id
   WHERE O.objtype_id = 1560";
