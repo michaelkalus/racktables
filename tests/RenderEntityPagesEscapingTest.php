@@ -354,6 +354,45 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		$this->assertInteractivePortName ($output);
 	}
 
+	// running port configuration handed to the popup script of the 802.1Q sync tab
+	/**
+	 * @group small
+	 */
+	public function testObject8021QSyncPreviewConfigData ()
+	{
+		global $pageno, $tabno, $html_headers;
+		list ($object_id, $default_port) = $this->add8021QSwitch();
+		$pageno = 'object';
+		$tabno = '8021qsync';
+		$this->setArg ('object_id', $object_id);
+		$object = spotEntity ('object', $object_id);
+		amplifyCell ($object);
+		$plan = array (self::RAW => array ('status' => 'in_sync', 'both' => $default_port));
+		$R = array ('portconfig' => array (self::RAW => array
+		(
+			array ('type' => 'line-other', 'line' => self::RAW . '</script>'),
+		)));
+		getOutputOf ('renderObject8021QSyncPreview', $object, getVLANSwitchInfo ($object_id), $plan, array(), $R, 0);
+		$config = NULL;
+		foreach ($html_headers as $group)
+			foreach ($group as $header)
+			{
+				$this->assertStringNotContainsString ('$port_config', $header);
+				if
+				(
+					preg_match ('/^\tvar confData = (.*);$/m', $header, $m) &&
+					is_array ($decoded = json_decode ($m[1], TRUE)) &&
+					isset ($decoded[self::RAW])
+				)
+					$config = $m[1];
+			}
+		$this->assertNotNull ($config, 'no script with the configuration of the port');
+		$this->assertSame (formatPortConfigHints ($object_id, $R), json_decode ($config, TRUE));
+		// nothing in the data can end the script block or a string literal
+		$this->assertDoesNotMatchRegularExpression ('/[<>&\']/', $config);
+		$this->assertStringContainsString ('\\u0022', $config);
+	}
+
 	// OS interface name and object name in a router cell
 	/**
 	 * @group small

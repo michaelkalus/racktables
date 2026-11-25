@@ -182,7 +182,9 @@ function applyMacData(data) {
 					appended = obj.html(item['inline']);
 			}
 			if (item['popup'] && appended) {
-				var obj = $("[id='maclist-popup-"+portname+"']");
+				// Look the id up directly: a port name is not safe in a selector,
+				// and jQuery 1.4 takes a string containing "<" for HTML.
+				var obj = $(document.getElementById('maclist-popup-'+portname));
 				if (! obj.size())
 					obj = $('<div />').addClass('popup-box mac-list').attr('id', 'maclist-popup-'+portname).html(item['popup']).appendTo('body');
 				else
