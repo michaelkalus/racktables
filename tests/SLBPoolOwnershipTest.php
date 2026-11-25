@@ -396,4 +396,25 @@ class SLBPoolOwnershipTest extends RTTestCase
 		$this->assertCount (1, $this->getTripletRows ('VSEnabledPorts', self::$lbb_id, self::$poolb_id));
 		$this->assertCount (1, $this->getTripletRows ('VSEnabledIPs', self::$lbb_id, self::$poolb_id));
 	}
+
+	// Two triplets of one load balancer that share a VIP must not share a port.
+	/**
+	 * @group small
+	 */
+	public function testDuplicateIPLinkRefused ()
+	{
+		$key = array ('object_id' => self::$lba_id, 'vs_id' => self::$vs_id, 'rspool_id' => self::$poolb_id);
+		addSLBPortLink ($key + array ('proto' => 'TCP', 'vport' => 80));
+		$message = NULL;
+		try
+		{
+			addSLBIPLink ($key + array ('vip' => self::$vip_bin));
+		}
+		catch (RTDatabaseError $e)
+		{
+			$message = $e->getMessage();
+		}
+		$this->assertEquals ('Duplicate link of TCP [192.0.2.10]:80 to object #' . self::$lba_id, $message);
+		$this->assertCount (0, $this->getTripletRows ('VSEnabledIPs', self::$lba_id, self::$poolb_id));
+	}
 }

@@ -12,6 +12,7 @@ class GetChildrenListTest extends RTTestCase
 
 	public static function setUpBeforeClass () : void
 	{
+		self::$locations = self::$objects = self::$links = self::$tags = array();
 		// add sample locations
 		self::$locations[] = $parent_location_id = commitAddObject (self::myStringStatic ('location 0', __CLASS__), NULL, 1562, NULL);
 		for ($i=1; $i<=self::$num_children; $i++)
