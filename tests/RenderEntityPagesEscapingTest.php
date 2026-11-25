@@ -24,6 +24,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 	protected $saved_request = NULL;
 	protected $saved_sic = NULL;
 	protected $saved_auto_tags = NULL;
+	protected $saved_rackcode = NULL;
 
 	public function setUp () : void
 	{
@@ -37,7 +38,11 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 
 	public function tearDown () : void
 	{
-		global $sic, $auto_tags, $object_attribute_cache;
+		global $sic, $auto_tags, $object_attribute_cache, $log_messages, $rackCode;
+		setMessageBuffering (FALSE);
+		$log_messages = array();
+		if ($this->saved_rackcode !== NULL)
+			$rackCode = $this->saved_rackcode;
 		$_REQUEST = $this->saved_request;
 		$sic = $this->saved_sic;
 		$auto_tags = $this->saved_auto_tags;
@@ -63,7 +68,7 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('198.51.100.5'))));
 		usePreparedDeleteBlade ('IPv6Address', array ('ip' => ip6_parse ('2001:db8:5::5')));
 		usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ('127.0.0.1'))));
-		foreach (array ('198.51.100.5', '198.51.100.20') as $ip)
+		foreach (array ('198.51.100.5', '198.51.100.10', '198.51.100.20', '198.51.100.30') as $ip)
 		{
 			usePreparedDeleteBlade ('IPv4Address', array ('ip' => ip4_bin2db (ip4_parse ($ip))));
 			usePreparedDeleteBlade ('IPv4Log', array ('ip' => ip4_bin2db (ip4_parse ($ip))));
@@ -1120,5 +1125,267 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 			$this->assertSame ('text', $output);
 			$this->assertStringNotContainsString ('<a', $output);
 		}
+	}
+
+	// A router with a NAT rule to an address of another object. The object
+	// name of the router, both OS interface names and the name of the local
+	// address are the probe text.
+	protected function addNATRuleBetweenObjects ()
+	{
+		$this->nets4[] = createIPv4Prefix ('198.51.100.0/24', $this->myString ('net'));
+		$router_id = $this->addObject (self::RAW, 7);
+		$target_id = $this->addObject ($this->myString ('target'), 4);
+		bindIPToObject (ip4_parse ('198.51.100.10'), $router_id, self::RAW, 'regular');
+		bindIPToObject (ip4_parse ('198.51.100.20'), $target_id, self::RAW, 'regular');
+		// a second address, so that the NAT tab shows a select of addresses
+		bindIPToObject (ip4_parse ('198.51.100.11'), $router_id, 'eth1', 'regular');
+		// longer than the 30 characters stringForLabel() shows by default
+		updateAddress (ip4_parse ('198.51.100.10'), str_repeat ('a', 30) . self::RAW, 'no', '');
+		newPortForwarding ($router_id, ip4_parse ('198.51.100.10'), 80, ip4_parse ('198.51.100.20'), 8080, 'TCP', '');
+		return array ($router_id, $target_id);
+	}
+
+	// OS interface and object names in the NAT portlet of the object page
+	/**
+	 * @group small
+	 */
+	public function testNATPortletNames ()
+	{
+		global $pageno, $tabno;
+		list ($router_id, $target_id) = $this->addNATRuleBetweenObjects();
+		$pageno = 'object';
+		$tabno = 'default';
+		$this->setArg ('object_id', $router_id);
+		$output = getOutputOf ('renderObject', $router_id);
+		$this->assertEscaped ('<td class=tdleft>TCP</td><td class=tdleft>', ': <a', $output);
+		$this->assertEscaped ("object_id={$target_id}\">" . $this->myString ('target') . '(', ')</a>', $output);
+		$this->setArg ('object_id', $target_id);
+		$output = getOutputOf ('renderObject', $target_id);
+		$this->assertEscaped ("object_id={$router_id}\">", '</a>', $output);
+	}
+
+	// OS interface, object and address names on the NAT tab of an object
+	// (see testNATAddressNames() for the separate process)
+	/**
+	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function testNATTabNames ()
+	{
+		global $pageno, $tabno;
+		list ($router_id, $target_id) = $this->addNATRuleBetweenObjects();
+		$pageno = 'object';
+		$tabno = 'nat4';
+		$this->setArg ('object_id', $router_id);
+		$output = getOutputOf ('renderNATv4ForObject', $router_id);
+		$this->assertEscaped ('<td>TCP/', ': <a', $output);
+		$this->assertEscaped ("object_id={$target_id}\">" . $this->myString ('target') . '(', ')</a>', $output);
+		// the local address in the select of the new rule
+		$this->assertEquals (1, preg_match ("#<option value='198\\.51\\.100\\.10'>([^<]*)</option>#", $output, $m));
+		$this->assertStringStartsWith (self::ESCAPED . ': 198.51.100.10 (' . str_repeat ('a', 30), $m[1]);
+		$this->assertStringNotContainsString ('span', $m[1]);
+	}
+
+	// object name of an arriving NAT rule on the NAT tab
+	/**
+	 * @group small
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function testNATTabArrivingName ()
+	{
+		global $pageno, $tabno;
+		list ($router_id, $target_id) = $this->addNATRuleBetweenObjects();
+		$pageno = 'object';
+		$tabno = 'nat4';
+		$this->setArg ('object_id', $target_id);
+		$output = getOutputOf ('renderNATv4ForObject', $target_id);
+		$this->assertEscaped ("object_id={$router_id}\">", '</a>', $output);
+	}
+
+	// An RS pool with an empty name in the address list of a network.
+	/**
+	 * @group small
+	 */
+	public function testAnonymousRSPoolInNetwork ()
+	{
+		global $pageno, $tabno;
+		$net4_id = createIPv4Prefix ('198.51.100.0/24', $this->myString ('net'));
+		$this->nets4[] = $net4_id;
+		$net6_id = createIPv6Prefix ('2001:db8:5::/64', $this->myString ('net'));
+		$this->nets6[] = $net6_id;
+		$this->pool_id = commitCreateRSPool ('');
+		addRStoRSPool ($this->pool_id, ip4_parse ('198.51.100.7'), 80);
+		addRStoRSPool ($this->pool_id, ip6_parse ('2001:db8:5::7'), 80);
+		foreach (array ('ipv4net' => $net4_id, 'ipv6net' => $net6_id) as $realm => $net_id)
+		{
+			$pageno = $realm;
+			$tabno = 'default';
+			$this->setArg ('id', $net_id);
+			$range = spotEntity ($realm, $net_id);
+			loadIPAddrList ($range);
+			$output = getOutputOf ('renderIPNetworkAddresses', $range);
+			$this->assertStringContainsString ('pool_id=' . $this->pool_id . '">ANONYMOUS</a>', $output);
+		}
+	}
+
+	// the texts of the messages waiting to be shown
+	protected function messages ()
+	{
+		global $log_messages;
+		$ret = array();
+		foreach ($log_messages as $record)
+			if (isset ($record['a']))
+				$ret[] = $record['a'][0];
+		$log_messages = array();
+		return implode ("\n", $ret);
+	}
+
+	// object, OS interface and address names in the warnings of a new
+	// IP allocation
+	/**
+	 * @group small
+	 */
+	public function testAddIPAllocationMessages ()
+	{
+		global $pageno, $tabno, $log_messages;
+		$pageno = 'object';
+		$tabno = 'ip';
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+		$this->nets4[] = createIPv4Prefix ('198.51.100.0/24', $this->myString ('net'));
+		$owner_id = $this->addObject (self::RAW, 4);
+		$object_id = $this->addObject ($this->myString ('server'), 4);
+		bindIPToObject (ip4_parse ('198.51.100.20'), $owner_id, self::RAW, 'regular');
+		updateAddress (ip4_parse ('198.51.100.30'), self::RAW, 'yes', '');
+		foreach (array ('198.51.100.20', '198.51.100.30') as $ip)
+		{
+			$this->setArg ('ip', $ip);
+			$this->setArg ('object_id', $object_id);
+			$this->setArg ('bond_name', 'eth0');
+			$this->setArg ('bond_type', 'regular');
+			addIPAllocation();
+		}
+		$output = $this->messages();
+		$this->assertStringContainsString ('IP 198.51.100.20 already in use by ' . self::ESCAPED . ' - ' . self::ESCAPED, $output);
+		$this->assertEscaped ('IP 198.51.100.30 reservation "', '"', $output);
+	}
+
+	// attribute name in the messages of a denied attribute change
+	/**
+	 * @group small
+	 */
+	public function testAttributePermissionMessages ()
+	{
+		global $pageno, $tabno, $rackCode, $log_messages;
+		usePreparedInsertBlade ('Attribute', array ('type' => 'string', 'name' => self::RAW));
+		$this->attr_id = lastInsertID();
+		$object_id = $this->addObject ($this->myString ('server'), 4);
+		commitSupplementAttrMap ($this->attr_id, 4);
+		commitUpdateAttrValue ($object_id, $this->attr_id, 'value');
+		$this->saved_rackcode = $rackCode;
+		$parsed = getRackCode ("deny {\$attr_{$this->attr_id}}\nallow true");
+		$rackCode = $parsed['load'];
+		$pageno = 'object';
+		$tabno = 'edit';
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+		$this->setArg ('object_id', $object_id);
+		$this->setArg ('attr_id', $this->attr_id);
+		clearSticker();
+		$_REQUEST['num_attrs'] = 1;
+		$_REQUEST['0_attr_id'] = $this->attr_id;
+		foreach (array ('', 'other value') as $value)
+		{
+			$this->setArg ('0_value', $value);
+			updateObjectAttributes ($object_id);
+		}
+		$output = $this->messages();
+		$this->assertEquals (3, substr_count ($output, 'Permission denied, "' . self::ESCAPED . '" left unchanged'));
+		$this->assertStringNotContainsString (self::RAW, $output);
+	}
+
+	// name of a deleted VS group
+	/**
+	 * @group small
+	 */
+	public function testDeleteVSMessage ()
+	{
+		global $pageno, $tabno, $log_messages;
+		usePreparedInsertBlade ('VS', array ('name' => self::RAW));
+		$vs_id = lastInsertID();
+		$pageno = 'ipvs';
+		$tabno = 'edit';
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+		$this->setArg ('vs_id', $vs_id);
+		deleteVS();
+		$this->assertSame (self::ESCAPED . ' deleted', $this->messages());
+	}
+
+	// plugin name of a failed plugin operation
+	/**
+	 * @group small
+	 */
+	public function testPluginOperationMessages ()
+	{
+		global $pageno, $tabno, $log_messages;
+		$pageno = 'plugins';
+		$tabno = 'edit';
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+		$this->setArg ('name', self::RAW);
+		foreach (array ('installPlugin', 'uninstallPlugin', 'upgradePlugin') as $func)
+			$func();
+		$output = $this->messages();
+		$this->assertEquals (3, substr_count ($output, 'The ' . self::ESCAPED . ' plugin is missing'));
+		$this->assertStringNotContainsString (self::RAW, $output);
+	}
+
+	// name of a contained object that a UCS cleanup does not delete
+	/**
+	 * @group small
+	 */
+	public function testCleanupUCSMessage ()
+	{
+		global $pageno, $tabno, $log_messages;
+		$ucsm_id = $this->addObject ($this->myString ('ucsm'), 1502);
+		$child_id = $this->addObject (self::RAW, 4);
+		commitLinkEntities ('object', $ucsm_id, 'object', $child_id);
+		$pageno = 'object';
+		$tabno = 'ucs';
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+		$this->setArg ('object_id', $ucsm_id);
+		cleanupUCS();
+		$this->assertEscaped ("object_id={$child_id}\">", '</a> is not an automatic UCS object', $this->messages());
+	}
+
+	// The change log text of an address comment refers to the old comment.
+	/**
+	 * @group small
+	 */
+	public function testAddressLogComment ()
+	{
+		$ip_bin = ip4_parse ('198.51.100.20');
+		updateAddress ($ip_bin, '', 'no', 'c1');
+		updateAddress ($ip_bin, '', 'no', 'c2');
+		updateAddress ($ip_bin, 'n1', 'no', '');
+		updateAddress ($ip_bin, 'n1', 'no', 'c3');
+		$result = usePreparedSelectBlade ('SELECT message FROM IPv4Log WHERE ip = ? ORDER BY id', array (ip4_bin2db ($ip_bin)));
+		$log = $result->fetchAll (PDO::FETCH_COLUMN, 0);
+		unset ($result);
+		$this->assertEquals
+		(
+			array
+			(
+				"Comment set to 'c1'",
+				"Comment changed from 'c1' to 'c2'",
+				"Name set to 'n1', comment 'c2' removed",
+				"Comment set to 'c3'",
+			),
+			$log
+		);
 	}
 }

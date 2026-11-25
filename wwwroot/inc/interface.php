@@ -1574,7 +1574,7 @@ function renderObject ($object_id)
 				if (array_key_exists ($localip_bin, $info['ipv4']))
 				{
 					$class = $info['ipv4'][$localip_bin]['addrinfo']['class'];
-					$osif = $info['ipv4'][$localip_bin]['osif'] . ': ';
+					$osif = stringForLabel ($info['ipv4'][$localip_bin]['osif'], 0) . ': ';
 				}
 				echo "<tr class='$class'>";
 				echo "<td class=tdleft>{$pf['proto']}</td><td class=tdleft>{$osif}" . getRenderedIPPortPair ($pf['localip'], $pf['localport']) . "</td>";
@@ -1583,7 +1583,7 @@ function renderObject ($object_id)
 				echo "<td class='description tdleft'>";
 				if (count ($address['allocs']))
 					foreach($address['allocs'] as $bond)
-						echo mkA ("{$bond['object_name']}({$bond['name']})", 'object', $bond['object_id']) . ' ';
+						echo mkA (stringForLabel ("{$bond['object_name']}({$bond['name']})", 0), 'object', $bond['object_id']) . ' ';
 				elseif ($pf['remote_addr_name'] != '')
 					echo '(' . stringForLabel ($pf['remote_addr_name'], 0) . ')';
 				echo "</td><td class='description tdleft'>{$pf['description']}</td></tr>";
@@ -1599,7 +1599,7 @@ function renderObject ($object_id)
 			{
 				echo "<tr>";
 				echo "<td class=tdleft>{$pf['proto']}/" . getRenderedIPPortPair ($pf['localip'], $pf['localport']) . "</td>";
-				echo '<td class="description tdleft">' . mkA ($pf['object_name'], 'object', $pf['object_id']);
+				echo '<td class="description tdleft">' . mkA (stringForLabel ($pf['object_name'], 0), 'object', $pf['object_id']);
 				echo "</td><td class=tdleft>" . getRenderedIPPortPair ($pf['remoteip'], $pf['remoteport']) . "</td>";
 				echo "<td class='description tdleft'>{$pf['description']}</td></tr>";
 			}
@@ -3078,7 +3078,7 @@ function renderIPv4NetworkAddresses ($range)
 		foreach ($addr['rsplist'] as $rsp_id)
 		{
 			$rsp = spotEntity ('ipv4rspool', $rsp_id);
-			echo "{$delim}&rarr;" . mkA (stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
+			echo "{$delim}&rarr;" . mkA ($rsp['name'] == '' ? 'ANONYMOUS' : stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
 			$delim = '<br>';
 		}
 		echo "</td></tr>\n";
@@ -3203,7 +3203,7 @@ function renderIPv6NetworkAddresses ($netinfo)
 		foreach ($addr['rsplist'] as $rsp_id)
 		{
 			$rsp = spotEntity ('ipv4rspool', $rsp_id);
-			echo "{$delim}&rarr;" . mkA (stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
+			echo "{$delim}&rarr;" . mkA ($rsp['name'] == '' ? 'ANONYMOUS' : stringForLabel ($rsp['name'], 0), 'ipv4rspool', $rsp['id']);
 			$delim = '<br>';
 		}
 		echo "</td></tr>\n";
@@ -3498,7 +3498,8 @@ function renderNATv4ForObject ($object_id)
 		foreach ($alloclist as $ip_bin => $alloc)
 		{
 			$ip = $alloc['addrinfo']['ip'];
-			$name = (! isset ($alloc['addrinfo']['name']) || $alloc['addrinfo']['name'] == '') ? '' : (' (' . stringForLabel ($alloc['addrinfo']['name']) . ')');
+			// getSelect() escapes the option text.
+			$name = (! isset ($alloc['addrinfo']['name']) || $alloc['addrinfo']['name'] == '') ? '' : (' (' . $alloc['addrinfo']['name'] . ')');
 			$osif = (! isset ($alloc['osif']) || $alloc['osif'] == '') ? '' : ($alloc['osif'] . ': ');
 			$options[$ip] = $osif . $ip . $name;
 		}
@@ -3530,7 +3531,7 @@ function renderNATv4ForObject ($object_id)
 		if (isset ($focus['ipv4'][$localip_bin]))
 		{
 			$class = $focus['ipv4'][$localip_bin]['addrinfo']['class'];
-			$osif = $focus['ipv4'][$localip_bin]['osif'] . ': ';
+			$osif = stringForLabel ($focus['ipv4'][$localip_bin]['osif'], 0) . ': ';
 		}
 
 		echo "<tr class='$class'>";
@@ -3555,7 +3556,7 @@ function renderNATv4ForObject ($object_id)
 		echo "<td class='description'>";
 		if (count ($address['allocs']))
 			foreach ($address['allocs'] as $bond)
-				echo mkA ("{$bond['object_name']}({$bond['name']})", 'object', $bond['object_id']) . ' ';
+				echo mkA (stringForLabel ("{$bond['object_name']}({$bond['name']})", 0), 'object', $bond['object_id']) . ' ';
 		elseif ($pf['remote_addr_name'] != '')
 			echo '(' . stringForLabel ($pf['remote_addr_name'], 0) . ')';
 		printOpFormIntro
@@ -3599,7 +3600,7 @@ function renderNATv4ForObject ($object_id)
 			), '', 'delete', 'Delete NAT rule'
 		) . "</td>";
 		echo "<td>{$pf['proto']}/" . getRenderedIPPortPair ($pf['localip'], $pf['localport']) . "</td>";
-		echo '<td class="description">' . mkA ($pf['object_name'], 'object', $pf['object_id']);
+		echo '<td class="description">' . mkA (stringForLabel ($pf['object_name'], 0), 'object', $pf['object_id']);
 		echo "</td><td>" . getRenderedIPPortPair ($pf['remoteip'], $pf['remoteport']) . "</td>";
 		echo "<td class='description'>{$pf['description']}</td></tr>";
 	}

@@ -2874,7 +2874,7 @@ function updateAddress ($ip_bin, $name = '', $reserved = 'no', $comment = '')
 	{
 		if ($comment == '')
 			$messages[] = "comment '$old_comment' removed";
-		elseif ($old_name == '')
+		elseif ($old_comment == '')
 			$messages[] = "comment set to '$comment'";
 		else
 			$messages[] = "comment changed from '$old_comment' to '$comment'";

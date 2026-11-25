@@ -891,7 +891,7 @@ function addIPAllocation ()
 	$address = getIPAddress($ip_bin);
 
 	if(!empty($address['allocs']) && ( ($address['allocs'][0]['type'] != 'shared') || ($alloc_type != 'shared') ) )
-		showWarning("IP ".ip_format($ip_bin)." already in use by ".$address['allocs'][0]['object_name']." - ".$address['allocs'][0]['name']);
+		showWarning ("IP " . ip_format ($ip_bin) . " already in use by " . stringForLabel ($address['allocs'][0]['object_name'], 0) . " - " . stringForLabel ($address['allocs'][0]['name'], 0));
 
 	if (getConfigVar ('IPV4_JAYWALK') != 'yes' && NULL === getIPAddressNetworkId ($ip_bin))
 	{
@@ -902,7 +902,7 @@ function addIPAllocation ()
 	// Tell what bindIPToObject() does to the address record. The reserved
 	// flag is 'yes' or 'no', the name may be there without a reservation.
 	$release = getConfigVar ('IPV4_AUTO_RELEASE');
-	$name = $address['name'] == '' ? '' : " \"{$address['name']}\"";
+	$name = $address['name'] == '' ? '' : ' "' . stringForLabel ($address['name'], 0) . '"';
 	if ($release >= 2)
 	{
 		// the whole address record goes
@@ -1120,7 +1120,7 @@ function clearSticker ()
 	else
 	{
 		$oldvalues = getAttrValues (getBypassValue());
-		showError ('Permission denied, "' . $oldvalues[$attr_id]['name'] . '" left unchanged');
+		showError ('Permission denied, "' . stringForLabel ($oldvalues[$attr_id]['name'], 0) . '" left unchanged');
 	}
 }
 
@@ -1365,7 +1365,7 @@ function updateObjectAttributes ($object_id)
 			if (permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $attr_id))))
 				commitUpdateAttrValue ($object_id, $attr_id);
 			else
-				showError ('Permission denied, "' . $oldvalues[$attr_id]['name'] . '" left unchanged');
+				showError ('Permission denied, "' . stringForLabel ($oldvalues[$attr_id]['name'], 0) . '" left unchanged');
 			continue;
 		}
 
@@ -1409,7 +1409,7 @@ function updateObjectAttributes ($object_id)
 		if (permitted (NULL, NULL, NULL, array (array ('tag' => '$attr_' . $attr_id))))
 			commitUpdateAttrValue ($object_id, $attr_id, $value);
 		else
-			showError ('Permission denied, "' . $oldvalues[$attr_id]['name'] . '" left unchanged');
+			showError ('Permission denied, "' . stringForLabel ($oldvalues[$attr_id]['name'], 0) . '" left unchanged');
 	}
 }
 
@@ -1747,7 +1747,7 @@ function deleteVS()
 		return;
 	}
 	commitDeleteVSG ($vsinfo['id']);
-	showSuccess (formatEntityName ($vsinfo) . ' deleted');
+	showSuccess (stringForLabel (formatEntityName ($vsinfo), 0) . ' deleted');
 	return buildRedirectURL ('ipv4slb', 'vs');
 }
 
@@ -3582,7 +3582,7 @@ function cleanupUCS()
 		# use HW type to decide if the object was produced by autoPopulateUCS()
 		if (! array_key_exists (2, $attrs) || ! in_array ($attrs[2]['key'], $ucsproductmap))
 		{
-			showWarning ('Contained object ' . mkA ($o['dname'], 'object', $item_id) . ' is not an automatic UCS object');
+			showWarning ('Contained object ' . mkA (stringForLabel ($o['dname'], 0), 'object', $item_id) . ' is not an automatic UCS object');
 			$clear = FALSE;
 		}
 	}
@@ -3989,7 +3989,7 @@ function installPlugin ()
 	try
 	{
 		if (! is_callable ("plugin_{$name}_install"))
-			throw new RackTablesError ("The {$name} plugin is missing or cannot be installed", RackTablesError::MISCONFIGURED);
+			throw new RackTablesError ('The ' . stringForLabel ($name, 0) . ' plugin is missing or cannot be installed', RackTablesError::MISCONFIGURED);
 		$plugin = getPlugin ($name);
 		call_user_func ("plugin_{$name}_install");
 		commitInstallPlugin ($plugin['name'], $plugin['longname'], $plugin['code_version'], $plugin['home_url']);
@@ -4008,7 +4008,7 @@ function uninstallPlugin ()
 	try
 	{
 		if (! is_callable ("plugin_{$name}_uninstall"))
-			throw new RackTablesError ("The {$name} plugin is missing or cannot be uninstalled", RackTablesError::MISCONFIGURED);
+			throw new RackTablesError ('The ' . stringForLabel ($name, 0) . ' plugin is missing or cannot be uninstalled', RackTablesError::MISCONFIGURED);
 		call_user_func ("plugin_{$name}_uninstall");
 		commitUninstallPlugin ($name);
 	}
@@ -4026,7 +4026,7 @@ function upgradePlugin ()
 	try
 	{
 		if (! is_callable ("plugin_{$name}_upgrade"))
-			throw new RackTablesError ("The {$name} plugin is missing or cannot be upgraded", RackTablesError::MISCONFIGURED);
+			throw new RackTablesError ('The ' . stringForLabel ($name, 0) . ' plugin is missing or cannot be upgraded', RackTablesError::MISCONFIGURED);
 		$plugin = getPlugin ($name);
 		call_user_func ("plugin_{$name}_upgrade");
 		// get details from the plugin code itself
