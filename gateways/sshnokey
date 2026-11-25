@@ -70,7 +70,9 @@ my $ssh = Net::OpenSSH->new(
 	$op_host,
 	'port' => $op_port,
 	'user' => $op_username,
-	'password' => $op_password
+	'password' => $op_password,
+	# do not print the SSH login banner to stderr, but keep real errors
+	'master_opts' => ['-oLogLevel=ERROR']
 );
 $ssh->error and
   die "Couldn't establish SSH connection: ". $ssh->error;
