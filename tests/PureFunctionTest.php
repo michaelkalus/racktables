@@ -843,6 +843,31 @@ class PureFunctionTest extends RTTestCase
 			// For some reason the result constructIPRange() returns for IPv6
 			// does not use a binary string for mask_bin and hence is difficult
 			// to record in a test case.
+
+			array ('stripSSHClosedByRemoteHost', '', ''),
+			array ('stripSSHClosedByRemoteHost', "Connection to 192.0.2.1 closed by remote host.\r\n", ''),
+			array ('stripSSHClosedByRemoteHost', "Connection to 192.0.2.1 closed by remote host.\n", ''),
+			array ('stripSSHClosedByRemoteHost', 'Connection to 192.0.2.1 closed by remote host.', ''),
+			array ('stripSSHClosedByRemoteHost', "Connection to sw1.example.com closed by remote host.\r\n", ''),
+			array
+			(
+				'stripSSHClosedByRemoteHost',
+				"Permission denied (publickey,password).\r\nConnection to 192.0.2.1 closed by remote host.\r\n",
+				"Permission denied (publickey,password).\r\n",
+			),
+			array
+			(
+				'stripSSHClosedByRemoteHost',
+				"ssh: connect to host 192.0.2.1 port 22: Connection refused\r\n",
+				"ssh: connect to host 192.0.2.1 port 22: Connection refused\r\n",
+			),
+			array ('stripSSHClosedByRemoteHost', "Connection to 192.0.2.1 closed.\r\n", "Connection to 192.0.2.1 closed.\r\n"),
+			array
+			(
+				'stripSSHClosedByRemoteHost',
+				"Connection to 192.0.2.1 closed by remote host. Extra\r\n",
+				"Connection to 192.0.2.1 closed by remote host. Extra\r\n",
+			),
 		);
 	}
 
