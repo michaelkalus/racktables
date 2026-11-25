@@ -53,15 +53,6 @@ $msgcode = array();
 global $opspec_list;
 $opspec_list = array();
 
-$opspec_list['object-edit-unlinkObjects'] = array
-(
-	'table' => 'EntityLink',
-	'action' => 'DELETE',
-	'arglist' => array
-	(
-		array ('url_argname' => 'link_id', 'table_colname' => 'id', 'assertion' => 'natural'),
-	),
-);
 $opspec_list['object-ports-useup'] = array
 (
 	'table' => 'Port',
@@ -1463,6 +1454,27 @@ function linkObjects ()
 		genericAssertion ('child_entity_id', 'natural')
 	);
 	showSuccess ('Container set successfully');
+}
+
+// Remove a container link of the current object (the one the permissions
+// have been checked for), and nothing else.
+function unlinkObjects ()
+{
+	$link_id = genericAssertion ('link_id', 'natural');
+	$deleted = usePreparedDeleteBlade
+	(
+		'EntityLink',
+		array
+		(
+			'id' => $link_id,
+			'parent_entity_type' => 'object',
+			'child_entity_type' => 'object',
+			'child_entity_id' => getBypassValue(),
+		)
+	);
+	if ($deleted != 1)
+		throw new InvalidRequestArgException ('link_id', $link_id, 'not a container link of this object');
+	showOneLiner (49);
 }
 
 function deleteObject ()
