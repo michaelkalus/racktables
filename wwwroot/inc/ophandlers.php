@@ -1770,7 +1770,7 @@ function updateVService ()
 		genericAssertion ('vsconfig', 'string0'),
 		genericAssertion ('rsconfig', 'string0')
 	);
-	rebuildTagChainForEntity ('ipvs', $vs_id, buildTagChainFromIds ($taglist), TRUE);
+	rebuildTagChainForEntity ('ipv4vs', $vs_id, buildTagChainFromIds ($taglist), TRUE);
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 
