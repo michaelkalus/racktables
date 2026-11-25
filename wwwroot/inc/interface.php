@@ -3728,7 +3728,7 @@ function renderSearchResults ($terms, $summary)
 						foreach ($obj['by_sticker'] as $attr_id)
 						{
 							$record = $aval[$attr_id];
-							echo "<tr><th width='50%' class=sticker>{$record['name']}:</th>";
+							echo "<tr><th width='50%' class=sticker>" . stringForLabel ($record['name'], 0) . ':</th>';
 							if ($attr_id == 3) // FQDN
 							{
 								// Switch context for the RackCode in MGMT_PROTOS to work.
@@ -3754,9 +3754,9 @@ function renderSearchResults ($terms, $summary)
 										'page' => 'object',
 										'object_id' => $object['id'],
 										'hl_port_id' => $port_id
-									)) . '">port ' . $port['name'] . '</a>';
+									)) . '">port ' . stringForLabel ($port['name'], 0) . '</a>';
 									echo "<tr><td>{$port_href}:</td>";
-									echo "<td class=tdleft>{$text}</td></tr>";
+									echo '<td class=tdleft>' . stringForTD ($text, 0) . '</td></tr>';
 									break; // next reason
 								}
 						echo '</table>';
@@ -3765,21 +3765,21 @@ function renderSearchResults ($terms, $summary)
 					{
 						echo '<ul>';
 						foreach ($obj['by_iface'] as $ifname)
-							echo "<li>interface {$ifname}</li>";
+							echo '<li>interface ' . stringForLabel ($ifname, 0) . '</li>';
 						echo '</ul>';
 					}
 					if (isset ($obj['by_nat']))
 					{
 						echo '<ul>';
 						foreach ($obj['by_nat'] as $comment)
-							echo "<li>NAT rule: {$comment}</li>";
+							echo '<li>NAT rule: ' . stringForLabel ($comment, 0) . '</li>';
 						echo '</ul>';
 					}
 					if (isset ($obj['by_cableid']))
 					{
 						echo '<ul>';
 						foreach ($obj['by_cableid'] as $cableid)
-							echo "<li>link cable ID: {$cableid}</li>";
+							echo '<li>link cable ID: ' . stringForLabel ($cableid, 0) . '</li>';
 						echo '</ul>';
 					}
 					echo "</td></tr>";
@@ -3827,7 +3827,7 @@ function renderSearchResults ($terms, $summary)
 							)) . "'>{$fmt}</a></td>";
 					else
 						echo mkA ($fmt, 'ipaddress', $fmt, 'default') . '</td>';
-					echo "<td class=tdleft>{$addr['name']}</td><td>{$addr['comment']}</td></tr>";
+					echo '<td class=tdleft>' . stringForTD ($addr['name'], 0) . '</td><td>' . stringForTD ($addr['comment'], 0) . '</td></tr>';
 				}
 				echo '</table>';
 				finishPortlet();
@@ -3910,7 +3910,7 @@ function renderSearchResults ($terms, $summary)
 				foreach ($what as $cell)
 				{
 					echo "<tr><td class=tdleft>";
-					echo mkCellA ($cell);
+					echo mkCellA ($cell, stringForLabel (formatRealmName ($cell['realm']) . ' ' . formatEntityName ($cell), 0));
 					echo "</td></tr>";
 				}
 				echo '</table>';
@@ -6025,6 +6025,7 @@ function formatAttributeValue ($record, $objtype_id)
 			datetimestrFromTimestamp ($record['value'])
 		);
 	case 'string':
+		$a_value = stringForLabel ($record['a_value'], 0);
 		if ($record['id'] == 3) // FQDN attribute
 			foreach (getMgmtProtosConfig() as $proto => $filter)
 				try
@@ -6032,7 +6033,7 @@ function formatAttributeValue ($record, $objtype_id)
 					if (considerGivenConstraint (NULL, $filter))
 					{
 						$blank = (preg_match ('/^https?$/', $proto) ? 'target=_blank' : '');
-						return "<a $blank title='Open $proto session' class='mgmt-link' href='" . $proto . '://' . $record['a_value'] . "'>{$record['a_value']}</a>";
+						return "<a $blank title='Open $proto session' class='mgmt-link' href='" . htmlspecialchars ($proto . '://' . $record['a_value'], ENT_QUOTES, 'UTF-8') . "'>{$a_value}</a>";
 					}
 				}
 				catch (RackTablesError $e)
@@ -6045,8 +6046,8 @@ function formatAttributeValue ($record, $objtype_id)
 					continue;
 				}
 		return array_key_exists ('href', $record) ?
-			"<a href='{$record['href']}'>{$record['a_value']}</a>" :
-			$record['a_value'];
+			"<a href='" . htmlspecialchars ($record['href'], ENT_QUOTES, 'UTF-8') . "'>{$a_value}</a>" :
+			$a_value;
 	case 'dict':
 		$map = array
 		(
@@ -6060,8 +6061,9 @@ function formatAttributeValue ($record, $objtype_id)
 			1561 => NULL,
 			1562 => NULL,
 		);
+		$a_value = stringForLabel ($record['a_value'], 0);
 		if (NULL === $filter_pageno = array_fetch ($map, $objtype_id, 'depot'))
-			$result = $record['a_value'];
+			$result = $a_value;
 		else
 		{
 			$filter_args = array
@@ -6072,10 +6074,10 @@ function formatAttributeValue ($record, $objtype_id)
 				'cfe' => '{$attr_' . $record['id'] . '_' . $record['key'] . '}',
 			);
 			$filter_url = makeHref ($filter_args);
-			$result = "<a href='{$filter_url}'>{$record['a_value']}</a>";
+			$result = "<a href='{$filter_url}'>{$a_value}</a>";
 		}
 		if (array_key_exists ('href', $record))
-			$result .= "&nbsp;<a class='img-link' href='{$record['href']}'>" . getImageHREF ('html', 'vendor\'s info page') . "</a>";
+			$result .= "&nbsp;<a class='img-link' href='" . htmlspecialchars ($record['href'], ENT_QUOTES, 'UTF-8') . "'>" . getImageHREF ('html', 'vendor\'s info page') . "</a>";
 		return $result;
 	default:
 		throw new InvalidArgException ('record[type]', $record['type']);

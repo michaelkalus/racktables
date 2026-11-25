@@ -42,14 +42,14 @@ function renderSLBEntityCell ($cell, $highlighted = FALSE)
 		echo "</td><td>";
 		echo "<a class='$a_class' href='index.php?page=ipv4vs&vs_id={$cell['id']}'>";
 		echo $cell['dname'] . "</a></td></tr><tr><td>";
-		echo $cell['name'] . '</td></tr>';
+		echo stringForTD ($cell['name']) . '</td></tr>';
 		break;
 	case 'ipvs':
 		echo "<tr><td rowspan=3 width='5%'>";
 		printImageHREF ('VS');
 		echo "</td><td>";
 		echo "<a class='$a_class' href='index.php?page=ipvs&vs_id={$cell['id']}'>";
-		echo $cell['name'] . "</a></td></tr>";
+		echo stringForTD ($cell['name']) . "</a></td></tr>";
 		break;
 	case 'ipv4rspool':
 		echo "<tr><td>";
