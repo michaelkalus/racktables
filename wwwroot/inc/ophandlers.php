@@ -899,9 +899,29 @@ function addIPAllocation ()
 		return;
 	}
 
-	if($address['reserved'] && $address['name'] != '')
+	// Tell what bindIPToObject() does to the address record. The reserved
+	// flag is 'yes' or 'no', the name may be there without a reservation.
+	$release = getConfigVar ('IPV4_AUTO_RELEASE');
+	$name = $address['name'] == '' ? '' : " \"{$address['name']}\"";
+	if ($release >= 2)
 	{
-		showWarning("IP ".ip_format($ip_bin)." reservation \"".$address['name']."\" is removed");
+		// the whole address record goes
+		$removed = array();
+		if ($address['reserved'] == 'yes')
+			$removed[] = 'reservation';
+		if ($address['name'] != '')
+			$removed[] = 'name' . $name;
+		if ($address['comment'] != '')
+			$removed[] = 'comment';
+		if (count ($removed))
+			showWarning ('IP ' . ip_format ($ip_bin) . ' ' . implode (' and ', $removed) . (count ($removed) > 1 ? ' are' : ' is') . ' removed');
+	}
+	elseif ($address['reserved'] == 'yes')
+	{
+		if ($release >= 1)
+			showWarning ('IP ' . ip_format ($ip_bin) . " reservation{$name} is removed" . ($name == '' ? '' : ', the name is kept'));
+		else
+			showWarning ('IP ' . ip_format ($ip_bin) . " reservation{$name} is kept");
 		//TODO ask to take reserved IP or not !
 	}
 
