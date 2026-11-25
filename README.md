@@ -7,6 +7,11 @@ is to keep RackTables working on current PHP and MySQL/MariaDB releases and to
 fix reported bugs and security issues. Its releases are numbered
 `0.23.0-community` and later; version numbers 0.22.x are left to upstream.
 
+**Upgrading is one-way.** A database upgraded by this fork cannot be used with
+upstream RackTables code again, so back up the database first. Read
+[Upgrading to 0.23.0-community](#upgrading-to-0230-community) before you
+upgrade.
+
 ## How it came to be, and a word about AI
 I have been a happy RackTables user for years. Over those years I also watched
 the bugs and issues pile up in the original tracker, while the author
