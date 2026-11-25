@@ -253,7 +253,7 @@ function renderExpirations ()
 
 				$object = spotEntity ('object', $row['object_id']);
 				$attributes = getAttrValues ($object['id']);
-				$oem_sn_1 = array_key_exists (1, $attributes) ? $attributes[1]['a_value'] : '&nbsp;';
+				$oem_sn_1 = array_key_exists (1, $attributes) ? stringForTD ($attributes[1]['a_value'], 0) : '&nbsp;';
 				echo '<tr class=' . $section['class'] . $order . ' valign=top>';
 				echo "<td class=tdright>{$count}</td>";
 				echo '<td class=tdleft>' . mkCellA ($object) . '</td>';

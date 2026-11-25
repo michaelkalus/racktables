@@ -52,7 +52,7 @@ function formatPortMacHints ($object_id)
 	$result = array();
 	if ($_REQUEST['ac'] == 'get-port-portmac')
 	{
-		$port_name = $_REQUEST['port_name'];
+		$port_name = genericAssertion ('port_name', 'string');
 		$ports = reduceSubarraysToColumn (getObjectPortsAndLinks ($_REQUEST['object_id'], FALSE), 'name');
 		$macList = in_array($port_name, $ports) ?
 				queryDevice ($object_id, 'getportmaclist', array ($port_name)) :

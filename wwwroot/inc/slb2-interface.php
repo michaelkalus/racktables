@@ -38,7 +38,7 @@ function renderVS ($vsid)
 
 	echo '<table border=0 class=objectview cellspacing=0 cellpadding=0>';
 	if ($vsinfo['name'] != '')
-		echo "<tr><td colspan=2 align=center><h1>{$vsinfo['name']}</h1></td></tr>\n";
+		echo '<tr><td colspan=2 align=center><h1>' . stringForLabel ($vsinfo['name'], 0) . "</h1></td></tr>\n";
 	echo '<tr>';
 
 	echo '<td class=pcleft>';
