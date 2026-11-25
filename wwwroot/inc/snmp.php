@@ -88,6 +88,15 @@ $iftable_processors['generic-gi-any-1000T'] = array
 	'try_next_proc' => FALSE,
 );
 
+$iftable_processors['generic-gi-any-1000SFP'] = array
+(
+	'pattern' => '@^gi(\d+)$@',
+	'replacement' => 'gi\\1',
+	'dict_key' => '4-1077',
+	'label' => '\\1',
+	'try_next_proc' => FALSE,
+);
+
 $iftable_processors['generic-gi-1-to-2-1000T'] = array
 (
 	'pattern' => '@^gi(\d+)$@',
@@ -2735,7 +2744,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	),
 	'9.1.749' => array
 	(
-		'dict_key' => 989,
+		'dict_key' => 1056,
 		'text' => 'WS-CBS3030-DEL: 10 internal/10-100-1000T(X) + 2 RJ-45/10-100-1000T(X) + 4 SFP/1000',
 		'processors' => array ('catalyst-blade-11-to-12-1000T', 'catalyst-blade-13-to-16-1000SFP', 'catalyst-blade-any-bp/1000T'),
 	),
@@ -3222,7 +3231,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'9.6.1.83.10.5' => array
 	(
 		'dict_key' => 2376,
-		'text' => 'SG 300-10SFP: 8 RJ-45/10/100/1000T(X) + 2 combo-gig',
+		'text' => 'SG 300-10SFP: 8 SFP/1000 + 2 combo-gig',
 		'processors' => array
 		(
 			'generic-gi-9-to-10-combo-1000SFP',
@@ -3478,7 +3487,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-9-to-10-combo-1000SFP',
-			'generic-gi-9-to-10-1000T',
+			'generic-gi-9-to-10-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3490,7 +3499,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-17-to-18-combo-1000SFP',
-			'generic-gi-17-to-18-1000T',
+			'generic-gi-17-to-18-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3502,7 +3511,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3514,7 +3523,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3526,7 +3535,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-25-to-26-combo-1000SFP',
-			'generic-gi-25-to-26-1000T',
+			'generic-gi-25-to-26-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3538,7 +3547,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3550,7 +3559,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3562,7 +3571,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 		'processors' => array
 		(
 			'generic-gi-49-to-50-combo-1000SFP',
-			'generic-gi-49-to-50-1000T',
+			'generic-gi-49-to-50-combo-1000T',
 			'generic-gi-any-1000T',
 		),
 		'ifDescrOID' => 'ifName',
@@ -3909,7 +3918,7 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'171.10.63.6' => array
 	(
 		'dict_key' => 614,
-		'text' => '24-Port Fast Ethernet L2 Managed PoE Switch with 2 x 1000BASE-T and 2 x Combo 1000BASE-T/SFP ports ',
+		'text' => '24-Port Fast Ethernet L2 Managed PoE Switch with 2 x 1000BASE-T and 2 x Combo 1000BASE-T/SFP ports',
 		'processors' => array ('Dlink-3028-25-to-26-Combo', 'Dlink-3028-25-to-28-1000T', 'Dlink-3028-100TX'),
 	),
 	'171.10.63.8' => array
@@ -4510,19 +4519,19 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	),
 	'11.2.3.7.11.145' => array
 	(
-		'dict_key' => 3654,
+		'dict_key' => 3721,
 		'text' => 'HP Aruba 2530 48 PoE+ Switch, (48) RJ-45 10/100 PoE+ ports, (2) autosensing 10/100/1000 ports, (2) fixed Gigabit Ethernet SFP ports',
 		'processors' => array ('procurve-51-to-52-1000SFP', 'procurve-49-to-50-1000T', 'procurve-chassis-100TX'),
 	),
 	'11.2.3.7.11.146' => array
 	(
-		'dict_key' => 3655,
+		'dict_key' => 3722,
 		'text' => 'HP Aruba 2530 24 PoE+ Switch, (24) RJ-45 10/100 PoE+ ports, (2) autosensing 10/100/1000 ports, (2) fixed Gigabit Ethernet SFP ports',
 		'processors' => array ('procurve-27-to-28-1000SFP', 'procurve-25-to-26-1000T', 'procurve-chassis-100TX'),
 	),
 	'25506.11.1.181' => array
 	(
-		'dict_key' => 3656,
+		'dict_key' => 3723,
 		'text' => 'HP 1950 48G 2SFP+ 2XGT Switch, (48) RJ-45 auto-negotiating 10/100/1000 PoE+ ports, (2) SFP+ fixed 1000/10000 SFP+ ports, (2) RJ-45 1/10GBASE-T ports',
 		'processors' => array ('procurve-49-to-50-10GBase-T', 'procurve-51-to-52-10000SFP+', 'procurve-any-1000T'),
 	),
@@ -4613,19 +4622,19 @@ $known_switches = array // key is system OID w/o "enterprises" prefix
 	'11.2.3.7.11.69' => array
 	(
 		'dict_key' => 872,
-		'text' => ' J9049A: 24 RJ-45/10-100-1000T',
+		'text' => 'J9049A: 24 RJ-45/10-100-1000T',
 		'processors' => array ('procurve-21-to-24-combo-1000SFP', 'procurve-chassis-1000T'),
 	),
 	'25506.11.1.189' => array
 	(
 		'dict_key' => 2466,
-		'text' => 'HP EI%GPASS%5130-48G-PoE+-4SFP+ (JG937A)',
+		'text' => 'HP EI 5130-48G-PoE+-4SFP+ (JG937A)',
 		'processors' => array ('h3c-any-Gb', 'h3c-any-SFP+'),
 	),
 	'25506.11.1.36' => array
 	(
 		'dict_key' => 3748,
-		'text' => 'HP%GPASS%HP A5120-48G-PoE+ EI (JG237A)',
+		'text' => 'HP A5120-48G-PoE+ EI (JG237A)',
 		'processors' => array ('h3c-49-to-52-SFP', 'h3c-any-Gb', 'h3c-any-SFP+'),
 	),
 );
