@@ -43,7 +43,7 @@ function renderVS ($vsid)
 
 	echo '<td class=pcleft>';
 	$summary = array();
-	$summary['Name'] = $vsinfo['name'] . getPopupSLBConfig ($vsinfo);
+	$summary['Name'] = stringForLabel ($vsinfo['name'] ?? '', 0) . getPopupSLBConfig ($vsinfo);
 	$summary['tags'] = '';
 
 	$ips = '<ul class="slb-checks">';

@@ -1388,7 +1388,7 @@ function renderObjectPortRow ($port, $is_highlighted)
 		echo "<td class=tdleft>" .
 			formatPortLink ($port['remote_object_id'], $dname, $port['remote_id'], NULL) .
 			"</td>";
-		echo "<td class=tdleft>" . formatLoggedSpan ($port['last_log'], $port['remote_name'], 'underline') . "</td>";
+		echo "<td class=tdleft>" . formatLoggedSpan ($port['last_log'], stringForLabel ($port['remote_name'], 0), 'underline') . "</td>";
 		$editable = permitted ('object', 'ports', 'editPort')
 			? 'editable'
 			: '';
@@ -1406,7 +1406,7 @@ function renderObject ($object_id)
 	amplifyCell ($info);
 	// Main layout starts.
 	echo "<table border=0 class=objectview cellspacing=0 cellpadding=0>";
-	echo "<tr><td colspan=2 align=center><h1>{$info['dname']}</h1></td></tr>\n";
+	echo '<tr><td colspan=2 align=center><h1>' . stringForLabel ($info['dname'], 0) . "</h1></td></tr>\n";
 	// A mandatory left column with varying number of portlets.
 	echo "<tr><td class=pcleft>";
 
@@ -1420,7 +1420,7 @@ function renderObject ($object_id)
 		'page' => 'depot',
 		'tab' => 'default',
 		'cfe' => '{$typeid_' . $info['objtype_id'] . '}'
-	)) . '">' .  decodeObjectType ($info['objtype_id']) . '</a>';
+	)) . '">' .  stringForLabel (decodeObjectType ($info['objtype_id']), 0) . '</a>';
 	if ($info['label'] != '')
 		$summary['Visible label'] = $info['label'];
 	if ($info['asset_no'] != '')
@@ -1436,7 +1436,7 @@ function renderObject ($object_id)
 	foreach ($grouped_parents as $parents_group)
 	{
 		uasort ($parents_group, 'compare_name');
-		$label = $parents_group[key ($parents_group)]['object_type'] . (count($parents_group) > 1 ? ' containers' : ' container');
+		$label = stringForLabel ($parents_group[key ($parents_group)]['object_type'], 0) . (count($parents_group) > 1 ? ' containers' : ' container');
 		$fmt_parents = array();
 		foreach ($parents_group as $parent)
 			$fmt_parents[] = mkCellA ($parent);
@@ -1449,7 +1449,7 @@ function renderObject ($object_id)
 		$fmt_children = array();
 		foreach ($children_group as $child)
 			$fmt_children[] = mkCellA ($child);
-		$summary["Contains " . mb_strtolower(decodeObjectType ($objtype_id))] = implode ('<br>', $fmt_children);
+		$summary["Contains " . stringForLabel (mb_strtolower(decodeObjectType ($objtype_id)), 0)] = implode ('<br>', $fmt_children);
 	}
 	if ($info['has_problems'] == 'yes')
 		$summary[] = array ('<tr><td colspan=2 class=msg_error>Has problems</td></tr>');
@@ -1535,7 +1535,7 @@ function renderObject ($object_id)
 				if ($is_first_row)
 				{
 					$rowspan = count ($alloclist) > 1 ? 'rowspan="' . count ($alloclist) . '"' : '';
-					echo "<td class=tdleft $rowspan>" . $iface_name . $rendered_alloc['td_name_suffix'] . "</td>";
+					echo "<td class=tdleft $rowspan>" . stringForLabel ($iface_name, 0) . $rendered_alloc['td_name_suffix'] . "</td>";
 					$is_first_row = FALSE;
 				}
 				echo $rendered_alloc['td_ip'];
@@ -1762,7 +1762,7 @@ function renderPortsForObject ($object_id)
 			echo "<td class=tdleft>" .
 				formatLoggedSpan ($port['last_log'], formatPortLink ($port['remote_object_id'], $dname, $port['remote_id'], NULL)) .
 				"</td>";
-			echo "<td class=tdleft> " . formatLoggedSpan ($port['last_log'], $port['remote_name'], 'underline') .
+			echo "<td class=tdleft> " . formatLoggedSpan ($port['last_log'], stringForLabel ($port['remote_name'], 0), 'underline') .
 				"<input type=hidden name=reservation_comment value=''></td>";
 			echo "<td><input type=text name=cable value='" . stringForTextInputValue ($port['cableid'] ?? '', 0) . "'></td>";
 			echo "<td class=tdcenter>";
@@ -1772,7 +1772,7 @@ function renderPortsForObject ($object_id)
 		elseif ($port['reservation_comment'] != '')
 		{
 			echo "<td>" . formatLoggedSpan ($port['last_log'], 'Reserved:', 'strong underline') . "</td>";
-			echo "<td><input type=text name=reservation_comment value='{$port['reservation_comment']}'></td>";
+			echo "<td><input type=text name=reservation_comment value='" . stringForTextInputValue ($port['reservation_comment'], 0) . "'></td>";
 			echo "<td></td>";
 			echo "<td class=tdcenter>";
 			echo getOpLink (array('op'=>'useup', 'port_id'=>$port['id']), '', 'clear', 'Use up this port');
@@ -3329,7 +3329,7 @@ function renderIPAddress ($ip_bin)
 				$tr_class .= ' highlight';
 			echo "<tr class='$tr_class'>" .
 				"<td>" . makeIPAllocLink ($ip_bin, $bond) . "</td>" .
-				"<td>{$bond['name']}</td>" .
+				'<td>' . stringForLabel ($bond['name'], 0) . '</td>' .
 				"<td><strong>" . $aat[$bond['type']] . "</strong></td>" .
 				"</tr>\n";
 		}
@@ -4305,7 +4305,7 @@ function renderLivePTR ($id)
 	$range = spotEntity ('ipv4net', $id);
 	loadIPAddrList ($range);
 	$can_import = permitted (NULL, NULL, 'importPTRData');
-	echo "<center><h1>{$range['ip']}/{$range['mask']}</h1><h2>{$range['name']}</h2></center>\n";
+	echo "<center><h1>{$range['ip']}/{$range['mask']}</h1><h2>" . stringForLabel ($range['name'], 0) . "</h2></center>\n";
 
 	echo "<table class=objview border=0 width='100%'><tr><td class=pcleft>";
 	startPortlet ('current records');
@@ -4354,8 +4354,8 @@ function renderLivePTR ($id)
 			$ptrname = '';
 		if ($can_import)
 		{
-			echo "<input type=hidden name=addr_{$idx} value={$straddr}>\n";
-			echo "<input type=hidden name=descr_{$idx} value={$ptrname}>\n";
+			echo "<input type=hidden name=addr_{$idx} value='{$straddr}'>\n";
+			echo "<input type=hidden name=descr_{$idx} value='" . stringForTextInputValue ($ptrname, 0) . "'>\n";
 		}
 		echo '<tr';
 		$print_cbox = FALSE;
@@ -4388,7 +4388,7 @@ function renderLivePTR ($id)
 		if (isset ($range['addrlist'][$ip_bin]['class']) && $range['addrlist'][$ip_bin]['class'] != '')
 			echo ' ' . $range['addrlist'][$ip_bin]['class'];
 		echo "'>" . mkA ($straddr, 'ipaddress', $straddr) . '</td>';
-		echo "<td class=tdleft>{$addr['name']}</td><td class=tdleft>{$ptrname}</td>";
+		echo '<td class=tdleft>' . stringForLabel ($addr['name'], 0) . '</td><td class=tdleft>' . stringForLabel ($ptrname, 0) . '</td>';
 		if ($can_import)
 		{
 			echo '<td>';
@@ -4949,7 +4949,7 @@ function renderFilesPortlet ($entity_type = NULL, $entity_id = 0)
 			// getFilesOfEntity() returns a standard cell list.
 			$file = spotEntity ('file', $file['id']);
 			renderCell ($file);
-			echo "</td><td class=tdleft>{$file['comment']}</td></tr>";
+			echo '</td><td class=tdleft>' . stringForLabel ($file['comment'] ?? '', 0) . '</td></tr>';
 			if (isolatedPermission ('file', 'download', $file) && '' != ($pcode = getFilePreviewCode ($file)))
 				echo "<tr><td colspan=2>{$pcode}</td></tr>\n";
 		}
@@ -5006,7 +5006,7 @@ function renderFilesForEntity ($entity_id)
 		{
 			echo "<tr valign=top><td class=tdleft>";
 			renderCell (spotEntity ('file', $file_id));
-			echo "</td><td class=tdleft>{$file['comment']}</td><td class=tdcenter>";
+			echo '</td><td class=tdleft>' . stringForLabel ($file['comment'] ?? '', 0) . '</td><td class=tdcenter>';
 			echo getOpLink (array('op'=>'unlinkFile', 'link_id'=>$file['link_id']), '', 'CUT', 'Unlink file');
 			echo "</td></tr>\n";
 		}
@@ -5822,7 +5822,7 @@ function renderDiscoveredNeighbors ($object_id)
 					$dp_remote_object_id = lookupEntityByString ('object', $dp_neighbor['device']);
 				if (! $dp_remote_object_id)
 				{
-					$error_message = "No such neighbor <i>{$dp_neighbor['device']}</i>";
+					$error_message = 'No such neighbor <i>' . stringForLabel ($dp_neighbor['device'], 0) . '</i>';
 					break;
 				}
 				$dp_remote_object = spotEntity ('object', $dp_remote_object_id);
@@ -5840,7 +5840,7 @@ function renderDiscoveredNeighbors ($object_id)
 				// check if ports with such names exist on devices
 				if (empty ($local_ports))
 				{
-					$error_message = "No such local port <i>$local_port</i>";
+					$error_message = 'No such local port <i>' . stringForLabel ($local_port, 0) . '</i>';
 					break;
 				}
 				if (empty ($remote_ports))
@@ -5926,8 +5926,8 @@ function renderDiscoveredNeighbors ($object_id)
 			}
 			echo "<td>" . ($portinfo_local ?  formatPortIIFOIF ($portinfo_local) : '&nbsp;') . "</td>";
 			echo "<td>" . formatIfTypeVariants ($variants, "ports_{$inputno}") . "</td>";
-			echo "<td>{$dp_neighbor['device']}</td>";
-			echo "<td>" . ($portinfo_remote ? formatPortLink ($dp_remote_object_id, NULL, $portinfo_remote['id'], $portinfo_remote['name']) : $dp_neighbor['port'] ) . "</td>";
+			echo '<td>' . stringForLabel ($dp_neighbor['device'], 0) . '</td>';
+			echo "<td>" . ($portinfo_remote ? formatPortLink ($dp_remote_object_id, NULL, $portinfo_remote['id'], $portinfo_remote['name']) : stringForLabel ($dp_neighbor['port'], 0) ) . "</td>";
 			echo "<td>" . ($portinfo_remote ?  formatPortIIFOIF ($portinfo_remote) : '&nbsp;') . "</td>";
 			echo "<td>";
 			if (! empty ($variants))
@@ -6370,7 +6370,7 @@ function formatPortReservation ($port)
 		? 'editable'
 		: '';
 	$ret[] = '<td class=tdleft>' .
-		formatLoggedSpan ($port['last_log'], $port['reservation_comment'], "rsvtext $editable id-{$port['id']} op-upd-reservation-port") .
+		formatLoggedSpan ($port['last_log'], stringForLabel ($port['reservation_comment'] ?? '', 0), "rsvtext $editable id-{$port['id']} op-upd-reservation-port") .
 		'</td>';
 	return $ret;
 }

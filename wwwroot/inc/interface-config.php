@@ -56,8 +56,8 @@ function renderUserListEditor ()
 		else
 			echo getOpLink (array ('op' => 'deleteUser', 'id' => $account['user_id']), '', 'destroy', 'delete user account');
 		echo '</td>';
-		echo "<td><input type=text name=username value='{$account['user_name']}' size=16></td>";
-		echo "<td><input type=text name=realname value='{$account['user_realname']}' size=24></td>";
+		echo "<td><input type=text name=username value='" . stringForTextInputValue ($account['user_name'], 0) . "' size=16></td>";
+		echo "<td><input type=text name=realname value='" . stringForTextInputValue ($account['user_realname'], 0) . "' size=24></td>";
 		echo "<td><input type=password name=password size=40></td><td>";
 		printImageHREF ('save', 'Save changes', TRUE);
 		echo '</td></form></tr>';
@@ -73,8 +73,8 @@ function renderUser ($user_id)
 	$userinfo = spotEntity ('user', $user_id);
 
 	$summary = array();
-	$summary['Account name'] = $userinfo['user_name'];
-	$summary['Real name'] = $userinfo['user_realname'];
+	$summary['Account name'] = stringForLabel ($userinfo['user_name'], 0);
+	$summary['Real name'] = stringForLabel ($userinfo['user_realname'] ?? '', 0);
 	$summary['tags'] = '';
 	renderEntitySummary ($userinfo, 'summary', $summary);
 

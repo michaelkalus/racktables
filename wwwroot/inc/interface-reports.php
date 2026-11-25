@@ -230,7 +230,7 @@ function renderExpirations ()
 	$attrmap = getAttrMap();
 	foreach ($expirations as $attr_id => $sections)
 	{
-		startPortlet ($attrmap[$attr_id]['name']);
+		startPortlet (stringForLabel ($attrmap[$attr_id]['name'], 0));
 		foreach ($sections as $section)
 		{
 			$count = 1;
