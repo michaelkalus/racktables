@@ -2937,6 +2937,21 @@ function getIPv6Address ($ip_bin)
 	return getIPAddress ($ip_bin);
 }
 
+// Tell whether the Live PTR import may change the given address of the given
+// IPv4 network. Reserved addresses, which include the network and broadcast
+// addresses of a connected network, are left alone, and so are the network and
+// broadcast addresses named that way.
+function isLivePTRImportable ($net, $ip_bin, $addr)
+{
+	if ($addr['reserved'] == 'yes')
+		return FALSE;
+	if ($ip_bin === $net['ip_bin'] && $addr['name'] == 'network')
+		return FALSE;
+	if ($ip_bin === ip_last ($net) && $addr['name'] == 'broadcast')
+		return FALSE;
+	return TRUE;
+}
+
 function makeIPTree ($netlist)
 {
 	// treeFromList() requires parent_id to be correct for an item to get onto the tree,
