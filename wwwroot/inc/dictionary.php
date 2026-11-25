@@ -1594,7 +1594,7 @@ $dictionary = array
 	1518 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%1955'),
 	1519 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M605'),
 	1520 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M610'),
-	1521 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M610x'),
+	1521 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M610x%L2,1%'),
 	1522 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M710%L2,1%'),
 	1523 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M805%L2,1%'),
 	1524 => array ('chapter_id' => 11, 'dict_value' => 'Dell PowerEdge (blade)%GPASS%M905%L2,1%'),

@@ -5,8 +5,8 @@
 # licensing information.
 
 ob_start();
-require_once 'inc/pre-init.php';
 try {
+	require_once 'inc/pre-init.php';
 	// Switch block below is a module request dispatcher.
 	// Dispatches based on module request.
 	// The last string 'interface' is the default.

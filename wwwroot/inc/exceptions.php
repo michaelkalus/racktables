@@ -270,7 +270,8 @@ class RTPermissionDenied extends RackTablesError
 			$target_given_tags,
 			$auto_tags,
 			$expl_tags,
-			$impl_tags;
+			$impl_tags,
+			$helpdesk_banner;
 		header ('Content-Type: text/html; charset=UTF-8');
 		echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' . "\n";
 		echo '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">' . "\n";
@@ -294,6 +295,8 @@ class RTPermissionDenied extends RackTablesError
 		echo "<tr><th width='50%' class=tdright>Requested tab:</th><td class=tdleft>{$tabno}</td></tr>\n";
 		echo "<tr><td colspan=2 align=center>Click <a href='index.php?logout'>here</a> to logout.</td></tr>\n";
 		echo "</table>\n";
+		if (isset ($helpdesk_banner))
+			echo '<hr>' . $helpdesk_banner;
 		echo '</body></html>';
 	}
 }
@@ -404,6 +407,7 @@ function stringTrace ($trace)
 
 function printPDOException ($e)
 {
+	global $helpdesk_banner;
 	header ('HTTP/1.1 500 Internal Server Error');
 	header ('Content-Type: text/html; charset=UTF-8');
 	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' . "\n";
@@ -427,11 +431,14 @@ function printPDOException ($e)
 	dumpArray ($_POST);
 	echo '<h3>COOKIE</h3>';
 	dumpArray ($_COOKIE);
+	if (isset ($helpdesk_banner))
+		echo '<hr>' . $helpdesk_banner;
 	echo '</body></html>';
 }
 
 function printGenericException ($e)
 {
+	global $helpdesk_banner;
 	header('HTTP/1.1 500 Internal Server Error');
 	header ('Content-Type: text/html; charset=UTF-8');
 	echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">' . "\n";
@@ -451,6 +458,8 @@ function printGenericException ($e)
 	dumpArray ($_POST);
 	echo '<h3>COOKIE</h3>';
 	dumpArray ($_COOKIE);
+	if (isset ($helpdesk_banner))
+		echo '<hr>' . $helpdesk_banner;
 	echo '</body></html>';
 }
 
