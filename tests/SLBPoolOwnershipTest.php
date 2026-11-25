@@ -99,6 +99,54 @@ class SLBPoolOwnershipTest extends RTTestCase
 		$this->assertTrue ($refused, 'the request must be refused');
 	}
 
+	// values of the hidden inputs of the addLink form in $html
+	protected function getAddLinkHiddenFields ($html)
+	{
+		$this->assertSame (1, preg_match ('/<form method=post id=addLink .*?<\/form>/s', $html, $m), 'the addLink form must be there');
+		preg_match_all ('/<input type=hidden name="?([a-z_]+)"?(?: id=[a-z_]+)? value="?([^"> ]*)"?>/', $m[0], $inputs, PREG_SET_ORDER);
+		$ret = array();
+		foreach ($inputs as $input)
+			$ret[$input[1]] = html_entity_decode ($input[2], ENT_QUOTES);
+		return $ret;
+	}
+
+	// Go through the "add VS group" forms of a page the way js/slb_editor.js
+	// does: render the first form and send its fields with the selected values
+	// to the get-slb-form AJAX handler. Return the hidden fields of the first
+	// form and of the form that handler returns.
+	protected function renderAddLinkForms ($pageno_, $bypass_name, $bypass_value, $selected)
+	{
+		global $pageno, $tabno, $sic, $configCache;
+		$this->clearRequest();
+		$pageno = $pageno_;
+		$tabno = 'editvslinks';
+		$sic[$bypass_name] = $_REQUEST[$bypass_name] = $bypass_value;
+		$this->request_args[] = $bypass_name;
+		$saved_listsrc = $configCache['IPV4LB_LISTSRC']['varvalue'];
+		$configCache['IPV4LB_LISTSRC']['varvalue'] = '{$typeid_4}';
+		try
+		{
+			$first = $this->getAddLinkHiddenFields (getOutputOf ('renderTripletForm', $bypass_value));
+		}
+		finally
+		{
+			$configCache['IPV4LB_LISTSRC']['varvalue'] = $saved_listsrc;
+		}
+
+		$ajax_args = array
+		(
+			'form' => http_build_query (array_merge ($first, $selected)),
+			'action' => "?module=redirect&page={$pageno_}&tab=editvslinks&op=addLink",
+		);
+		foreach ($ajax_args as $argname => $value)
+		{
+			$sic[$argname] = $_REQUEST[$argname] = $value;
+			$this->request_args[] = $argname;
+		}
+		$second = $this->getAddLinkHiddenFields (getOutputOf ('renderSLBFormAJAX'));
+		return array ($first, $second);
+	}
+
 	protected function getRS ($rs_id)
 	{
 		$result = usePreparedSelectBlade ('SELECT rspool_id, rsport, comment FROM IPv4RS WHERE id = ?', array ($rs_id));
@@ -272,6 +320,38 @@ class SLBPoolOwnershipTest extends RTTestCase
 				$this->tripletArgs (self::$lba_id, self::$poolb_id)
 		);
 		$this->assertCount (0, $this->getTripletRows ('VSEnabledPorts', self::$lba_id, self::$poolb_id));
+	}
+
+	// The forms of the RS pool page carry the RS pool as rspool_id, as the
+	// forms of the load balancer and VS group pages carry their own key field.
+	// (renderNewTripletForm() can run only once per process.)
+
+	/**
+	 * @group small
+	 */
+	public function testAddLinkFormsOnPoolPage ()
+	{
+		$this->runOp ('ipv4rspool', 'editvslinks', 'del', array ('pool_id' => self::$poola_id) + $this->tripletArgs (self::$lba_id, self::$poola_id));
+		list ($first, $second) = $this->renderAddLinkForms
+		(
+			'ipv4rspool',
+			'pool_id',
+			self::$poola_id,
+			array ('object_id' => self::$lba_id, 'vs_id' => self::$vs_id)
+		);
+		foreach (array ($first, $second) as $fields)
+		{
+			$this->assertArrayHasKey ('rspool_id', $fields);
+			$this->assertEquals (self::$poola_id, $fields['rspool_id']);
+			$this->assertEquals (self::$poola_id, $fields['pool_id']);
+		}
+		$this->assertEquals (self::$lba_id, $second['object_id']);
+		$this->assertEquals (self::$vs_id, $second['vs_id']);
+
+		// submit the second form
+		$this->runOp ('ipv4rspool', 'editvslinks', 'addLink', $second + array ('enabled_vips' => array ('192.0.2.10'), 'enabled_ports' => array ('TCP-80')));
+		$this->assertCount (1, $this->getTripletRows ('VSEnabledPorts', self::$lba_id, self::$poola_id));
+		$this->assertCount (1, $this->getTripletRows ('VSEnabledIPs', self::$lba_id, self::$poola_id));
 	}
 
 	/**

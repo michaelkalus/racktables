@@ -532,9 +532,17 @@ function renderNewTripletForm ($realm1, $realm2)
 
 	$realm1_data = get_realm_data ($realm1);
 	$realm2_data = get_realm_data ($realm2);
+	// The entity of the current page is the third member of the triplet,
+	// send its key field (on the RS pool page it differs from the bypass name).
+	$key_fields = array
+	(
+		'object' => 'object_id',
+		'ipvs' => 'vs_id',
+		'ipv4rspool' => 'rspool_id',
+	);
 	startPortlet ('Add new VS group');
 	if (count ($realm1_data['list']) && count ($realm2_data['list']))
-		printOpFormIntro ('addLink');
+		printOpFormIntro ('addLink', array ($key_fields[etypeByPageno()] => getBypassValue()));
 	echo "<table cellspacing=0 cellpadding=5 align=center>";
 	echo "<tr valign=top><th class=tdright>{$realm1_data['name']}</th><td class=tdleft>";
 	printSelect ($realm1_data['list'], $realm1_data['options']);
