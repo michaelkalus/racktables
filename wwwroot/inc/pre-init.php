@@ -66,16 +66,23 @@ if (! isset ($local_gwdir)) // the directory where RT will search gateway script
 if (! isset ($local_staticdir)) // the directory where RT will search static files (js/*, css/*, pix/*) if not found in $racktables_staticdir
 	$local_staticdir = $racktables_plugins_dir;
 
+// Returns the value of the MySQL driver attribute $name (e.g. 'SSL_CA'), or NULL
+// if this PHP build does not have it (MAX_BUFFER_SIZE does not exist with mysqlnd).
+// The PDO::MYSQL_ATTR_* constants are deprecated since PHP 8.5 in favour of
+// Pdo\Mysql::ATTR_*, which do not exist before PHP 8.4.
+function getPDOMySQLAttr ($name)
+{
+	foreach (array ("Pdo\\Mysql::ATTR_{$name}", "PDO::MYSQL_ATTR_{$name}") as $const)
+		if (defined ($const))
+			return constant ($const);
+	return NULL;
+}
+
 // (re)connects to DB, stores PDO object in $dbxlink global var
 function connectDB()
 {
 	global $dbxlink, $pdo_dsn, $db_username, $db_password, $pdo_bufsize, $pdo_ssl_key, $pdo_ssl_cert, $pdo_ssl_ca;
 	$dbxlink = NULL;
-	// PDO::MYSQL_ATTR_INIT_COMMAND is deprecated since PHP 8.5 in favour of
-	// Pdo\Mysql::ATTR_INIT_COMMAND, which does not exist before PHP 8.4.
-	$init_command = defined ('Pdo\Mysql::ATTR_INIT_COMMAND') ?
-		constant ('Pdo\Mysql::ATTR_INIT_COMMAND') :
-		constant ('PDO::MYSQL_ATTR_INIT_COMMAND');
 	$drvoptions = array
 	(
 		PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -85,16 +92,18 @@ function connectDB()
 		// stop changing @@SQL_MODE but still keep SET NAMES in place.
 		// RackTables requires the strict SQL mode, which is not enabled by default
 		// in MariaDB <= 10.2.3.
-		$init_command => 'SET NAMES "utf8", @@SQL_MODE = CONCAT("STRICT_ALL_TABLES,", REPLACE(@@SQL_MODE, "NO_ZERO_DATE", ""))',
+		getPDOMySQLAttr ('INIT_COMMAND') => 'SET NAMES "utf8", @@SQL_MODE = CONCAT("STRICT_ALL_TABLES,", REPLACE(@@SQL_MODE, "NO_ZERO_DATE", ""))',
 	);
-	if (isset ($pdo_bufsize))
-		$drvoptions[PDO::MYSQL_ATTR_MAX_BUFFER_SIZE] = $pdo_bufsize;
-	if (isset ($pdo_ssl_key))
-		$drvoptions[PDO::MYSQL_ATTR_SSL_KEY] = $pdo_ssl_key;
-	if (isset ($pdo_ssl_cert))
-		$drvoptions[PDO::MYSQL_ATTR_SSL_CERT] = $pdo_ssl_cert;
-	if (isset ($pdo_ssl_ca))
-		$drvoptions[PDO::MYSQL_ATTR_SSL_CA] = $pdo_ssl_ca;
+	$optional = array
+	(
+		'MAX_BUFFER_SIZE' => $pdo_bufsize,
+		'SSL_KEY' => $pdo_ssl_key,
+		'SSL_CERT' => $pdo_ssl_cert,
+		'SSL_CA' => $pdo_ssl_ca,
+	);
+	foreach ($optional as $name => $value)
+		if (isset ($value) && NULL !== ($attr = getPDOMySQLAttr ($name)))
+			$drvoptions[$attr] = $value;
 	try
 	{
 		$dbxlink = new PDO ($pdo_dsn, $db_username, $db_password, $drvoptions);
