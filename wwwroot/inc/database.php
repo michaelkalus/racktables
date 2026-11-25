@@ -1774,26 +1774,115 @@ function commitUpdatePort ($object_id, $port_id, $port_name, $port_type_id, $por
 	global $dbxlink;
 	$db_l2address = l2addressForDatabase ($port_l2address);
 	list ($iif_id, $oif_id) = parsePortIIFOIF ($port_type_id);
-	if ($db_l2address != '')
-		$dbxlink->exec ('LOCK TABLES Port WRITE, PortLog WRITE');
+	// A rename also moves the 802.1Q configuration of the port (see
+	// rename8021QPort()), and both must succeed or fail together. Table
+	// locks and START TRANSACTION end each other, so with the locks the
+	// transaction is the one opened by disabling autocommit (the way MySQL
+	// documents LOCK TABLES with transactional tables).
+	if ($db_l2address == '')
+	{
+		$savepoint = beginAtomicChange (__FUNCTION__);
+		try
+		{
+			$notices = commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_id, $port_label, $db_l2address, $port_reservation_comment);
+		}
+		catch (Exception $e)
+		{
+			endAtomicChange ($savepoint, FALSE);
+			throw $e;
+		}
+		endAtomicChange ($savepoint, TRUE);
+		call8021QPortHooks ($object_id, $notices);
+		return;
+	}
+	// The server may be configured with autocommit off, restore what it was.
+	$result = usePreparedSelectBlade ('SELECT @@autocommit');
+	$autocommit = $result->fetchColumn() ? 1 : 0;
+	unset ($result);
+	$locked = $done = FALSE;
 	try
 	{
+		$dbxlink->exec ('SET autocommit = 0');
+		$dbxlink->exec
+		(
+			'LOCK TABLES Port WRITE, PortLog WRITE, VLANValidID READ, VLANSwitch WRITE, ' .
+			'CachedPVM WRITE, CachedPAV WRITE, CachedPNV WRITE, ' .
+			'PortVLANMode WRITE, PortAllowedVLAN WRITE, PortNativeVLAN WRITE'
+		);
+		$locked = TRUE;
 		assertUniqueL2Addresses (array ($db_l2address), $object_id);
-		commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_id, $port_label, $db_l2address, $port_reservation_comment);
+		$notices = commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_id, $port_label, $db_l2address, $port_reservation_comment);
+		$dbxlink->exec ('COMMIT');
+		$done = TRUE;
 	}
-	catch (Exception $e)
+	finally
 	{
-		if ($db_l2address != '')
-			$dbxlink->exec ('UNLOCK TABLES');
-		throw $e;
+		// Release the session on every exit. If an exception is on its way,
+		// a failure here must not replace it.
+		$cleanup = array ('UNLOCK TABLES', "SET autocommit = {$autocommit}");
+		if ($locked && ! $done)
+			array_unshift ($cleanup, 'ROLLBACK');
+		$cleanup_error = NULL;
+		foreach ($cleanup as $query)
+			try
+			{
+				$dbxlink->exec ($query);
+			}
+			catch (Exception $e)
+			{
+				if ($cleanup_error === NULL)
+					$cleanup_error = $e;
+			}
+		if ($done && $cleanup_error !== NULL)
+			throw $cleanup_error;
 	}
-	if ($db_l2address != '')
-		$dbxlink->exec ('UNLOCK TABLES');
+	call8021QPortHooks ($object_id, $notices);
 }
 
-// The comment about commitAddPortReal() also applies here.
+// Call the portConfChanged hook for each (port name, configuration or NULL)
+// pair, once the change has been committed and the tables unlocked. A hook
+// that fails does not stop the others, the first error reaches the caller.
+function call8021QPortHooks ($object_id, $notices)
+{
+	$error = NULL;
+	foreach ($notices as $notice)
+		try
+		{
+			callHook ('portConfChanged', $object_id, $notice[0], $notice[1]);
+		}
+		catch (Exception $e)
+		{
+			if ($error === NULL)
+				$error = $e;
+		}
+	if ($error !== NULL)
+		throw $error;
+}
+
+// The comment about commitAddPortReal() also applies here. Returns the
+// portConfChanged notifications for call8021QPortHooks().
 function commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_id, $port_label, $db_l2address, $port_reservation_comment)
 {
+	// Lock the port row first, so that a concurrent rename of the same port
+	// waits and then sees the name and the 802.1Q rows this one leaves.
+	$result = usePreparedSelectBlade ('SELECT name FROM Port WHERE id = ? AND object_id = ? FOR UPDATE', array ($port_id, $object_id));
+	$old_name = $result->fetchColumn();
+	unset ($result);
+	$renamed = $old_name !== FALSE && $old_name !== $port_name;
+	if ($renamed)
+	{
+		// The rename may move the 802.1Q configuration of the port. Take the
+		// VLAN switch row lock the 802.1Q editors take and lock the root row
+		// of the configuration before any plain read, so that the reads below
+		// see the data as these locks leave it.
+		getVLANSwitchInfo ($object_id, 'FOR UPDATE');
+		$result = usePreparedSelectBlade
+		(
+			'SELECT port_name FROM CachedPVM WHERE object_id = ? AND port_name = ? FOR UPDATE',
+			array ($object_id, $old_name)
+		);
+		unset ($result);
+	}
 	$old_reservation_comment = getPortReservationComment ($port_id);
 	$port_reservation_comment = nullIfEmptyStr ($port_reservation_comment);
 	usePreparedUpdateBlade
@@ -1814,8 +1903,10 @@ function commitUpdatePortReal ($object_id, $port_id, $port_name, $iif_id, $oif_i
 			'object_id' => $object_id
 		)
 	);
+	$notices = $renamed ? rename8021QPort ($object_id, $port_id, $old_name, $port_name) : array();
 	if ($old_reservation_comment !== $port_reservation_comment)
 		addPortLogEntry ($port_id, sprintf ("Reservation changed from '%s' to '%s'", $old_reservation_comment, $port_reservation_comment));
+	return $notices;
 }
 
 function commitUpdatePortComment ($port_id, $port_reservation_comment)
@@ -5586,6 +5677,116 @@ function del8021QPort ($object_id, $port_name)
 
 	callHook ('portConfChanged', $object_id, $port_name, NULL);
 	return $changed ? 1 : 0;
+}
+
+// Copy the stored 802.1Q configuration (desired and cached) of a port to
+// another name, then delete it under the old name. The tables refer to each
+// other without ON UPDATE CASCADE, so the rows cannot be updated in place.
+function move8021QPortRows ($object_id, $from_name, $to_name)
+{
+	global $tablemap_8021q;
+	foreach (array ('cached', 'desired') as $instance)
+		foreach (getStored8021QConfig ($object_id, $instance, array ($from_name)) as $port)
+		{
+			usePreparedInsertBlade
+			(
+				$tablemap_8021q[$instance]['pvm'],
+				array ('object_id' => $object_id, 'port_name' => $to_name, 'vlan_mode' => $port['mode'])
+			);
+			foreach (makeVlanListWhere ('vlan_id', $port['allowed']) as $where)
+				usePreparedExecuteBlade
+				(
+					'INSERT INTO ' . $tablemap_8021q[$instance]['pav'] . ' (object_id, port_name, vlan_id) ' .
+					'SELECT ?, ?, vlan_id FROM VLANValidID WHERE ' . $where[0],
+					array_merge (array ($object_id, $to_name), $where[1])
+				);
+			if ($port['native'])
+				usePreparedInsertBlade
+				(
+					$tablemap_8021q[$instance]['pnv'],
+					array ('object_id' => $object_id, 'port_name' => $to_name, 'vlan_id' => $port['native'])
+				);
+		}
+	// The allowed and native VLAN rows go by ON DELETE CASCADE.
+	foreach (array ('desired', 'cached') as $instance)
+		usePreparedDeleteBlade
+		(
+			$tablemap_8021q[$instance]['pvm'],
+			array ('object_id' => $object_id, 'port_name' => $from_name)
+		);
+}
+
+// The 802.1Q configuration (desired and cached) is stored by port name, so
+// when a port gets a new name, move the configuration to it. Leave it where
+// it is if the name does not identify one port: another port of the object
+// still has the old name or has the new one already, or a configuration of
+// a different port is stored under the new name already. The caller wraps
+// this together with the rename into one transaction, having locked the
+// configuration first (see commitUpdatePortReal()). Returns the
+// portConfChanged notifications for call8021QPortHooks().
+function rename8021QPort ($object_id, $port_id, $old_name, $new_name)
+{
+	global $tablemap_8021q;
+	// The desired configuration of a port cannot exist without the cached one.
+	// The database compares the names with the collation of the column, which
+	// ignores letter case, so it finds the stored spelling of each name.
+	$query = 'SELECT port_name FROM ' . $tablemap_8021q['cached']['pvm'] . ' WHERE object_id = ? AND port_name = ?';
+	$result = usePreparedSelectBlade ($query, array ($object_id, $old_name));
+	$stored_old = $result->fetchColumn();
+	unset ($result);
+	if ($stored_old === FALSE)
+		return array();
+	// the new name exactly as the port has it now
+	$result = usePreparedSelectBlade ('SELECT name FROM Port WHERE id = ?', array ($port_id));
+	$new_name = $result->fetchColumn();
+	unset ($result);
+	if ($new_name === FALSE || $new_name === $stored_old)
+		return array();
+	$result = usePreparedSelectBlade ($query, array ($object_id, $new_name));
+	$stored_new = $result->fetchColumn();
+	unset ($result);
+	// If both names find the same row, the rename changes letter case only.
+	$case_only = $stored_new === $stored_old;
+	if ($stored_new !== FALSE && ! $case_only)
+		return array();
+	$result = usePreparedSelectBlade
+	(
+		'SELECT COUNT(*) FROM Port WHERE object_id = ? AND id != ? AND name IN(?, ?)',
+		array ($object_id, $port_id, $old_name, $new_name)
+	);
+	$found = $result->fetchColumn();
+	unset ($result);
+	if ($found)
+		return array();
+	if (! $case_only)
+		move8021QPortRows ($object_id, $stored_old, $new_name);
+	else
+	{
+		// The new spelling collides with the old one in the primary key, so
+		// go through a name that no port or configuration of the object has.
+		for ($i = 0; ; $i++)
+		{
+			$tmp_name = "rename-{$port_id}-{$i}";
+			$result = usePreparedSelectBlade
+			(
+				'SELECT (SELECT COUNT(*) FROM Port WHERE object_id = ? AND name = ?) + ' .
+				'(SELECT COUNT(*) FROM ' . $tablemap_8021q['cached']['pvm'] . ' WHERE object_id = ? AND port_name = ?)',
+				array ($object_id, $tmp_name, $object_id, $tmp_name)
+			);
+			$found = $result->fetchColumn();
+			unset ($result);
+			if (! $found)
+				break;
+		}
+		move8021QPortRows ($object_id, $stored_old, $tmp_name);
+		move8021QPortRows ($object_id, $tmp_name, $new_name);
+	}
+	// An 802.1Q form opened before the rename has the old port name in it.
+	usePreparedExecuteBlade ('UPDATE VLANSwitch SET mutex_rev = mutex_rev + 1 WHERE object_id = ?', array ($object_id));
+	$ret = array (array ($stored_old, NULL));
+	foreach (getStored8021QConfig ($object_id, 'desired', array ($new_name)) as $port)
+		$ret[] = array ($new_name, $port);
+	return $ret;
 }
 
 // Returns list of tuples ("where_text" params_array) that covers
