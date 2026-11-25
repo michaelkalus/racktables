@@ -21,6 +21,7 @@
 	bugfix: store IPv4 virtual service tags under realm ipv4vs
 	bugfix: do not send sshnokey credentials as session input
 	bugfix: do not fail the Objects list on a rack without a row (Mantis#1787)
+	bugfix: show the pages of a rack without a row and of its objects, allow assigning a row to it (Mantis#1787)
 	bugfix: find addresses of /32 and /128 networks in their network (Mantis#1605)
 	bugfix: fix searching for a string with three dots that is not an IPv4 address (Mantis#2069)
 	bugfix: make the fallback ip6_parse() accept only valid IPv6 addresses

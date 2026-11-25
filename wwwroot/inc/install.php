@@ -1373,7 +1373,7 @@ WHERE O.objtype_id = 1562";
   LEFT JOIN `AttributeValue` AV_S ON O.id = AV_S.object_id AND AV_S.attr_id = 29
   LEFT JOIN `RackThumbnail` RT ON O.id = RT.rack_id
   LEFT JOIN `EntityLink` RL ON O.id = RL.child_entity_id  AND RL.parent_entity_type = 'row' AND RL.child_entity_type = 'rack'
-  INNER JOIN `Object` R ON R.id = RL.parent_entity_id
+  LEFT JOIN `Object` R ON R.id = RL.parent_entity_id
   LEFT JOIN `EntityLink` LL ON R.id = LL.child_entity_id AND LL.parent_entity_type = 'location' AND LL.child_entity_type = 'row'
   LEFT JOIN `Object` L ON L.id = LL.parent_entity_id
   WHERE O.objtype_id = 1560";

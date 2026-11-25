@@ -2586,13 +2586,15 @@ function addRack ()
 function updateRack ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
-	$row_id = genericAssertion ('row_id', 'natural');
+	$rack_id = getBypassValue();
+	$rack = spotEntity ('rack', $rack_id);
+	// A rack that is not linked to any row may be saved without choosing one.
+	$row_id = genericAssertion ('row_id', $rack['row_id'] === NULL ? 'natural0' : 'natural');
 	assertStringArg ('name');
 	$height = genericAssertion ('height', 'natural');
 	assertStringArg ('asset_no', TRUE);
 	assertStringArg ('comment', TRUE);
 	$taglist = genericAssertion ('taglist', 'array0');
-	$rack_id = getBypassValue();
 	// Apply all of the changes or none of them.
 	$savepoint = beginAtomicChange ('updateRack');
 	try
