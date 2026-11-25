@@ -45,6 +45,16 @@ if (! isset ($racktables_plugins_dir)) // the directory where RT will load addit
 if (fileSearchExists ($path_to_secret_php))
 {
 	$found_secret_file = TRUE;
+	// but if it exists, it must be readable, otherwise require_once fails fatally
+	if (! fileSearchExists ($path_to_secret_php, 'is_readable'))
+		throw new RackTablesError
+		(
+			"The configuration file of this RackTables instance " .
+			"(<code>{$path_to_secret_php}</code>) exists, but is not readable " .
+			'by the web server. Make sure the file permissions allow the web ' .
+			'server to read it.',
+			RackTablesError::MISCONFIGURED
+		);
 	require_once $path_to_secret_php;
 }
 else
@@ -98,13 +108,14 @@ function connectDB()
 // tries to guess the existence of the file before the php's include using the same searching method.
 // in addition to calling file_exists, searches the current file's directory if the path is not looks
 // like neither absolute nor relative.
-function fileSearchExists ($filename)
+// $test can be 'is_readable' to check that the file can actually be included.
+function fileSearchExists ($filename, $test = 'file_exists')
 {
 	if (! preg_match ('@^(\.+)?/@', $filename))
 	{
 		$this_file_dir = dirname (__FILE__);
-		if (file_exists ($this_file_dir . '/' . $filename))
+		if ($test ($this_file_dir . '/' . $filename))
 			return TRUE;
 	}
-	return file_exists ($filename);
+	return $test ($filename);
 }
