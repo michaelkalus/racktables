@@ -1425,6 +1425,9 @@ function addMultipleObjects()
 
 		if ($tid == 0)
 			continue; // Just skip on intact SELECT.
+		// Add each object completely or not at all, as addRack() does.
+		$savepoint = beginAtomicChange ('addMultipleObjects');
+		$created = count (lastCreated());
 		try
 		{
 			$object_id = commitAddObject
@@ -1435,12 +1438,20 @@ function addMultipleObjects()
 				$_REQUEST["{$i}_object_asset_no"],
 				$taglist
 			);
-			showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
+			endAtomicChange ($savepoint, TRUE);
 		}
-		catch (RTDatabaseError $e)
+		catch (Exception $e)
 		{
+			endAtomicChange ($savepoint, FALSE);
+			// what was created has been rolled back
+			foreach (array_slice (lastCreated(), $created) as $item)
+				lastCreated ($item['realm'], $item['id'], TRUE);
+			if (! ($e instanceof RTDatabaseError))
+				throw $e;
 			showError ("Error creating object '$name': " . $e->getMessage());
+			continue;
 		}
+		showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
 	}
 }
 
@@ -1455,15 +1466,28 @@ function addLotOfObjects()
 		return;
 	}
 	foreach (textareaCooked ($_REQUEST['namelist']) as $name)
+	{
+		// Add each object completely or not at all, as addRack() does.
+		$savepoint = beginAtomicChange ('addLotOfObjects');
+		$created = count (lastCreated());
 		try
 		{
 			$object_id = commitAddObject ($name, NULL, $global_type_id, '', $taglist);
-			showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
+			endAtomicChange ($savepoint, TRUE);
 		}
-		catch (RackTablesError $e)
+		catch (Exception $e)
 		{
+			endAtomicChange ($savepoint, FALSE);
+			// what was created has been rolled back
+			foreach (array_slice (lastCreated(), $created) as $item)
+				lastCreated ($item['realm'], $item['id'], TRUE);
+			if (! ($e instanceof RackTablesError))
+				throw $e;
 			showError ("Failed to add object '$name': " . $e->getMessage());
+			continue;
 		}
+		showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
+	}
 }
 
 // Set a container of the current object (the one the permissions have been
