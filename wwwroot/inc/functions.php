@@ -4914,7 +4914,7 @@ function formatPortLink($host_id, $hostname, $port_id, $portname, $a_class = '')
 
 	$text_items = array();
 	if (isset ($hostname))
-		$text_items[] = $hostname;
+		$text_items[] = stringForLabel ($hostname, 0);
 	if (isset ($portname))
 	{
 		$additional .= ($additional == '' ? '' : ' ') . "data-portname='" . htmlspecialchars ($portname, ENT_QUOTES, 'UTF-8') . "'";
@@ -6304,10 +6304,10 @@ function mkCellA ($cell, $title = NULL)
 			case 'ipv4vs':
 			case 'ipv4net':
 			case 'ipv6net':
-				$title = formatEntityName ($cell);
+				$title = stringForLabel (formatEntityName ($cell), 0);
 				break;
 			default:
-				$title = formatRealmName ($cell['realm']) . ' ' . formatEntityName ($cell);
+				$title = formatRealmName ($cell['realm']) . ' ' . stringForLabel (formatEntityName ($cell), 0);
 				break;
 		}
 	return mkA ($title, $cell_page, $cell_key);

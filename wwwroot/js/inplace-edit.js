@@ -73,7 +73,7 @@ function onPencilClick (event) {
 	// construct editor form
 	group = $('<span class="reservation-form" />');
 	input = $('<input type="text" />')
-		.val(span.html().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'))
+		.val(span.text())
 		.css('width', '' + width + 'px')
 		.keydown(
 			function (event) {
@@ -144,7 +144,7 @@ function onFormSubmit () {
 		data: data,
 		success: function(data, textStatus, XMLHttpRequest) {
 			if (data == 'OK')
-				span.html(text);
+				span.text(text);
 			else
 				alert ('Error updating port: ' + data);
 		},

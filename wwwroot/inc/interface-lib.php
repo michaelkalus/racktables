@@ -342,7 +342,7 @@ function getSelectOptions ($options, $selected_id = NULL)
 	foreach ($options as $key => $value)
 	{
 		$selected = is_array ($selected_id) ? in_array ($key, $selected_id) : $key == $selected_id;
-		$ret .= "<option value='{$key}'" . ($selected ? ' selected' : '') . '>';
+		$ret .= "<option value='" . stringForTextInputValue ($key, 0) . "'" . ($selected ? ' selected' : '') . '>';
 		$ret .= stringForOption ($value) . '</option>';
 	}
 	return $ret;
@@ -1312,7 +1312,7 @@ function makeIPAllocLink ($ip_bin, $alloc, $display_ifname = FALSE)
 	return
 		'<a href="' . makeHref (array ('page' => 'object', 'tab' => 'default', 'object_id' => $alloc['object_id'], 'hl_ip' => ip_format ($ip_bin))) . '"' .
 		' title="' . htmlspecialchars ($title, ENT_QUOTES) . '"' .
-		">" . ($display_ifname ? $alloc['name'] . '@' : '') . $object_name . "</a>";
+		">" . ($display_ifname ? stringForLabel ($alloc['name'], 0) . '@' : '') . stringForLabel ($object_name, 0) . "</a>";
 }
 
 function makeHtmlTag ($tagname, $attributes = array())
