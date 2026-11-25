@@ -85,9 +85,12 @@ class EntityChangeRollbackTest extends RTTestCase
 				commitDeleteObject ($entity_id);
 		}
 		// objects a failed test may have left behind
-		foreach (array ('new location', 'new row', 'other row') as $name)
+		foreach (array ('new location', 'new row', 'other row', 'object', 'new rack 1', 'new rack 2') as $name)
 			foreach ($this->fetchRows ('SELECT id FROM Object WHERE name = ?', array ($this->myString ($name))) as $row)
 				commitDeleteObject ($row['id']);
+		setMessageBuffering (FALSE);
+		$dbxlink->exec ('DROP TRIGGER IF EXISTS `EntityChangeRollbackTest-fail`');
+		$GLOBALS['log_messages'] = array();
 	}
 
 	protected function allIDs ()
@@ -293,14 +296,57 @@ class EntityChangeRollbackTest extends RTTestCase
 	public function testUpdateLocationFailingLate ()
 	{
 		$before = $this->snapshot();
-		// a location's parent may not be one of its children
+		// num_attrs is missing
 		$this->setRequest
 		(
 			'location',
 			array
 			(
+				'location_id' => $this->child_location_id,
+				'parent_id' => '0',
+				'name' => $this->myString ('new name'),
+				'comment' => 'new comment',
+				'has_problems' => 'on',
+			)
+		);
+		try
+		{
+			updateLocation();
+			$this->fail ('the operation must fail');
+		}
+		catch (InvalidRequestArgException $e)
+		{
+		}
+		$this->assertUnchanged ($before);
+	}
+
+	public function circularParentProvider ()
+	{
+		return array
+		(
+			// a location's parent may not be one of its children
+			array ('location', 'child_location_id'),
+			array ('rackspace', 'child_location_id'),
+			// nor the location itself
+			array ('location', 'location_id'),
+			array ('rackspace', 'location_id'),
+		);
+	}
+
+	/**
+	 * @group small
+	 * @dataProvider circularParentProvider
+	 */
+	public function testUpdateLocationCircularParent ($pageno, $parent)
+	{
+		$before = $this->snapshot();
+		$this->setRequest
+		(
+			$pageno,
+			array
+			(
 				'location_id' => $this->location_id,
-				'parent_id' => $this->child_location_id,
+				'parent_id' => $this->$parent,
 				'name' => $this->myString ('new name'),
 				'comment' => 'new comment',
 				'has_problems' => 'on',
@@ -312,10 +358,143 @@ class EntityChangeRollbackTest extends RTTestCase
 			updateLocation();
 			$this->fail ('the operation must fail');
 		}
+		// an ordinary argument error, not an internal one
+		catch (InvalidRequestArgException $e)
+		{
+			$this->assertEquals ('parent_id', $e->name);
+		}
+		$this->assertUnchanged ($before);
+	}
+
+	protected function updateLocationParent ($location_id, $parent_id)
+	{
+		$this->setRequest
+		(
+			'location',
+			array
+			(
+				'location_id' => $location_id,
+				'parent_id' => $parent_id,
+				'name' => $this->myString ("name {$location_id}"),
+				'comment' => '',
+				'num_attrs' => '0',
+			)
+		);
+		// every call is a request of its own
+		$GLOBALS['entityCache'] = array();
+		updateLocation();
+	}
+
+	protected function parentOf ($location_id)
+	{
+		$location = spotEntity ('location', $location_id, TRUE);
+		return $location['parent_id'];
+	}
+
+	// Data from before the circular reference checks: the location is the
+	// parent of its own parent. Removing the parent of either location
+	// repairs it, assigning another parent works after that.
+	/**
+	 * @group small
+	 */
+	public function testRepairCircularLocations ()
+	{
+		$new_location_id = commitAddObject ($this->myString ('new location'), NULL, 1562, NULL);
+		foreach (array ($this->location_id, $this->child_location_id) as $location_id)
+		{
+			usePreparedInsertBlade
+			(
+				'EntityLink',
+				array
+				(
+					'parent_entity_type' => 'location',
+					'parent_entity_id' => $this->child_location_id,
+					'child_entity_type' => 'location',
+					'child_entity_id' => $this->location_id,
+				)
+			);
+			// the descendants of a location in the loop cannot be listed,
+			// so a new parent cannot be checked and is refused
+			$before = $this->snapshot();
+			try
+			{
+				$this->updateLocationParent ($location_id, $new_location_id);
+				$this->fail ('the operation must fail');
+			}
+			catch (RackTablesError $e)
+			{
+			}
+			$this->assertEquals ($before, $this->snapshot());
+			$this->updateLocationParent ($location_id, '0');
+			$this->assertNull ($this->parentOf ($location_id));
+			$this->updateLocationParent ($location_id, $new_location_id);
+			$this->assertEquals ($new_location_id, $this->parentOf ($location_id));
+			$this->assertFalse (isTransactionActive());
+			// back to the initial tree
+			commitUnlinkEntities ('location', $new_location_id, 'location', $location_id);
+			commitUnlinkEntities ('location', $this->child_location_id, 'location', $this->location_id);
+			if ($location_id == $this->child_location_id)
+				commitLinkEntities ('location', $this->location_id, 'location', $this->child_location_id);
+			$this->assertNull ($this->parentOf ($this->location_id));
+			$this->assertEquals ($this->location_id, $this->parentOf ($this->child_location_id));
+		}
+	}
+
+	// Data from before the EntityLink triggers: the location is its own parent.
+	/**
+	 * @group small
+	 */
+	public function testRepairSelfParentedLocation ()
+	{
+		global $dbxlink;
+		$new_location_id = commitAddObject ($this->myString ('new location'), NULL, 1562, NULL);
+		// the trigger refuses such a link, so go around it
+		try
+		{
+			$result = $dbxlink->query ('SHOW CREATE TRIGGER `EntityLink-before-insert`');
+			$row = $result->fetch (PDO::FETCH_NUM);
+			unset ($result);
+			$dbxlink->exec ('DROP TRIGGER `EntityLink-before-insert`');
+		}
+		catch (PDOException $e)
+		{
+			$this->markTestSkipped ('cannot replace the EntityLink trigger: ' . $e->getMessage());
+		}
+		try
+		{
+			usePreparedInsertBlade
+			(
+				'EntityLink',
+				array
+				(
+					'parent_entity_type' => 'location',
+					'parent_entity_id' => $this->location_id,
+					'child_entity_type' => 'location',
+					'child_entity_id' => $this->location_id,
+				)
+			);
+		}
+		finally
+		{
+			$dbxlink->exec ($row[2]);
+		}
+		$this->assertEquals ($this->location_id, $this->parentOf ($this->location_id));
+		$before = $this->snapshot();
+		try
+		{
+			$this->updateLocationParent ($this->location_id, $new_location_id);
+			$this->fail ('the operation must fail');
+		}
 		catch (RackTablesError $e)
 		{
 		}
-		$this->assertUnchanged ($before);
+		$this->assertEquals ($before, $this->snapshot());
+		$this->updateLocationParent ($this->location_id, '0');
+		$this->assertNull ($this->parentOf ($this->location_id));
+		$this->updateLocationParent ($this->location_id, $new_location_id);
+		$this->assertEquals ($new_location_id, $this->parentOf ($this->location_id));
+		$this->assertEquals ($this->location_id, $this->parentOf ($this->child_location_id));
+		$this->assertFalse (isTransactionActive());
 	}
 
 	/**
@@ -533,6 +712,52 @@ class EntityChangeRollbackTest extends RTTestCase
 		$this->assertCount (0, $this->fetchRows ("SELECT id FROM FileLink WHERE entity_type = 'rack' AND entity_id IN ({$in})", $this->rack_ids));
 		$this->assertCount (0, $this->fetchRows ("SELECT entity_id FROM TagStorage WHERE entity_realm = 'rack' AND entity_id IN ({$in})", $this->rack_ids));
 		$this->assertCount (0, $this->fetchRows ("SELECT rack_id FROM RackSpace WHERE rack_id IN ({$in})", $this->rack_ids));
+		$this->assertNothingStoredFor ('row', $this->row_id);
+		$this->assertFalse (isTransactionActive());
+	}
+
+	protected function assertNothingStoredFor ($realm, $entity_id)
+	{
+		$this->assertCount
+		(
+			0,
+			$this->fetchRows ('SELECT id FROM FileLink WHERE entity_type = ? AND entity_id = ?', array ($realm, $entity_id)),
+			"file links of {$realm} {$entity_id}"
+		);
+		$this->assertCount
+		(
+			0,
+			$this->fetchRows ('SELECT tag_id FROM TagStorage WHERE entity_realm = ? AND entity_id = ?', array ($realm, $entity_id)),
+			"tags of {$realm} {$entity_id}"
+		);
+	}
+
+	// Racks, rows and locations deleted by commitDeleteObject() directly must
+	// not leave their file links and tags behind either.
+	/**
+	 * @group small
+	 */
+	public function testDeleteObjectReleasesRealm ()
+	{
+		$object_id = commitAddObject ($this->myString ('object'), NULL, 4, NULL, array (self::$tag_id));
+		usePreparedInsertBlade ('FileLink', array ('file_id' => self::$file_id, 'entity_type' => 'object', 'entity_id' => $object_id));
+		usePreparedDeleteBlade ('RackSpace', array ('rack_id' => $this->rack_ids[0]));
+		$deleted = array
+		(
+			'object' => $object_id,
+			'rack' => $this->rack_ids[0],
+			'row' => $this->row_id,
+			'location' => $this->child_location_id,
+		);
+		foreach ($deleted as $realm => $entity_id)
+		{
+			commitDeleteObject ($entity_id);
+			$this->assertCount (0, $this->fetchRows ('SELECT id FROM Object WHERE id = ?', array ($entity_id)));
+			$this->assertNothingStoredFor ($realm, $entity_id);
+		}
+		// the entities that were not deleted keep theirs
+		$this->assertCount (1, $this->fetchRows ('SELECT id FROM FileLink WHERE entity_type = "rack" AND entity_id = ?', array ($this->rack_ids[1])));
+		$this->assertCount (1, $this->fetchRows ('SELECT tag_id FROM TagStorage WHERE entity_realm = "location" AND entity_id = ?', array ($this->location_id)));
 		$this->assertFalse (isTransactionActive());
 	}
 
@@ -564,6 +789,124 @@ class EntityChangeRollbackTest extends RTTestCase
 		deleteLocation();
 		$this->assertCount (0, $this->fetchRows ('SELECT id FROM Object WHERE id = ?', array ($this->child_location_id)));
 		$this->assertCount (0, $this->fetchRows ('SELECT id FROM FileLink WHERE entity_type = "location" AND entity_id = ?', array ($this->child_location_id)));
+		$this->assertFalse (isTransactionActive());
+	}
+
+	protected function addRacksRequest ($names, $height)
+	{
+		global $log_messages;
+		$this->setRequest
+		(
+			'row',
+			array
+			(
+				'row_id' => $this->row_id,
+				'mode' => 'many',
+				'height2' => $height,
+				'names' => implode ("\n", $names),
+				'taglist' => array (self::$tag_id),
+			)
+		);
+		setMessageBuffering (TRUE);
+		$log_messages = array();
+	}
+
+	// the codes of the messages shown to the user
+	protected function messageCodes ()
+	{
+		$ret = array();
+		foreach ($GLOBALS['log_messages'] as $line)
+			$ret[] = $line['c'];
+		return $ret;
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testAddRacksWithFailingLine ()
+	{
+		// the second name is longer than the column
+		$this->addRacksRequest (array ($this->myString ('new rack 1'), str_repeat ('x', 300), $this->myString ('new rack 2')), '42');
+		addRack();
+		// every line is reported and the others are added
+		$this->assertEquals (array (0, 100, 0), $this->messageCodes());
+		foreach (array (1 => 3, 2 => 4) as $n => $sort_order)
+		{
+			$rows = $this->fetchRows ('SELECT id FROM Object WHERE name = ?', array ($this->myString ("new rack {$n}")));
+			$this->assertCount (1, $rows);
+			$rack = spotEntity ('rack', $rows[0]['id']);
+			$this->assertEquals ($this->row_id, $rack['row_id']);
+			$this->assertEquals (42, $rack['height']);
+			$this->assertEquals
+			(
+				array (array ('uint_value' => $sort_order)),
+				$this->fetchRows ('SELECT uint_value FROM AttributeValue WHERE object_id = ? AND attr_id = 29', array ($rack['id']))
+			);
+		}
+		$this->assertFalse (isTransactionActive());
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testAddRacksFailingLate ()
+	{
+		$before = $this->snapshot();
+		$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM Object');
+		$count = $result->fetchColumn();
+		unset ($result);
+		// the height does not fit the column, which fails after the rack
+		// object has been created
+		$this->addRacksRequest (array ($this->myString ('new rack 1'), $this->myString ('new rack 2')), '99999999999');
+		addRack();
+		$this->assertEquals (array (100, 100), $this->messageCodes());
+		$this->assertNoObjectNamed ($this->myString ('new rack 1'));
+		$this->assertNoObjectNamed ($this->myString ('new rack 2'));
+		$result = usePreparedSelectBlade ('SELECT COUNT(*) FROM Object');
+		$this->assertEquals ($count, $result->fetchColumn());
+		unset ($result);
+		$this->assertUnchanged ($before);
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testAddRacksLastLineFailingLate ()
+	{
+		global $dbxlink;
+		// make the line with this name fail after the rack object is created
+		$failing_name = $this->myString ('new rack 2');
+		try
+		{
+			$dbxlink->exec
+			(
+				'CREATE TRIGGER `EntityChangeRollbackTest-fail` BEFORE INSERT ON `AttributeValue` FOR EACH ROW ' .
+				'IF NEW.object_id = (SELECT id FROM Object WHERE name = ' . $dbxlink->quote ($failing_name) . ') THEN ' .
+				"SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'injected failure'; END IF"
+			);
+		}
+		catch (PDOException $e)
+		{
+			$this->markTestSkipped ('cannot create the trigger: ' . $e->getMessage());
+		}
+		// no rack is created
+		$last_id = getLastCreatedId ('rack');
+		$count = count (lastCreated());
+		$this->addRacksRequest (array ($failing_name), '42');
+		addRack();
+		$this->assertEquals (array (100), $this->messageCodes());
+		$this->assertNoObjectNamed ($failing_name);
+		$this->assertEquals ($last_id, getLastCreatedId ('rack'));
+		$this->assertCount ($count, lastCreated());
+		// the rack of the first line is the last one created
+		$this->addRacksRequest (array ($this->myString ('new rack 1'), $failing_name), '42');
+		addRack();
+		$this->assertEquals (array (0, 100), $this->messageCodes());
+		$this->assertNoObjectNamed ($failing_name);
+		$rows = $this->fetchRows ('SELECT id FROM Object WHERE name = ?', array ($this->myString ('new rack 1')));
+		$this->assertCount (1, $rows);
+		$this->assertEquals ($rows[0]['id'], getLastCreatedId ('rack'));
+		$this->assertEquals (array (array ('realm' => 'rack', 'id' => $rows[0]['id'])), array_slice (lastCreated(), $count));
 		$this->assertFalse (isTransactionActive());
 	}
 }

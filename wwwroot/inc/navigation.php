@@ -761,7 +761,7 @@ $ophandler['8021q']['vdlist']['add'] = 'createVLANDomain';
 $ophandler['8021q']['vdlist']['del'] = 'tableHandler';
 $ophandler['8021q']['vdlist']['upd'] = 'updateVLANDomain';
 $ophandler['8021q']['vstlist']['add'] = 'tableHandler';
-$ophandler['8021q']['vstlist']['del'] = 'tableHandler';
+$ophandler['8021q']['vstlist']['del'] = 'deleteVST';
 $ophandler['8021q']['vstlist']['upd'] = 'tableHandler';
 $interface_requires['8021q-*'] = 'interface-8021q.php';
 
