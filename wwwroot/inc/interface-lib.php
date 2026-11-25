@@ -1185,16 +1185,22 @@ function niftyString ($string, $maxlen = 30, $usetags = TRUE)
 		($usetags ? '</span>' : '');
 }
 
+// Some of the stored text is HTML-escaped already (the request handlers that
+// read $_REQUEST store it so), the display helpers below do not escape the
+// existing character references again to show such text as it was typed.
+// Form field values are posted back and must not be decoded, so
+// stringForTextInputValue() and stringForTextarea() escape every ampersand.
+
 // "Some text, %s, some more text."
 function stringForLabel ($string, $maxlen = 30)
 {
 	// A tab counts for a space.
 	$string = preg_replace ("/\t/", ' ', $string);
-	$full = htmlspecialchars ($string, ENT_QUOTES, 'UTF-8');
+	$full = htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE);
 	if ($maxlen == 0 || mb_strlen ($string) <= $maxlen)
 		return $full;
 	$trimmed = mb_substr ($string, 0, $maxlen - 1);
-	$trimmed = htmlspecialchars ($trimmed, ENT_QUOTES, 'UTF-8');
+	$trimmed = htmlspecialchars ($trimmed, ENT_QUOTES, 'UTF-8', FALSE);
 	$trimmed = str_replace (' ', '&nbsp;', $trimmed) . '&hellip;';
 	return "<span title='{$full}'>{$trimmed}</span>";
 }
@@ -1225,9 +1231,9 @@ function stringForOption ($string, $maxlen = 80)
 {
 	$string = preg_replace ("/\t/", ' ', $string);
 	if ($maxlen == 0 || mb_strlen ($string) <= $maxlen)
-		return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8');
+		return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE);
 	$string = mb_substr ($string, 0, $maxlen - 1);
-	return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8') . '&hellip;';
+	return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE) . '&hellip;';
 }
 
 function printTagsPicker ($preselect=NULL)

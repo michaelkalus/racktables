@@ -246,4 +246,58 @@ class RenderSearchResultsTest extends RTTestCase
 		$this->assertStringContainsString ('Row ' . self::escaped ('row'), $output);
 		$this->assertStringNotContainsString ('<b>', $output);
 	}
+
+	// Values that the request handlers stored HTML-escaped already must be
+	// displayed as typed, not with visible character references.
+	/**
+	 * @group small
+	 */
+	public function testStoredEscaped ()
+	{
+		$this->row_id = commitAddObject (self::stored ('row'), NULL, 1561, NULL);
+		usePreparedInsertBlade
+		(
+			'IPv4VS',
+			array
+			(
+				'vip' => ip4_parse ('192.0.2.20'),
+				'vport' => 80,
+				'proto' => 'TCP',
+				'name' => self::stored ('ipv4vs'),
+			)
+		);
+		$this->ipv4vs_id = lastInsertID();
+		$this->object_id = commitAddObject ($this->myString ('server'), NULL, 4, NULL);
+		$summary = array
+		(
+			'object' => array
+			(
+				$this->object_id => array
+				(
+					'id' => $this->object_id,
+					'by_nat' => array (self::stored ('nat')),
+				),
+			),
+			'ipv4addressbydescr' => array
+			(
+				array ('ip' => ip4_parse ('192.0.2.1'), 'name' => self::stored ('name4'), 'comment' => self::stored ('comment4')),
+			),
+			'ipv4vs' => array ($this->ipv4vs_id => spotEntity ('ipv4vs', $this->ipv4vs_id)),
+			'row' => array ($this->row_id => spotEntity ('row', $this->row_id)),
+		);
+		$output = getOutputOf ('renderSearchResults', 'x', $summary);
+		foreach (array ('nat', 'name4', 'comment4', 'ipv4vs') as $marker)
+			$this->assertStringContainsString (self::escaped ($marker), $output);
+		$this->assertStringContainsString ('Row ' . self::escaped ('row'), $output);
+		$this->assertStringNotContainsString ('&amp;lt;', $output);
+		$this->assertStringNotContainsString ('&amp;amp;', $output);
+		$this->assertStringNotContainsString ('&amp;quot;', $output);
+		$this->assertStringNotContainsString ('<b>', $output);
+	}
+
+	// Return the probe value the way the request handlers store it.
+	protected static function stored ($marker)
+	{
+		return htmlspecialchars (self::probe ($marker), ENT_QUOTES, 'UTF-8');
+	}
 }
