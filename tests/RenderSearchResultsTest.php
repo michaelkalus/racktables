@@ -178,6 +178,67 @@ class RenderSearchResultsTest extends RTTestCase
 		$this->assertStringNotContainsString ('"d\'e', $output);
 	}
 
+	// Search objects by name, label, asset tag and comment and render the result.
+	protected function renderObjectAttrsSearch ($what)
+	{
+		$summary = array
+		(
+			'object' => getObjectAttrsSearchResults ($what),
+			'ipv4addressbydescr' => array
+			(
+				array ('ip' => ip4_parse ('192.0.2.2'), 'name' => 'two', 'comment' => ''),
+			),
+		);
+		return getOutputOf ('renderSearchResults', $what, $summary);
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testObjectAttrReasons ()
+	{
+		$what = $this->myString ('found');
+		$name = $what . 'name';
+		$this->object_id = commitAddObject ($name, NULL, 4, NULL);
+		commitUpdateObject ($this->object_id, $name, self::probe ($what . 'label'), 'no', self::probe ($what . 'asset'), self::probe ($what . 'comment'));
+		$output = $this->renderObjectAttrsSearch ($what);
+		$expected = array
+		(
+			'Visible label' => self::escaped ($what . 'label'),
+			'Asset tag' => self::escaped ($what . 'asset'),
+		);
+		foreach ($expected as $label => $value)
+			$this->assertStringContainsString ("<th width='50%' class=sticker>{$label}:</th><td class=sticker>{$value}</td>", $output);
+		// The comment is longer than 30 characters.
+		$this->assertStringContainsString ("<th width='50%' class=sticker>Comment:</th><td class=sticker><span title='" . self::escaped ($what . 'comment') . "'>", $output);
+		// The name is already shown as the link to the object.
+		$this->assertStringNotContainsString ('Common name', $output);
+		$this->assertStringNotContainsString ('matched', $output);
+		$this->assertStringNotContainsString ('<b>', $output);
+		$this->assertStringNotContainsString ('"d\'e', $output);
+	}
+
+	/**
+	 * @group small
+	 */
+	public function testObjectLongComment ()
+	{
+		$what = $this->myString ('found');
+		$name = $this->myString ('server');
+		$comment = str_repeat ('x', 40) . self::probe ($what);
+		$this->object_id = commitAddObject ($name, NULL, 4, NULL);
+		commitUpdateObject ($this->object_id, $name, '', 'no', '', $comment);
+		$output = $this->renderObjectAttrsSearch ($what);
+		$this->assertStringContainsString
+		(
+			"<th width='50%' class=sticker>Comment:</th><td class=sticker><span title='" .
+				str_repeat ('x', 40) . self::escaped ($what) . "'>" . str_repeat ('x', 29) . '&hellip;</span></td>',
+			$output
+		);
+		$this->assertStringNotContainsString ('matched', $output);
+		$this->assertStringNotContainsString ('<b>', $output);
+	}
+
 	/**
 	 * @group small
 	 */
