@@ -2402,7 +2402,11 @@ function renderDepot ()
 						$places[] = mkA ($ci['container_dname'], 'object', $ci['container_id']);
 				if (array_key_exists ($obj['id'], $mountinfo))
 					foreach ($mountinfo[$obj['id']] as $mi)
-						$places[] = mkA ($mi['row_name'], 'row', $mi['row_id']) . '/' . mkA ($mi['rack_name'], 'rack', $mi['rack_id']);
+					{
+						// a rack that is not linked to any row has no row to link to
+						$row_text = $mi['row_id'] === NULL ? '(no row)' : mkA ($mi['row_name'], 'row', $mi['row_id']);
+						$places[] = $row_text . '/' . mkA ($mi['rack_name'], 'rack', $mi['rack_id']);
+					}
 				if (! count ($places))
 					$places[] = 'Unmounted';
 				echo "<td>" . implode (', ', $places) . '</td>';

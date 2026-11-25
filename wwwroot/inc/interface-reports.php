@@ -378,6 +378,28 @@ function renderDataIntegrityReport ()
 		finishPortLet ();
 	}
 
+	// check 2: racks not linked to any row
+	$result = usePreparedSelectBlade
+	(
+		'SELECT O.id, O.name FROM Object O ' .
+		"LEFT JOIN EntityLink EL ON EL.child_entity_id = O.id AND EL.parent_entity_type = 'row' AND EL.child_entity_type = 'rack' " .
+		'WHERE O.objtype_id = 1560 AND EL.id IS NULL'
+	);
+	$orphans = $result->fetchAll (PDO::FETCH_ASSOC);
+	unset ($result);
+	if (count ($orphans))
+	{
+		$violations = TRUE;
+		startPortlet ('Racks without a row (' . count ($orphans) . ')');
+		$columns = array
+		(
+			array ('th_text' => 'ID', 'row_key' => 'id', 'td_class' => 'tdright'),
+			array ('th_text' => 'Name', 'row_key' => 'name'),
+		);
+		renderTableViewer ($columns, $orphans);
+		finishPortLet ();
+	}
+
 	// check 3: multiple tables referencing non-existent dictionary entries
 	// check 3.1: AttributeMap
 	$orphans = array ();
