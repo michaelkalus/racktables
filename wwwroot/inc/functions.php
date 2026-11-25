@@ -2538,6 +2538,10 @@ function ip6_parse ($ip)
 		$split = explode ('.', $last_token);
 		if (count ($split) == 4)
 		{
+			// accept only what inet_pton() accepts: decimal 0-255, no leading zeros
+			foreach ($split as $octet)
+				if (! preg_match ('/^(0|[1-9][0-9]{0,2})$/D', $octet) || $octet > 255)
+					break 2;
 			$hex_tokens = array();
 			$hex_tokens[] = dechex ($split[0] * 256 + $split[1]);
 			$hex_tokens[] = dechex ($split[2] * 256 + $split[3]);
