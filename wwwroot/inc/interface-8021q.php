@@ -947,7 +947,7 @@ function renderVLANInfo ($vlan_ck)
 						echo ' &mdash; ' . formatPortLink ($portinfo['remote_object_id'], $portinfo['remote_object_name'], $portinfo['remote_id'], NULL);
 				}
 				else
-					echo $port_name;
+					echo stringForLabel ($port_name, 0);
 				echo '</li>';
 			}
 			echo '</ul></td></tr>';

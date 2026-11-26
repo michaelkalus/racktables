@@ -403,16 +403,18 @@ function getNiftySelect ($groupList, $select_attrs, $selected_id = NULL)
 	foreach ($select_attrs as $attr_name => $attr_value)
 		$ret .= " {$attr_name}={$attr_value}";
 	$ret .= ">\n";
+	// The value is escaped in full, so that the browser sends back exactly the
+	// key. The labels are escaped as getSelectOptions() does it.
 	foreach ($groupList as $groupname => $groupdata)
 	{
-		$ret .= "<optgroup label='{$groupname}'>\n";
+		$ret .= "<optgroup label='" . stringForOption ($groupname, 0) . "'>\n";
 		foreach ($groupdata as $dict_key => $dict_value)
 		{
 			if (is_array ($selected_id))
 				$is_selected = in_array ($dict_key, $selected_id);
 			else
 				$is_selected = $dict_key == $selected_id;
-			$ret .= "<option value='{$dict_key}'" . ($is_selected ? ' selected' : '') . ">{$dict_value}</option>\n";
+			$ret .= "<option value='" . stringForTextInputValue ($dict_key, 0) . "'" . ($is_selected ? ' selected' : '') . '>' . stringForOption ($dict_value, 0) . "</option>\n";
 		}
 		$ret .= "</optgroup>\n";
 	}

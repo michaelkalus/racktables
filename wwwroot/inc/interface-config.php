@@ -827,7 +827,7 @@ function renderUIConfig ()
 		echo "<td nowrap valign=top class=tdright>";
 		renderConfigVarName ($v);
 		echo '</td>';
-		echo "<td valign=top class=tdleft>{$v['varvalue']}</td></tr>";
+		echo '<td valign=top class=tdleft>' . stringForLabel ((string) $v['varvalue'], 0) . '</td></tr>';
 	}
 	echo "</table>\n";
 	finishPortlet();
