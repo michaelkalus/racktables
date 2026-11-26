@@ -221,6 +221,18 @@ A new password can be at most 72 bytes long; an account whose password is
 longer keeps its SHA-1 hash until a shorter password is set.
 ENDOFTEXT
 ,
+
+	'0.23.1-community' => <<<'ENDOFTEXT'
+With LDAP authentication and its cache enabled, the cache used to keep an
+unsalted SHA-1 digest of the directory password of every cached user. It now
+keeps a password_hash() result. The upgrade empties the cache, so the first
+request of each user after the upgrade asks the directory server; no action
+is needed.
+A client that does not keep the session cookie, such as a script that sends
+HTTP basic authentication with each request, now spends the time of one
+password verification (a fraction of a second) on every request.
+ENDOFTEXT
+,
 );
 
 // This function currently implements a convention that to upgrade any release R1
@@ -1472,6 +1484,17 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			$query[] = "UPDATE Config SET varvalue = '0.23.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case '0.23.1-community':
+			// issue #131: the LDAP cache stores password_hash() results. The rows
+			// are only a cache, the digests in them are not wanted any more. The
+			// key scanidx serves no query, and with the wider column it can exceed
+			// the key length limit of a table in an old row format. It goes in the
+			// same statement, and only if it is there, so that the batch can run
+			// again after a failure.
+			$query[] = "DELETE FROM LDAPCache";
+			$result = $dbxlink->query ("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'LDAPCache' AND INDEX_NAME = 'scanidx'");
+			$drop_key = $result->fetchColumn() > 0 ? 'DROP KEY `scanidx`, ' : '';
+			unset ($result);
+			$query[] = "ALTER TABLE LDAPCache {$drop_key}MODIFY COLUMN successful_hash varchar(255) NOT NULL";
 			$query[] = "UPDATE Config SET varvalue = '0.23.1-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':

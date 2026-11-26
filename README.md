@@ -53,7 +53,8 @@ never released, which this fork includes. In short:
 * port link, object link, file link and RS pool operations are restricted to
   the entity the user was authorised for;
 * passwords of local accounts are stored with `password_hash()` instead of
-  unsalted SHA-1, and existing hashes are replaced on login;
+  unsalted SHA-1, and existing hashes are replaced on login; the LDAP cache
+  does the same for directory passwords (since 0.23.1-community);
 * user names are escaped in LDAP search filters, and sshnokey credentials are
   no longer sent as session input.
 
@@ -230,6 +231,16 @@ and initialize the application.
    [issue tracker of this fork](https://github.com/michaelkalus/racktables/issues).
 
 ## Release notes
+
+### Upgrading to 0.23.1-community
+With LDAP authentication and its cache enabled, the cache used to keep an
+unsalted SHA-1 digest of the directory password of every cached user. It now
+keeps a password_hash() result. The upgrade empties the cache, so the first
+request of each user after the upgrade asks the directory server; no action
+is needed.
+A client that does not keep the session cookie, such as a script that sends
+HTTP basic authentication with each request, now spends the time of one
+password verification (a fraction of a second) on every request.
 
 ### Upgrading to 0.23.0-community
 This is the first release of the community fork. A database of RackTables

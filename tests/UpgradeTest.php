@@ -21,6 +21,7 @@ class UpgradeTest extends RTTestCase
 	// two keys as non-unique, see issue #20.
 	private static $fresh_install_lines = array
 	(
+		array ('LDAPCache', 'UNIQUE KEY `presented_username` '),
 		array ('Object', 'UNIQUE KEY `id-tid` '),
 		array ('TagTree', 'UNIQUE KEY `id-is_assignable` '),
 		array ('AttributeValue', 'CONSTRAINT `AttributeValue-FK-object` '),
@@ -169,6 +170,8 @@ ENDOFCODE;
 		// have the password "admin" as an SHA-1 hash in a char(40) column).
 		$this->assertTrue (authenticate_admin ('admin', 'admin'), "upgrader login before upgrading from {$version}");
 		$this->assertFalse (authenticate_admin ('admin', 'wrong password'));
+		// a cache row of an earlier release, with an SHA-1 digest of the password
+		usePreparedInsertBlade ('LDAPCache', array ('presented_username' => 'upgradetest', 'successful_hash' => sha1 ('secret')));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -226,6 +229,22 @@ ENDOFCODE;
 				"Definition of {$table} after upgrading from {$version}"
 			);
 		}
+		// The LDAP cache is emptied and has room for password_hash() results (issue #131).
+		$result = usePreparedSelectBlade
+		(
+			'SELECT COLUMN_TYPE, IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+			array ($db_name, 'LDAPCache', 'successful_hash')
+		);
+		$row = $result->fetch (PDO::FETCH_NUM);
+		$result->closeCursor();
+		$this->assertSame ('varchar(255)', $row[0], "LDAPCache.successful_hash type after upgrading from {$version}");
+		$this->assertSame ('NO', $row[1], "LDAPCache.successful_hash nullability after upgrading from {$version}");
+		// the key that included the hash is gone, as in a fresh install
+		$this->assertNull (self::findLine (self::freshInstallTableSQL ('LDAPCache'), 'KEY `scanidx` '));
+		$this->assertNull (self::findLine (self::showCreateTable ('LDAPCache'), 'KEY `scanidx` '), "LDAPCache.scanidx after upgrading from {$version}");
+		$result = $dbxlink->query ('SELECT COUNT(*) FROM LDAPCache');
+		$this->assertEquals (0, $result->fetchColumn(), "LDAPCache rows after upgrading from {$version}");
+		$result->closeCursor();
 		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
 		// references anything but the full column list of a PRIMARY or UNIQUE key.
 		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");
