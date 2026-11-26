@@ -17,6 +17,11 @@ upgrade.
 [Upgrading to 0.24.0-community](#upgrading-to-0240-community) if you have
 code of your own or read the database directly.
 
+**Use 0.24.1-community or later, not 0.24.0-community.** The upgrade of
+0.24.0-community sets the time of the object history records it converts to
+the time of the upgrade; 0.24.1-community keeps it and also converts user
+names. See [Upgrading to 0.24.1-community](#upgrading-to-0241-community).
+
 ## How it came to be, and a word about AI
 I have been a happy RackTables user for years. Over those years I also watched
 the bugs and issues pile up in the original tracker, while the author
