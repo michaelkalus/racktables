@@ -240,6 +240,32 @@ class LDAPCacheTest extends RTTestCase
 		}
 	}
 
+	/**
+	 * @group small
+	 * @dataProvider providerServerURIs
+	 */
+	public function testServerURI ($server, $port, $expected)
+	{
+		$this->assertSame ($expected, getLDAPServerURI ($server, $port));
+	}
+
+	public function providerServerURIs ()
+	{
+		return array
+		(
+			array ('ldap.example.com', 389, 'ldap://ldap.example.com:389'),
+			array ('ldap.example.com', 3389, 'ldap://ldap.example.com:3389'),
+			array ('192.0.2.1', '389', 'ldap://192.0.2.1:389'),
+			array ('2001:db8::1', 389, 'ldap://[2001:db8::1]:389'),
+			array ('::1', 636, 'ldap://[::1]:636'),
+			array ('[2001:db8::1]', 389, 'ldap://[2001:db8::1]:389'),
+			// an URI is used as it is, the port option does not apply
+			array ('ldaps://ldap.example.com', 389, 'ldaps://ldap.example.com'),
+			array ('ldap://ldap.example.com:1389', 389, 'ldap://ldap.example.com:1389'),
+			array ('ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi', 389, 'ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi'),
+		);
+	}
+
 	// A row that cannot be found after the insert (here because the name does
 	// not fit the column) makes acquireLDAPCache() retry and then give up
 	// without leaving a transaction open.
