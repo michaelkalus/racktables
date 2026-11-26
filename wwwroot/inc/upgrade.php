@@ -296,6 +296,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.23.0-community',
 		'0.23.1-community',
 		'0.24.0-community',
+		'0.24.1-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1531,6 +1532,9 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			// issue #73: decode the text that the forms used to store HTML-escaped
 			$query = array_merge ($query, getStoredTextDecodingQueries());
 			$query[] = "UPDATE Config SET varvalue = '0.24.0-community' WHERE varname = 'DB_VERSION'";
+			break;
+		case '0.24.1-community':
+			$query[] = "UPDATE Config SET varvalue = '0.24.1-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
 			$query = reloadDictionary();
