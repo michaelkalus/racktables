@@ -177,6 +177,11 @@ ENDOFCODE;
 			usePreparedInsertBlade ('LDAPCache', array ('presented_username' => 'upgradetest', 'successful_hash' => sha1 ('secret')));
 			usePreparedInsertBlade ('Script', array ('script_name' => 'LDAPConfigHash', 'script_text' => sha1 ('config')));
 		}
+		// Text as the forms of every release before 0.24.0-community stored it:
+		// HTML-escaped, and with a level per save in the configuration (issue #73).
+		usePreparedInsertBlade ('Object', array ('name' => 'upgrade &lt;test&gt; &amp; &quot;more&quot;', 'label' => 'it&#039;s', 'objtype_id' => 4, 'comment' => "one\n&lt;two&gt;"));
+		usePreparedInsertBlade ('Object', array ('name' => 'upgrade R&D; typed', 'objtype_id' => 4));
+		usePreparedInsertBlade ('Config', array ('varname' => 'UPGRADETEST_73', 'varvalue' => 'a &amp;amp;amp; b &amp;amp;lt; c'));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -251,6 +256,24 @@ ENDOFCODE;
 		$result = $dbxlink->query ('SELECT COUNT(*) FROM LDAPCache');
 		$this->assertEquals (0, $result->fetchColumn(), "LDAPCache rows after upgrading from {$version}");
 		$result->closeCursor();
+		// Stored text is decoded once, the configuration values completely (issue #73).
+		$result = usePreparedSelectBlade ("SELECT name, label, comment FROM Object WHERE name LIKE 'upgrade %' ORDER BY id");
+		$rows = $result->fetchAll (PDO::FETCH_ASSOC);
+		$result->closeCursor();
+		$this->assertSame
+		(
+			array
+			(
+				array ('name' => 'upgrade <test> & "more"', 'label' => "it's", 'comment' => "one\n<two>"),
+				array ('name' => 'upgrade R&D; typed', 'label' => NULL, 'comment' => NULL),
+			),
+			$rows,
+			"Object text after upgrading from {$version}"
+		);
+		$result = usePreparedSelectBlade ("SELECT varvalue FROM Config WHERE varname = 'UPGRADETEST_73'");
+		$this->assertSame ('a & b < c', $result->fetchColumn(), "Config value after upgrading from {$version}");
+		$result->closeCursor();
+		usePreparedDeleteBlade ('Config', array ('varname' => 'UPGRADETEST_73'));
 		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
 		// references anything but the full column list of a PRIMARY or UNIQUE key.
 		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");

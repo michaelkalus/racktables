@@ -1,4 +1,8 @@
 0.24.0-community
+	update: store text as typed in every form and decode the existing HTML-escaped values once (names, labels, asset tags, comments, descriptions, configuration values)
+	bugfix: the configuration forms no longer add a level of escaping to a value on every save
+	bugfix: the port selector popup finds names with special characters, and a cable ID is no longer escaped twice
+	bugfix: send the SNMP community and SNMPv3 credentials to the device as typed
 	bugfix: escape stored text in more page elements and messages (rack, row and location names, object list, comments, NAT rules, reports)
 	update: remove three more PHP 8 deprecations (ports without an L2 address, LDAP server list and connection)
 0.23.1-community 2026-11-26

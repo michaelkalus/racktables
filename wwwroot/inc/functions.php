@@ -2040,6 +2040,14 @@ function applyCellFilter ($realm, $cellfilter, $parent_id = NULL)
 	return filterCellList (listCells ($realm, $parent_id), $cellfilter['expression']);
 }
 
+// The configured default operator of the list filter. The configuration form
+// takes any text, and the value becomes a part of filter expressions and links.
+function getDefaultFilterAndor()
+{
+	$ret = getConfigVar ('FILTER_DEFAULT_ANDOR');
+	return $ret === 'or' ? 'or' : 'and';
+}
+
 function getCellFilter ()
 {
 	global $sic;
@@ -2089,7 +2097,7 @@ function getCellFilter ()
 	if (isset ($_REQUEST['andor']))
 		$_SESSION[$pageno]['filter']['andor'] = $andor = $_REQUEST['andor'];
 	else
-		$andor = getConfigVar ('FILTER_DEFAULT_ANDOR');
+		$andor = getDefaultFilterAndor();
 	// The operator goes into the links whenever the filter text uses it.
 	$ret['andor'] = $andor;
 	// Both tags and predicates that don't exist, should be
@@ -2157,7 +2165,7 @@ function getCellFilter ()
 			$ret['extraclass'] = $ret['expression'] ? 'validation-success' : 'validation-error';
 	}
 	if (! $andor_used)
-		$ret['andor'] = getConfigVar ('FILTER_DEFAULT_ANDOR');
+		$ret['andor'] = getDefaultFilterAndor();
 	else
 		$ret['urlextra'] .= '&andor=' . $ret['andor'];
 	session_commit();

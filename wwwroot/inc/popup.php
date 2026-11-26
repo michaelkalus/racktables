@@ -219,7 +219,8 @@ function handlePopupPortLink()
 	assertPermission('depot', 'default');
 	genericAssertion ('port', 'natural');
 	genericAssertion ('remote_port', 'natural');
-	assertStringArg ('cable', TRUE);
+	// The cable ID is stored and shown again as it was typed.
+	$cable = assertStringArg ('cable', TRUE);
 	$port_info = getPortInfo ($_REQUEST['port']);
 	$remote_port_info = getPortInfo ($_REQUEST['remote_port']);
 	if ($port_info === NULL)
@@ -290,7 +291,7 @@ function handlePopupPortLink()
 			commitUpdatePortOIF ($port_info['id'], $type_local);
 		if ($remote_port_info['oif_id'] != $type_remote)
 			commitUpdatePortOIF ($remote_port_info['id'], $type_remote);
-		linkPorts ($port_info['id'], $remote_port_info['id'], $_REQUEST['cable']);
+		linkPorts ($port_info['id'], $remote_port_info['id'], $cable);
 		if ($heap_id != 0)
 		{
 			// Leave the compatibility constraints check up to the foreign keys.
@@ -361,7 +362,7 @@ END
 		echo '<input type=hidden name="helper" value="portlist">';
 		echo '<input type=hidden name="port" value="' . $port_info['id'] . '">';
 		echo '<input type=hidden name="remote_port" value="' . $remote_port_info['id'] . '">';
-		echo '<input type=hidden name="cable" value="' . htmlspecialchars ($_REQUEST['cable'], ENT_QUOTES) . '">';
+		echo '<input type=hidden name="cable" value="' . htmlspecialchars ($cable, ENT_QUOTES, 'UTF-8') . '">';
 		echo '<p>The ports you have selected are not compatible. Please select a compatible transceiver pair.';
 		echo '<p>';
 		echo formatPort ($port_info) . ' ';
@@ -413,12 +414,12 @@ function renderPopupPortSelector()
 		'ports' => '',
 		'asset_no' => '',
 	);
-	if (isset ($_REQUEST['filter-obj']))
-		$filter['objects'] = trim($_REQUEST['filter-obj']);
-	if (isset ($_REQUEST['filter-port']))
-		$filter['ports'] = trim($_REQUEST['filter-port']);
-	if (isset ($_REQUEST['filter-asset_no']))
-		$filter['asset_no'] = trim($_REQUEST['filter-asset_no']);
+	// The filter is matched against stored text and shown again in the form,
+	// both need the text as it was typed.
+	global $sic;
+	foreach (array ('filter-obj' => 'objects', 'filter-port' => 'ports', 'filter-asset_no' => 'asset_no') as $argname => $key)
+		if (isset ($sic[$argname]) && is_string ($sic[$argname]))
+			$filter[$key] = trim ($sic[$argname]);
 	if ($in_rack)
 	{
 		$object = spotEntity ('object', $port_info['object_id']);

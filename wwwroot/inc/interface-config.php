@@ -130,7 +130,7 @@ $(document).ready(function() {
 ENDJAVASCRIPT
 	); // addJSText ()
 	echo "<tr><td><textarea rows=40 cols=100 id=RCTA>";
-	echo loadScript ('RackCode') . "</textarea></td></tr>\n";
+	echo stringForTextarea (loadScript ('RackCode')) . "</textarea></td></tr>\n";
 	echo '</table>';
 }
 
@@ -186,7 +186,7 @@ ENDJAVASCRIPT
 	printOpFormIntro ('saveRackCode');
 	echo '<table width="100%" border=0>';
 	echo "<tr><td><textarea rows=40 cols=100 name=rackcode id=RCTA>";
-	echo loadScript ('RackCode') . "</textarea></td></tr>\n";
+	echo stringForTextarea (loadScript ('RackCode')) . "</textarea></td></tr>\n";
 	echo "<tr><td class=submit>";
 	echo '<div id="ShowMessage"></div>';
 	echo "<input type='button' value='Verify' onclick='verify();'>";

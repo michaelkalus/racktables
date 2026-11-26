@@ -615,6 +615,7 @@ function setFuncMessages ($funcname, $messages)
 
 function addPortForwarding ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 48));
 	$proto = genericAssertion ('proto', 'enum/natv4proto');
 	if ($proto != 'ALL')
@@ -637,7 +638,7 @@ function addPortForwarding ()
 			genericAssertion ('remoteip', 'inet4'),
 			$remoteport,
 			$proto,
-			$_REQUEST['description']
+			$sic['description']
 		);
 	}
 	catch (InvalidArgException $iae)
@@ -671,6 +672,7 @@ function delPortForwarding ()
 
 function updPortForwarding ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$proto = genericAssertion ('proto', 'enum/natv4proto');
 	if ($proto != 'ALL')
@@ -688,13 +690,14 @@ function updPortForwarding ()
 		genericAssertion ('remoteip', 'inet4'),
 		$_REQUEST['remoteport'],
 		$proto,
-		$_REQUEST['description']
+		$sic['description']
 	);
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 
 function addPortForObject ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 48));
 	genericAssertion ('port_name', 'string');
 	try
@@ -702,9 +705,10 @@ function addPortForObject ()
 		commitAddPort
 		(
 			getBypassValue(),
-			trim ($_REQUEST['port_name']),
+			trim ($sic['port_name']),
 			genericAssertion ('port_type_id', 'string'),
-			trim ($_REQUEST['port_label']),
+			// the label is optional in the request
+			isset ($sic['port_label']) && is_string ($sic['port_label']) ? trim ($sic['port_label']) : '',
 			trim (genericAssertion ('port_l2address', 'l2address0'))
 		);
 	}
@@ -780,13 +784,14 @@ function editPortForObject ()
 
 function addMultiPorts ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 10));
 	assertStringArg ('input');
 	$format = genericAssertion ('format', 'string');
 	$port_type = genericAssertion ('port_type', 'string');
 	$object_id = getBypassValue();
 	$ports = array();
-	foreach (textareaCooked ($_REQUEST['input']) as $line)
+	foreach (textareaCooked ($sic['input']) as $line)
 	{
 		switch ($format)
 		{
@@ -834,14 +839,15 @@ function addMultiPorts ()
 
 function addBulkPorts ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 82));
 	assertStringArg ('port_name', TRUE);
 	assertStringArg ('port_label', TRUE);
 
 	$object_id = getBypassValue();
-	$port_name = $_REQUEST['port_name'];
+	$port_name = $sic['port_name'];
 	$port_type_id = genericAssertion ('port_type_id', 'string');
-	$port_label = $_REQUEST['port_label'];
+	$port_label = $sic['port_label'];
 	$port_numbering_start = genericAssertion ('port_numbering_start', 'unsigned');
 	$port_numbering_count = genericAssertion ('port_numbering_count', 'natural');
 
@@ -860,6 +866,7 @@ function addBulkPorts ()
 
 function updIPAllocation ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$ip_bin = assertIPArg ('ip');
 	assertStringArg ('bond_name', TRUE);
@@ -867,7 +874,7 @@ function updIPAllocation ()
 	(
 		$ip_bin,
 		genericAssertion ('object_id', 'natural'),
-		$_REQUEST['bond_name'],
+		$sic['bond_name'],
 		genericAssertion ('bond_type', 'enum/alloc_type')
 	);
 	showFuncMessage (__FUNCTION__, 'OK');
@@ -1296,6 +1303,7 @@ function updateObjectAllocation ()
 
 function updateObject ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$taglist = genericAssertion ('taglist', 'array0');
 	genericAssertion ('num_attrs', 'unsigned');
@@ -1313,11 +1321,11 @@ function updateObject ()
 		commitUpdateObject
 		(
 			$object_id,
-			$_REQUEST['object_name'],
-			$_REQUEST['object_label'],
+			$sic['object_name'],
+			$sic['object_label'],
 			isCheckSet ('object_has_problems', 'yesno'),
-			$_REQUEST['object_asset_no'],
-			$_REQUEST['object_comment']
+			$sic['object_asset_no'],
+			$sic['object_comment']
 		);
 		updateObjectAttributes ($object_id);
 		$object = spotEntity ('object', $object_id);
@@ -1417,6 +1425,7 @@ function updateObjectAttributes ($object_id)
 
 function addMultipleObjects()
 {
+	global $sic;
 	$taglist = genericAssertion ('taglist', 'array0');
 	$max = genericAssertion ('num_records', 'natural');
 	for ($i = 0; $i < $max; $i++)
@@ -1425,7 +1434,7 @@ function addMultipleObjects()
 		assertStringArg ("{$i}_object_name", TRUE);
 		assertStringArg ("{$i}_object_label", TRUE);
 		assertStringArg ("{$i}_object_asset_no", TRUE);
-		$name = $_REQUEST["{$i}_object_name"];
+		$name = $sic["{$i}_object_name"];
 
 		if ($tid == 0)
 			continue; // Just skip on intact SELECT.
@@ -1437,9 +1446,9 @@ function addMultipleObjects()
 			$object_id = commitAddObject
 			(
 				$name,
-				$_REQUEST["{$i}_object_label"],
+				$sic["{$i}_object_label"],
 				$tid,
-				$_REQUEST["{$i}_object_asset_no"],
+				$sic["{$i}_object_asset_no"],
 				$taglist
 			);
 			endAtomicChange ($savepoint, TRUE);
@@ -1452,7 +1461,7 @@ function addMultipleObjects()
 				lastCreated ($item['realm'], $item['id'], TRUE);
 			if (! ($e instanceof RTDatabaseError))
 				throw $e;
-			showError ("Error creating object '$name': " . $e->getMessage());
+			showError ("Error creating object '" . stringForLabel ($name, 0) . "': " . $e->getMessage());
 			continue;
 		}
 		showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
@@ -1461,15 +1470,16 @@ function addMultipleObjects()
 
 function addLotOfObjects()
 {
+	global $sic;
 	$taglist = genericAssertion ('taglist', 'array0');
 	assertStringArg ('namelist', TRUE);
 	$global_type_id = genericAssertion ('global_type_id', 'unsigned'); // 0 by default in the SELECT
-	if ($global_type_id == 0 || $_REQUEST['namelist'] == '')
+	if ($global_type_id == 0 || $sic['namelist'] == '')
 	{
 		showError ('Incomplete form has been ignored. Cheers.');
 		return;
 	}
-	foreach (textareaCooked ($_REQUEST['namelist']) as $name)
+	foreach (textareaCooked ($sic['namelist']) as $name)
 	{
 		// Add each object completely or not at all, as addRack() does.
 		$savepoint = beginAtomicChange ('addLotOfObjects');
@@ -1487,7 +1497,7 @@ function addLotOfObjects()
 				lastCreated ($item['realm'], $item['id'], TRUE);
 			if (! ($e instanceof RackTablesError))
 				throw $e;
-			showError ("Failed to add object '$name': " . $e->getMessage());
+			showError ("Failed to add object '" . stringForLabel ($name, 0) . "': " . $e->getMessage());
 			continue;
 		}
 		showSuccess ('added object ' . mkCellA (spotEntity ('object', $object_id)));
@@ -1558,6 +1568,7 @@ function resetObject ()
 
 function updateUI ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 43));
 	$num_vars = genericAssertion ('num_vars', 'natural');
 	try
@@ -1566,7 +1577,7 @@ function updateUI ()
 		{
 			assertStringArg ("{$i}_varvalue", TRUE);
 			$varname = genericAssertion ("{$i}_varname", 'string');
-			$varvalue = $_REQUEST["{$i}_varvalue"];
+			$varvalue = $sic["{$i}_varvalue"];
 			// If form value = value in DB, don't bother updating DB.
 			if (isConfigVarChanged ($varname, $varvalue))
 				setConfigVar ($varname, $varvalue);
@@ -1581,6 +1592,7 @@ function updateUI ()
 
 function saveMyPreferences ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$num_vars = genericAssertion ('num_vars', 'natural');
 
@@ -1588,7 +1600,7 @@ function saveMyPreferences ()
 	{
 		assertStringArg ("{$i}_varvalue", TRUE);
 		$varname = genericAssertion ("{$i}_varname", 'string');
-		$varvalue = $_REQUEST["{$i}_varvalue"];
+		$varvalue = $sic["{$i}_varvalue"];
 
 		// If form value = value in DB, don't bother updating DB
 		if (!isConfigVarChanged($varname, $varvalue))
@@ -1691,6 +1703,7 @@ function addRealServers ()
 
 function addVService ()
 {
+	global $sic;
 	assertStringArg ('name', TRUE);
 	$proto = genericAssertion ('proto', 'enum/ipproto');
 	usePreparedInsertBlade
@@ -1701,7 +1714,7 @@ function addVService ()
 			'vip' => genericAssertion ('vip', 'inet'),
 			'vport' => $proto == 'MARK' ? NULL : genericAssertion ('vport', 'natural'),
 			'proto' => $proto,
-			'name' => nullIfEmptyStr ($_REQUEST['name']),
+			'name' => nullIfEmptyStr ($sic['name']),
 			'vsconfig' => nullIfEmptyStr (genericAssertion ('vsconfig', 'string0')),
 			'rsconfig' => nullIfEmptyStr (genericAssertion ('rsconfig', 'string0')),
 		)
@@ -1799,6 +1812,7 @@ function updateRealServer ()
 
 function updateVService ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$vs_id = getBypassValue();
 	$taglist = genericAssertion ('taglist', 'array0');
@@ -1810,7 +1824,7 @@ function updateVService ()
 		genericAssertion ('vip', 'inet'),
 		$_REQUEST['vport'],
 		$proto,
-		$_REQUEST['name'],
+		$sic['name'],
 		genericAssertion ('vsconfig', 'string0'),
 		genericAssertion ('rsconfig', 'string0')
 	);
@@ -2125,6 +2139,7 @@ function createTriplet()
 
 function addLoadBalancer ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 48));
 	assertStringArg ('prio', TRUE);
 
@@ -2134,17 +2149,18 @@ function addLoadBalancer ()
 		genericAssertion ('vs_id', 'natural'),
 		genericAssertion ('vsconfig', 'string0'),
 		genericAssertion ('rsconfig', 'string0'),
-		$_REQUEST['prio']
+		$sic['prio']
 	);
 	showFuncMessage (__FUNCTION__, 'OK');
 }
 
 function addRSPool ()
 {
+	global $sic;
 	assertStringArg ('name');
 	$pool_id = commitCreateRSPool
 	(
-		$_REQUEST['name'],
+		$sic['name'],
 		genericAssertion ('vsconfig', 'string0'),
 		genericAssertion ('rsconfig', 'string0'),
 		isset ($_REQUEST['taglist']) ? $_REQUEST['taglist'] : array()
@@ -2168,6 +2184,7 @@ function deleteRSPool ()
 
 function importPTRData ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 26, 'ERR' => 141, 'SKIP' => 200));
 	$net = spotEntity ('ipv4net', getBypassValue());
 	$addrcount = genericAssertion ('addrcount', 'natural');
@@ -2186,7 +2203,7 @@ function importPTRData ()
 			$nbad++;
 			continue;
 		}
-		$records[] = array ($ip_bin, $_REQUEST["descr_{$i}"]);
+		$records[] = array ($ip_bin, $sic["descr_{$i}"]);
 		if ($first === NULL || strcmp ($ip_bin, $first) < 0)
 			$first = $ip_bin;
 		if ($last === NULL || strcmp ($ip_bin, $last) > 0)
@@ -2323,14 +2340,16 @@ function changeMyPassword ()
 
 function saveRackCode ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 43, 'ERR1' => 154));
 	assertStringArg ('rackcode');
 	// For the test to succeed, unescape LFs, strip CRs.
-	$newcode = dos2unix ($_REQUEST['rackcode']);
+	$newcode = dos2unix ($sic['rackcode']);
 	$parseTree = getRackCode ($newcode);
 	if ($parseTree['result'] != 'ACK')
 	{
-		showFuncMessage (__FUNCTION__, 'ERR1', array ($parseTree['load']));
+		// the parser quotes the text it could not make sense of
+		showFuncMessage (__FUNCTION__, 'ERR1', array (htmlspecialchars ($parseTree['load'], ENT_QUOTES, 'UTF-8')));
 		return;
 	}
 	saveScript ('RackCode', $newcode);
@@ -2345,12 +2364,13 @@ function submitSLBConfig ()
 
 function addLocation ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
 	assertStringArg ('name');
 	if (0 != $parent_id = genericAssertion ('parent_id', 'unsigned'))
 		spotEntity ('location', $parent_id);
 
-	$location_id = commitAddObject ($_REQUEST['name'], NULL, 1562, NULL);
+	$location_id = commitAddObject ($sic['name'], NULL, 1562, NULL);
 	if ($parent_id != 0)
 		commitLinkEntities ('location', $parent_id, 'location', $location_id);
 	showSuccess ('added location ' . mkA ($_REQUEST['name'], 'location', $location_id));
@@ -2361,6 +2381,7 @@ function addLocation ()
 //  - renderRackspaceLocationEditor - only the name and parent may be modified
 function updateLocation ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
 	global $pageno;
 	$location_id = genericAssertion ('location_id', 'natural');
@@ -2381,12 +2402,12 @@ function updateLocation ()
 			$taglist = genericAssertion ('taglist', 'array0');
 			$has_problems = isCheckSet ('has_problems', 'yesno');
 			assertStringArg ('comment', TRUE);
-			commitUpdateObject ($location_id, $_REQUEST['name'], NULL, $has_problems, NULL, $_REQUEST['comment']);
+			commitUpdateObject ($location_id, $sic['name'], NULL, $has_problems, NULL, $sic['comment']);
 			updateObjectAttributes ($location_id);
 			rebuildTagChainForEntity ('location', $location_id, buildTagChainFromIds ($taglist), TRUE);
 		}
 		else
-			commitRenameObject ($location_id, $_REQUEST['name']);
+			commitRenameObject ($location_id, $sic['name']);
 
 		$locationData = spotEntity ('location', $location_id);
 
@@ -2446,12 +2467,13 @@ function deleteLocation ()
 
 function addRow ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
 	$location_id = genericAssertion ('location_id', 'unsigned');
 	assertStringArg ('name');
 	if ($location_id)
 		spotEntity ('location', $location_id);
-	$row_id = commitAddObject ($_REQUEST['name'], NULL, 1561, NULL);
+	$row_id = commitAddObject ($sic['name'], NULL, 1561, NULL);
 	if ($location_id)
 		commitLinkEntities ('location', $location_id, 'row', $row_id);
 	showSuccess ('added row ' . mkA ($_REQUEST['name'], 'row', $row_id));
@@ -2462,6 +2484,7 @@ function addRow ()
 //  - renderRackspaceRowEditor - only the name and location may be modified
 function updateRow ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
 	$row_id = genericAssertion ('row_id', 'natural');
 	$location_id = genericAssertion ('location_id', 'unsigned');
@@ -2472,7 +2495,7 @@ function updateRow ()
 	$savepoint = beginAtomicChange ('updateRow');
 	try
 	{
-		commitUpdateObject ($row_id, $_REQUEST['name'], NULL, 'no', NULL, NULL);
+		commitUpdateObject ($row_id, $sic['name'], NULL, 'no', NULL, NULL);
 
 		global $pageno;
 		if ($pageno == 'row')
@@ -2521,6 +2544,7 @@ function deleteRow ()
 
 function addRack ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('ERR2' => 172));
 	$taglist = genericAssertion ('taglist', 'array0');
 	$row_id = getBypassValue();
@@ -2535,7 +2559,7 @@ function addRack ()
 		assertStringArg ('name');
 		$height = genericAssertion ('height1', 'natural');
 		assertStringArg ('asset_no', TRUE);
-		$rack_id = commitAddObject ($_REQUEST['name'], NULL, 1560, $_REQUEST['asset_no'], $taglist);
+		$rack_id = commitAddObject ($sic['name'], NULL, 1560, $sic['asset_no'], $taglist);
 
 		// Set the height and sort order
 		commitUpdateAttrValue ($rack_id, 27, $height);
@@ -2548,7 +2572,7 @@ function addRack ()
 	case 'many':
 		$height = genericAssertion ('height2', 'natural');
 		assertStringArg ('names', TRUE);
-		foreach (textareaCooked ($_REQUEST['names']) as $cname)
+		foreach (textareaCooked ($sic['names']) as $cname)
 		{
 			// Add each rack completely or not at all, report the failure
 			// and go on with the next one, as addLotOfObjects() does.
@@ -2588,6 +2612,7 @@ function addRack ()
 
 function updateRack ()
 {
+	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 6));
 	$rack_id = getBypassValue();
 	$rack = spotEntity ('rack', $rack_id);
@@ -2606,11 +2631,11 @@ function updateRack ()
 		(
 			$rack_id,
 			$row_id,
-			$_REQUEST['name'],
+			$sic['name'],
 			$height,
 			isCheckSet ('has_problems', 'yesno'),
-			$_REQUEST['asset_no'],
-			$_REQUEST['comment']
+			$sic['asset_no'],
+			$sic['comment']
 		);
 		updateObjectAttributes ($rack_id);
 		rebuildTagChainForEntity ('rack', $rack_id, buildTagChainFromIds ($taglist), TRUE);
@@ -2673,6 +2698,7 @@ function updateRackProblems ()
 
 function querySNMPData ()
 {
+	global $sic;
 	$ver = genericAssertion ('ver', 'natural');
 	$snmpsetup = array ();
 	switch ($ver)
@@ -2680,7 +2706,7 @@ function querySNMPData ()
 	case 1:
 	case 2:
 		genericAssertion ('community', 'string');
-		$snmpsetup['community'] = $_REQUEST['community'];
+		$snmpsetup['community'] = $sic['community'];
 		break;
 	case 3:
 		assertStringArg ('sec_name');
@@ -2690,12 +2716,12 @@ function querySNMPData ()
 		assertStringArg ('priv_protocol');
 		assertStringArg ('priv_passphrase', TRUE);
 
-		$snmpsetup['sec_name'] = $_REQUEST['sec_name'];
-		$snmpsetup['sec_level'] = $_REQUEST['sec_level'];
-		$snmpsetup['auth_protocol'] = $_REQUEST['auth_protocol'];
-		$snmpsetup['auth_passphrase'] = $_REQUEST['auth_passphrase'];
-		$snmpsetup['priv_protocol'] = $_REQUEST['priv_protocol'];
-		$snmpsetup['priv_passphrase'] = $_REQUEST['priv_passphrase'];
+		$snmpsetup['sec_name'] = $sic['sec_name'];
+		$snmpsetup['sec_level'] = $sic['sec_level'];
+		$snmpsetup['auth_protocol'] = $sic['auth_protocol'];
+		$snmpsetup['auth_passphrase'] = $sic['auth_passphrase'];
+		$snmpsetup['priv_protocol'] = $sic['priv_protocol'];
+		$snmpsetup['priv_passphrase'] = $sic['priv_passphrase'];
 		break;
 	default:
 		throw new InvalidRequestArgException ('ver', $ver);
