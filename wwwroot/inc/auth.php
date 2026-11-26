@@ -565,6 +565,20 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 	return FALSE;
 }
 
+// The argument for ldap_connect(), which takes only an URI since PHP 8.3. An
+// entry of the 'server' option is either an URI itself, in which case the
+// 'port' option does not apply, or a host name or address. This is what
+// ldap_connect() with a host and a port did, except that it did not put an
+// IPv6 address into brackets and so could not use one.
+function getLDAPServerURI ($server, $port)
+{
+	if (FALSE !== strpos ($server, '/'))
+		return $server;
+	if (FALSE !== filter_var ($server, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6))
+		$server = "[{$server}]";
+	return "ldap://{$server}:{$port}";
+}
+
 // Attempt a server conversation and return an array describing the outcome:
 //
 // 'result' => 'CAN' : connect (or search) failed completely
@@ -596,7 +610,7 @@ function queryLDAPServer ($username, $password)
 
 	$last_successful_server = loadScript ('LDAPLastSuccessfulServer');
 	$success_server = NULL;
-	$servers = preg_split ("/\s+/", $LDAP_options['server'], NULL, PREG_SPLIT_NO_EMPTY);
+	$servers = preg_split ("/\s+/", $LDAP_options['server'], -1, PREG_SPLIT_NO_EMPTY);
 	if (isset ($last_successful_server) && in_array ($last_successful_server, $servers))	// Cached server is still present in config ?
 	{
 		// Use last successful server first
@@ -606,7 +620,7 @@ function queryLDAPServer ($username, $password)
 	// Try to connect to each server until first success
 	foreach ($servers as $server)
 	{
-		$connect = @ldap_connect ($server, array_fetch ($LDAP_options, 'port', 389));
+		$connect = @ldap_connect (getLDAPServerURI ($server, array_fetch ($LDAP_options, 'port', 389)));
 		if ($connect === FALSE)
 			continue;
 		ldap_set_option ($connect, LDAP_OPT_NETWORK_TIMEOUT, array_fetch ($LDAP_options, 'server_alive_timeout', 2));
@@ -631,7 +645,7 @@ function queryLDAPServer ($username, $password)
 				$success_server = $server;
 				// Cleanup after check. This connection will be used below
 				@ldap_unbind ($connect);
-				$connect = ldap_connect ($server, array_fetch ($LDAP_options, 'port', 389));
+				$connect = ldap_connect (getLDAPServerURI ($server, array_fetch ($LDAP_options, 'port', 389)));
 				break;
 			}
 		}

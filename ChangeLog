@@ -1,3 +1,5 @@
+0.23.2-community
+	update: remove three more PHP 8 deprecations (ports without an L2 address, LDAP server list and connection)
 0.23.1-community 2026-11-26
 	bugfix: a failed login with a wrong password no longer removes the LDAP cache row of the user while the directory server is down
 	update: leave the password of the LDAP search account out of the stored digest of the LDAP configuration

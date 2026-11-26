@@ -5340,7 +5340,8 @@ function alreadyUsedL2Address ($address, $my_object_id)
 function assertUniqueL2Addresses ($db_l2addresses, $my_object_id)
 {
 	// Reindex the array such that array_merge() below works as expected.
-	$db_l2addresses = array_values (array_unique (array_filter ($db_l2addresses, 'strlen')));
+	// A port without an address has NULL here.
+	$db_l2addresses = array_values (array_unique (array_filter ($db_l2addresses, function ($address) { return $address !== NULL && $address !== ''; })));
 	if (0 == count ($db_l2addresses))
 		return;
 	$qm = questionMarks (count ($db_l2addresses));
