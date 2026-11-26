@@ -12,6 +12,11 @@ upstream RackTables code again, so back up the database first. Read
 [Upgrading to 0.23.0-community](#upgrading-to-0230-community) before you
 upgrade.
 
+**0.24.0-community converts stored text** and changes what plugins and
+`local.php` code must do when they print it. Read
+[Upgrading to 0.24.0-community](#upgrading-to-0240-community) if you have
+code of your own or read the database directly.
+
 ## How it came to be, and a word about AI
 I have been a happy RackTables user for years. Over those years I also watched
 the bugs and issues pile up in the original tracker, while the author
@@ -34,8 +39,9 @@ Please report bugs in this fork via its
 about the original project are kept at https://bugs.racktables.org.
 
 ## Changes compared to upstream 0.22.0
-The complete list is in the `0.23.1-community` and `0.23.0-community` sections
-of `ChangeLog`, together with the `0.22.1` section below them: the changes
+The complete list is in the `0.24.0-community`, `0.23.1-community` and
+`0.23.0-community` sections of `ChangeLog`, together with the `0.22.1` section
+below them: the changes
 upstream made after 0.22.0 but never released, which this fork includes. In
 short:
 
@@ -61,6 +67,13 @@ short:
 * while the directory server is down, a failed login with a wrong password
   no longer removes the LDAP cache entry of the user, which used to lock the
   user out until the server came back (since 0.23.1-community).
+
+**Stored text**
+* every form stores text as it was typed, and the upgrade decodes the values
+  that older forms stored HTML-escaped (since 0.24.0-community); names with
+  `&` or `<` can be searched, sorted and edited without turning into entities;
+* names, labels, comments and configuration values are escaped where they are
+  printed, in about a hundred more places than before.
 
 **Data integrity**
 * rack, row, location and object changes, bulk object adds and the SNMP port

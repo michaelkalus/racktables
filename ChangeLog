@@ -1,4 +1,4 @@
-0.24.0-community
+0.24.0-community 2026-11-26
 	bugfix: escape the text of the cell filter, the real server and SLB configuration cells and the labels of the VLAN selector
 	update: send JSON replies of the AJAX interface with a JSON content type
 	update: store text as typed in every form and decode the existing HTML-escaped values once (names, labels, asset tags, comments, descriptions, configuration values)
