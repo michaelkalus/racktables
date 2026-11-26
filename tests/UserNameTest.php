@@ -186,10 +186,10 @@ class UserNameTest extends RTTestCase
 		usePreparedInsertBlade ('ObjectLog', array ('object_id' => $this->object_id, 'user' => $old, 'date' => '2026-01-01 00:00:00', 'content' => 'kept &amp; as typed'));
 		usePreparedExecuteBlade
 		(
-			'INSERT INTO ObjectHistory (id, name, objtype_id, ctime, user_name) VALUES (?, ?, 4, NOW(), ?)',
+			"INSERT INTO ObjectHistory (id, name, objtype_id, ctime, user_name) VALUES (?, ?, 4, '2018-01-30 09:40:23', ?)",
 			array ($this->object_id, 'history 152', $old)
 		);
-		usePreparedInsertBlade ('MountOperation', array ('object_id' => $this->object_id, 'user_name' => $old, 'comment' => 'c'));
+		usePreparedInsertBlade ('MountOperation', array ('object_id' => $this->object_id, 'ctime' => '2018-01-30 09:40:23', 'user_name' => $old, 'comment' => 'c'));
 		$port_id = commitAddPort ($this->object_id, 'p152', '1-24', '', '');
 		usePreparedInsertBlade ('PortLog', array ('port_id' => $port_id, 'date' => '2026-01-01 00:00:00', 'user' => $old, 'message' => "linked to R&amp;D &lt;sw&gt; ge-0/0/1"));
 		usePreparedInsertBlade ('IPv4Log', array ('ip' => ip4_bin2db ($this->ip4), 'date' => '2026-01-01 00:00:00', 'user' => $old, 'message' => 'Binded with R&amp;D, ifname=eth0'));
@@ -226,6 +226,9 @@ class UserNameTest extends RTTestCase
 			$this->assertSame (array ('kept &amp; as typed'), $this->column ('SELECT content FROM ObjectLog WHERE object_id = ?', array ($this->object_id)));
 			$this->assertSame (array ($typed), $this->column ('SELECT user_name FROM ObjectHistory WHERE id = ? AND name = ?', array ($this->object_id, 'history 152')));
 			$this->assertSame (array ($typed), $this->column ('SELECT user_name FROM MountOperation WHERE object_id = ?', array ($this->object_id)));
+			// the records keep the time of the change
+			$this->assertSame (array ('2018-01-30 09:40:23'), $this->column ('SELECT ctime FROM ObjectHistory WHERE id = ? AND name = ?', array ($this->object_id, 'history 152')));
+			$this->assertSame (array ('2018-01-30 09:40:23'), $this->column ('SELECT ctime FROM MountOperation WHERE object_id = ?', array ($this->object_id)));
 			$this->assertSame (array ($typed), $this->column ('SELECT PortLog.user FROM PortLog INNER JOIN Port ON port_id = Port.id WHERE object_id = ?', array ($this->object_id)));
 			$this->assertSame (array ('linked to R&D <sw> ge-0/0/1'), $this->column ('SELECT message FROM PortLog INNER JOIN Port ON port_id = Port.id WHERE object_id = ?', array ($this->object_id)));
 			$this->assertSame (array ($typed), $this->column ('SELECT user FROM IPv4Log WHERE ip = ?', array (ip4_bin2db ($this->ip4))));

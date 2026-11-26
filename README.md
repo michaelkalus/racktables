@@ -267,6 +267,11 @@ authentication, which always used the name as it is, only the account names
 are decoded. The LDAP cache is emptied, every LDAP user is verified against
 the server on the next request.
 
+The 0.24.0-community upgrade set the time of each object history record it
+decoded to the time of the upgrade. This is fixed for databases upgraded from
+now on; a database that went through 0.24.0-community already keeps the wrong
+time in those records (the records themselves are intact).
+
 `stringForLabel()`, `stringForTD()` and `stringForOption()` escape every
 ampersand again. Text that was typed to look like an entity (the five
 characters `&amp;`) is displayed as typed. **Code of your own** that passes
