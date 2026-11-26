@@ -34,9 +34,10 @@ Please report bugs in this fork via its
 about the original project are kept at https://bugs.racktables.org.
 
 ## Changes compared to upstream 0.22.0
-The complete list is in the `0.23.0-community` section of `ChangeLog`, together
-with the `0.22.1` section below it: the changes upstream made after 0.22.0 but
-never released, which this fork includes. In short:
+The complete list is in the `0.23.1-community` and `0.23.0-community` sections
+of `ChangeLog`, together with the `0.22.1` section below them: the changes
+upstream made after 0.22.0 but never released, which this fork includes. In
+short:
 
 **Current platforms**
 * runs on current PHP 8 releases without errors and without deprecation messages
@@ -56,7 +57,10 @@ never released, which this fork includes. In short:
   unsalted SHA-1, and existing hashes are replaced on login; the LDAP cache
   does the same for directory passwords (since 0.23.1-community);
 * user names are escaped in LDAP search filters, and sshnokey credentials are
-  no longer sent as session input.
+  no longer sent as session input;
+* while the directory server is down, a failed login with a wrong password
+  no longer removes the LDAP cache entry of the user, which used to lock the
+  user out until the server came back (since 0.23.1-community).
 
 **Data integrity**
 * rack, row, location and object changes, bulk object adds and the SNMP port
