@@ -533,11 +533,6 @@ function transformRequestData()
 	foreach (array_keys ($_REQUEST) as $key)
 		if (! isset ($seen_keys[$key]))
 			unset ($_REQUEST[$key]);
-
-	if (isset ($_SERVER['PHP_AUTH_USER']))
-		$_SERVER['PHP_AUTH_USER'] = htmlspecialchars ($_SERVER['PHP_AUTH_USER'], ENT_QUOTES, 'UTF-8');
-	if (isset ($_SERVER['REMOTE_USER']))
-		$_SERVER['REMOTE_USER'] = htmlspecialchars ($_SERVER['REMOTE_USER'], ENT_QUOTES, 'UTF-8');
 }
 
 // Return whether value passed is likely to be a URI.
@@ -880,8 +875,8 @@ function serializeTags ($chain, $baseurl = '')
 		{
 			$parent_info = array();
 			foreach ($taglist[$taginfo['id']]['trace'] as $tag_id)
-				$parent_info[] = $taglist[$tag_id]['tag'];
-			$parent_info[] = $taginfo['tag'];
+				$parent_info[] = htmlspecialchars ($taglist[$tag_id]['tag'], ENT_QUOTES, 'UTF-8');
+			$parent_info[] = htmlspecialchars ($taginfo['tag'], ENT_QUOTES, 'UTF-8');
 			if ($title != '')
 				$title .= "\n";
 			$title .= implode (" &rarr;  ", $parent_info);
@@ -909,7 +904,8 @@ function serializeTags ($chain, $baseurl = '')
 			$tag = 'a';
 			$href = "href='{$baseurl}cft[]={$taginfo['id']}'";
 		}
-		$tmp[] = "<$tag $href $title $class>" . $taginfo['tag'] . "</$tag>";
+		// An automatic tag can carry a user name, which is free text.
+		$tmp[] = "<$tag $href $title $class>" . htmlspecialchars ($taginfo['tag'], ENT_QUOTES, 'UTF-8') . "</$tag>";
 	}
 	return implode (', ', $tmp);
 }
@@ -1187,22 +1183,20 @@ function niftyString ($string, $maxlen = 30, $usetags = TRUE)
 		($usetags ? '</span>' : '');
 }
 
-// Some of the stored text is HTML-escaped already (the request handlers that
-// read $_REQUEST store it so), the display helpers below do not escape the
-// existing character references again to show such text as it was typed.
-// Form field values are posted back and must not be decoded, so
-// stringForTextInputValue() and stringForTextarea() escape every ampersand.
+// Stored text is kept as it was typed (since 0.24.0-community, user names
+// since 0.24.1-community), so each of the helpers below escapes its argument
+// completely: text that looks like a character reference is shown as typed.
 
 // "Some text, %s, some more text."
 function stringForLabel ($string, $maxlen = 30)
 {
 	// A tab counts for a space.
 	$string = preg_replace ("/\t/", ' ', $string);
-	$full = htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE);
+	$full = htmlspecialchars ($string, ENT_QUOTES, 'UTF-8');
 	if ($maxlen == 0 || mb_strlen ($string) <= $maxlen)
 		return $full;
 	$trimmed = mb_substr ($string, 0, $maxlen - 1);
-	$trimmed = htmlspecialchars ($trimmed, ENT_QUOTES, 'UTF-8', FALSE);
+	$trimmed = htmlspecialchars ($trimmed, ENT_QUOTES, 'UTF-8');
 	$trimmed = str_replace (' ', '&nbsp;', $trimmed) . '&hellip;';
 	return "<span title='{$full}'>{$trimmed}</span>";
 }
@@ -1233,9 +1227,9 @@ function stringForOption ($string, $maxlen = 80)
 {
 	$string = preg_replace ("/\t/", ' ', $string);
 	if ($maxlen == 0 || mb_strlen ($string) <= $maxlen)
-		return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE);
+		return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8');
 	$string = mb_substr ($string, 0, $maxlen - 1);
-	return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8', FALSE) . '&hellip;';
+	return htmlspecialchars ($string, ENT_QUOTES, 'UTF-8') . '&hellip;';
 }
 
 function printTagsPicker ($preselect=NULL)

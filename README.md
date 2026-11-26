@@ -39,7 +39,7 @@ Please report bugs in this fork via its
 about the original project are kept at https://bugs.racktables.org.
 
 ## Changes compared to upstream 0.22.0
-The complete list is in the `0.24.0-community`, `0.23.1-community` and
+The complete list is in the `0.24.1-community`, `0.24.0-community`, `0.23.1-community` and
 `0.23.0-community` sections of `ChangeLog`, together with the `0.22.1` section
 below them: the changes
 upstream made after 0.22.0 but never released, which this fork includes. In
@@ -73,7 +73,10 @@ short:
   that older forms stored HTML-escaped (since 0.24.0-community); names with
   `&` or `<` can be searched, sorted and edited without turning into entities;
 * names, labels, comments and configuration values are escaped where they are
-  printed, in about a hundred more places than before.
+  printed, in about a hundred more places than before;
+* user names are used as typed by the login and stored as typed (since
+  0.24.1-community), so a login name with `'` or `&` reaches the LDAP server
+  unchanged.
 
 **Data integrity**
 * rack, row, location and object changes, bulk object adds and the SNMP port
@@ -248,6 +251,30 @@ and initialize the application.
    [issue tracker of this fork](https://github.com/michaelkalus/racktables/issues).
 
 ## Release notes
+
+### Upgrading to 0.24.1-community
+User names are now used and stored as they are typed. Until this release the
+login name of HTTP basic, LDAP and httpd authentication had the characters
+`& < > " '` replaced by HTML entities before it was looked up, sent to the
+LDAP server and recorded with each change, and the "add user" form stored
+account names the same way. The upgrade decodes the names of the accounts, of
+the user preferences and of the change records once, and the generated
+messages of the port and IP address logs (as a whole, including text typed to
+look like an entity). Names without these characters, which is nearly all of
+them, are not affected. An account whose decoded name belongs to another
+account keeps its name, preferences and records as they are. With SAML
+authentication, which always used the name as it is, only the account names
+are decoded. The LDAP cache is emptied, every LDAP user is verified against
+the server on the next request.
+
+`stringForLabel()`, `stringForTD()` and `stringForOption()` escape every
+ampersand again. Text that was typed to look like an entity (the five
+characters `&amp;`) is displayed as typed. **Code of your own** that passes
+already escaped text to these functions now shows the entity; pass the text as
+it is.
+
+Take a backup of the database before the upgrade: the conversion cannot be
+undone.
 
 ### Upgrading to 0.24.0-community
 Text is now stored as it was typed. Until this release most forms stored
