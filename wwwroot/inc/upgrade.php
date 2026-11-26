@@ -1495,6 +1495,9 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			$drop_key = $result->fetchColumn() > 0 ? 'DROP KEY `scanidx`, ' : '';
 			unset ($result);
 			$query[] = "ALTER TABLE LDAPCache {$drop_key}MODIFY COLUMN successful_hash varchar(255) NOT NULL";
+			// issue #142: the stored digest of the LDAP configuration included the
+			// password of the search account. The next LDAP login stores a new one.
+			$query[] = "DELETE FROM Script WHERE script_name = 'LDAPConfigHash'";
 			$query[] = "UPDATE Config SET varvalue = '0.23.1-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':

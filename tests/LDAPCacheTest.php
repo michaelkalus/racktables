@@ -155,6 +155,51 @@ class LDAPCacheTest extends RTTestCase
 		}
 	}
 
+	// The stored digest of the configuration follows every option but the
+	// password of the search account.
+	/**
+	 * @group small
+	 */
+	public function testConfigHash ()
+	{
+		global $LDAP_options;
+		$saved = isset ($LDAP_options) ? $LDAP_options : NULL;
+		$base = array
+		(
+			'server' => 'ldap.example.com',
+			'search_dn' => 'ou=people,dc=example,dc=com',
+			'search_attr' => 'uid',
+			'search_bind_rdn' => 'cn=reader,dc=example,dc=com',
+			'cache_expiry' => 600,
+		);
+		try
+		{
+			$LDAP_options = $base;
+			$without = getLDAPConfigHash();
+			$this->assertSame (1, preg_match ('/^[0-9a-f]{64}$/D', $without));
+			$this->assertSame ($base, $LDAP_options);
+
+			$LDAP_options = $base + array ('search_bind_password' => 'secret');
+			$this->assertSame ($without, getLDAPConfigHash());
+			$this->assertSame ('secret', $LDAP_options['search_bind_password']);
+			$LDAP_options['search_bind_password'] = 'another secret';
+			$this->assertSame ($without, getLDAPConfigHash());
+			$this->assertNotSame (sha1 (serialize ($LDAP_options)), getLDAPConfigHash());
+
+			foreach (array ('server' => 'ldap2.example.com', 'search_bind_rdn' => 'cn=other,dc=example,dc=com', 'cache_expiry' => 601) as $name => $value)
+			{
+				$LDAP_options = array ($name => $value) + $base;
+				$this->assertNotSame ($without, getLDAPConfigHash(), $name);
+			}
+			$LDAP_options = $base + array ('use_tls' => 2);
+			$this->assertNotSame ($without, getLDAPConfigHash());
+		}
+		finally
+		{
+			$LDAP_options = $saved;
+		}
+	}
+
 	// A row that cannot be found after the insert (here because the name does
 	// not fit the column) makes acquireLDAPCache() retry and then give up
 	// without leaving a transaction open.
