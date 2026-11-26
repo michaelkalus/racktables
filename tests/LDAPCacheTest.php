@@ -155,6 +155,46 @@ class LDAPCacheTest extends RTTestCase
 		}
 	}
 
+	// Only an unexpired row with another password survives a request that was
+	// not authenticated.
+	/**
+	 * @group small
+	 */
+	public function testRowOfAnotherPassword ()
+	{
+		global $LDAP_options;
+		$saved = isset ($LDAP_options) ? $LDAP_options : NULL;
+		$LDAP_options = array ('cache_refresh' => 300, 'cache_retry' => 15, 'cache_expiry' => 600);
+		try
+		{
+			// the row that only serves as a lock
+			$row = acquireLDAPCache ($this->username);
+			releaseLDAPCache();
+			$this->assertFalse (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'wrong'));
+			$this->assertFalse (isLDAPCacheRowOfAnotherPassword (FALSE, $this->username, 'wrong'));
+
+			replaceLDAPCacheRecord ($this->username, makeLDAPCacheHash ('secret'), 'Some Name', array());
+			$row = fetchLDAPCacheRow ($this->username);
+			$this->assertTrue (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'wrong'));
+			$this->assertTrue (isLDAPCacheRowOfAnotherPassword ($row, $this->username, ''));
+			// the server has refused the cached password
+			$this->assertFalse (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'secret'));
+			// due for a refresh, not expired
+			$row['success_age'] = 400;
+			$this->assertTrue (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'wrong'));
+			$row['success_age'] = 600;
+			$this->assertFalse (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'wrong'));
+			// a digest of an earlier release
+			$row['success_age'] = 0;
+			$row['successful_hash'] = sha1 ('secret');
+			$this->assertFalse (isLDAPCacheRowOfAnotherPassword ($row, $this->username, 'wrong'));
+		}
+		finally
+		{
+			$LDAP_options = $saved;
+		}
+	}
+
 	// The stored digest of the configuration follows every option but the
 	// password of the search account.
 	/**

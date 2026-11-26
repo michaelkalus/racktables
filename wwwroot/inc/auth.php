@@ -473,6 +473,26 @@ function isLDAPCacheValid ($cache_row, $username, $password, $check_for_refreshi
 		LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password);
 }
 
+// TRUE for a cache row that is not expired and remembers a password other
+// than the given one. A request that was not authenticated says nothing
+// about such a row, so it stays: otherwise anybody could remove the row of
+// another user with a wrong password, which locks that user out while the
+// directory server cannot be reached. The caller keeps it only when the
+// server refused the given password or could not be reached: when the server
+// does not know the user (any more) or has accepted the given password, the
+// remembered one is obsolete. Any other row (the one that only
+// served as a lock, an expired one, one with the given password that the
+// server has just refused) is of no use after such a request.
+function isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password)
+{
+	global $LDAP_options;
+	return
+		is_array ($cache_row) &&
+		isModernPasswordHash ($cache_row['successful_hash']) &&
+		$cache_row['success_age'] < $LDAP_options['cache_expiry'] &&
+		! LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password);
+}
+
 // Idem, but consider existing data in cache and modify/discard it, when necessary.
 // Remember to have releaseLDAPCache() called before any return statement.
 // Perform cache maintenance on each update.
@@ -516,7 +536,8 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 				break;
 			case 'NAK': // The record isn't valid any more.
 				// TODO: negative result caching
-				deleteLDAPCacheRecord ($username);
+				if (empty ($ldap_answer['wrong_password']) || ! isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password))
+					deleteLDAPCacheRecord ($username);
 				break;
 			case 'CAN': // LDAP query failed, use old value till next retry
 				if (isLDAPCacheValid ($cache_row, $username, $password, FALSE))
@@ -524,7 +545,7 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 					touchLDAPCacheRecord ($username);
 					$user_data = $cache_row;
 				}
-				else
+				elseif (! empty ($ldap_answer['bound']) || ! isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password))
 					deleteLDAPCacheRecord ($username);
 				break;
 			default:
@@ -553,6 +574,11 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 // 'result' => 'ACK' : server replied and cleared access, there were no search errors
 // 'displayed_name' : a string built according to LDAP displayname_attrs option
 // 'memberof' => filtered list of all LDAP groups the user belongs to
+//
+// 'wrong_password' => TRUE : with 'NAK', a search has found the user and the
+// server refused the password (any other 'NAK' is, or may be, about the user)
+// 'bound' => TRUE : with 'CAN', the server did accept the password and a later
+// step failed
 //
 function queryLDAPServer ($username, $password)
 {
@@ -622,6 +648,9 @@ function queryLDAPServer ($username, $password)
 
 	// Build the server's version of the user's username for ldap_bind(). This may
 	// involve an anonymous (or a non-anonymous, with another ldap_bind()) LDAP search.
+	// TRUE once a search has found the user. Without the search a refused bind
+	// does not tell a wrong password from a user that does not exist.
+	$user_found = FALSE;
 	if (isset ($LDAP_options['domain']) && $LDAP_options['domain'] != '')
 		$auth_user_name = $username . "@" . $LDAP_options['domain'];
 	elseif
@@ -664,6 +693,7 @@ function queryLDAPServer ($username, $password)
 		$info = @ldap_get_entries ($connect, $results);
 		ldap_free_result ($results);
 		$auth_user_name = $info[0]['dn'];
+		$user_found = TRUE;
 	}
 	else
 		throw new RackTablesError ('LDAP misconfiguration. Cannon build username for authentication.', RackTablesError::MISCONFIGURED);
@@ -672,7 +702,7 @@ function queryLDAPServer ($username, $password)
 		switch (ldap_errno ($connect))
 		{
 		case 49: // LDAP_INVALID_CREDENTIALS
-			return array ('result' => 'NAK');
+			return array ('result' => 'NAK', 'wrong_password' => $user_found);
 		default:
 			return array ('result' => 'CAN');
 		}
@@ -702,7 +732,7 @@ function queryLDAPServer ($username, $password)
 		{
 			error_log ('RackTables: LDAP search for user attributes failed: ' . ldap_error ($connect));
 			@ldap_close ($connect);
-			return array ('result' => 'CAN');
+			return array ('result' => 'CAN', 'bound' => TRUE);
 		}
 		if (@ldap_count_entries ($connect, $results) != 1)
 		{
