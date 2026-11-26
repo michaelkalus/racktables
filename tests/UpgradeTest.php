@@ -56,7 +56,7 @@ class UpgradeTest extends RTTestCase
 	{
 		$versions = array();
 		foreach (scandir ('./data') as $file)
-			if (preg_match ('/^(\d+\.\d+\.\d+)\.sql$/', $file, $m))
+			if (preg_match ('/^(\d+\.\d+\.\d+(-community)?)\.sql$/', $file, $m))
 				$versions[] = $m[1];
 		usort ($versions, 'version_compare');
 		$ret = array();
