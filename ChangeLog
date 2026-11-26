@@ -1,4 +1,5 @@
 0.24.1-community
+	bugfix: the conversion of stored text keeps the time of the object history records it decodes (0.24.0-community set it to the time of the upgrade)
 	bugfix: use the login name as typed with HTTP basic, LDAP and httpd authentication, store user names as typed in the "add user" form and decode the existing HTML-escaped names once (accounts, preferences, change records)
 	bugfix: escape user names on the "my account" page, in the log tables, the rackspace history and automatic tags
 	update: stringForLabel(), stringForTD() and stringForOption() escape every ampersand again, text typed to look like an entity is displayed as typed

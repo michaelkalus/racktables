@@ -275,6 +275,11 @@ authentication, which always used the name as it is, only the account names
 are decoded. The LDAP cache is emptied, every LDAP user is verified against
 the server on the next request.
 
+The 0.24.0-community upgrade set the time of each object history record it
+decoded to the time of the upgrade. This is fixed for databases upgraded from
+now on; a database that went through 0.24.0-community already keeps the wrong
+time in those records (the records themselves are intact).
+
 stringForLabel(), stringForTD() and stringForOption() escape every ampersand
 again. Text that was typed to look like an entity (the five characters
 "&amp;amp;") is displayed as typed. Code of your own that passes already
@@ -1834,7 +1839,8 @@ function getStoredTextDecodingQueries ()
 	$query = array();
 	foreach ($columns as $table => $list)
 		foreach ($list as $column)
-			$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") . " WHERE `{$column}` LIKE '%&%;%'";
+			$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") .
+				getKeepTimestampSQL ($table) . " WHERE `{$column}` LIKE '%&%;%'";
 	$query = array_merge ($query, get8021QPortNameDecodingQueries());
 	// The two forms of RackCode can differ only in comments, which are not part
 	// of the parse tree. The cached tree is dropped all the same, init.php
@@ -1863,6 +1869,15 @@ function getStoredTextDecodingQueries ()
 		}
 	}
 	return $query;
+}
+
+// The time of a history record is a TIMESTAMP column that the server sets to
+// the current time whenever the row changes, unless the statement assigns
+// the column itself. Returns the assignment that keeps the recorded time, to
+// append to the SET clause of an UPDATE of the given table.
+function getKeepTimestampSQL ($table)
+{
+	return in_array ($table, array ('ObjectHistory', 'MountOperation')) ? ', ctime = ctime' : '';
 }
 
 // Until 0.24.1-community the login name of HTTP basic, LDAP and httpd
@@ -1912,6 +1927,7 @@ function getUserNameDecodingQueries ()
 	// after UserAccount, to see which accounts kept their names
 	foreach ($name_columns as $table => $column)
 		$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") .
+			getKeepTimestampSQL ($table) .
 			" WHERE `{$column}` LIKE '%&%;%' AND `{$column}` NOT IN (SELECT user_name FROM UserAccount)";
 	foreach (array ('PortLog', 'IPv4Log', 'IPv6Log') as $table)
 		$query[] = "UPDATE `{$table}` SET message = " . getHTMLDecodingSQL ('message') . " WHERE message LIKE '%&%;%'";

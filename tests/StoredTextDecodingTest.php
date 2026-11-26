@@ -128,8 +128,14 @@ class StoredTextDecodingTest extends RTTestCase
 		usePreparedInsertBlade ('IPv4LB', array ('object_id' => $object_id, 'rspool_id' => $this->pool_id, 'vs_id' => $this->vs_id, 'prio' => $e));
 		// values that were never escaped stay as they are
 		$raw_id = $this->addObject ($this->myString ('raw') . ' R&D; <b>', 'x & y; z', NULL);
+		// the history keeps the time of each change
+		usePreparedExecuteBlade ("UPDATE ObjectHistory SET ctime = '2018-01-30 09:40:23' WHERE id = ?", array ($object_id));
 
 		$this->runQueries();
+
+		$result = usePreparedSelectBlade ('SELECT DISTINCT ctime FROM ObjectHistory WHERE id = ?', array ($object_id));
+		$this->assertSame (array ('2018-01-30 09:40:23'), $result->fetchAll (PDO::FETCH_COLUMN), 'ObjectHistory.ctime');
+		$result->closeCursor();
 
 		$row = $this->fetchRow ('SELECT name, label, asset_no, comment FROM Object WHERE id = ?', array ($object_id));
 		$this->assertSame (array ('name' => $name, 'label' => self::TYPED, 'asset_no' => $asset, 'comment' => "line 1\n" . self::TYPED), $row);
