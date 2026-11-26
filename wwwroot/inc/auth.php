@@ -397,14 +397,54 @@ function authenticated_via_ldap_nocache ($username, $password, &$ldap_displaynam
 	return FALSE;
 }
 
+// The LDAP cache remembers the password of a successful bind as a password_hash()
+// result, so that a copy of the table does not allow guessing directory passwords
+// at the speed of a plain digest. bcrypt reads only the first 72 bytes of its
+// input and stops at a NUL byte, and a directory password is not limited that
+// way, so the password goes through SHA-256 first.
+function prepareLDAPCachePassword ($password)
+{
+	return base64_encode (hash ('sha256', $password, TRUE));
+}
+
+function makeLDAPCacheHash ($password)
+{
+	$ret = password_hash (prepareLDAPCachePassword ($password), PASSWORD_DEFAULT);
+	if (! isModernPasswordHash ($ret))
+		throw new RackTablesError ('password_hash() failed', RackTablesError::INTERNAL);
+	return $ret;
+}
+
+// TRUE if the password is the one the given LDAPCache.successful_hash was made
+// from. Any other stored value (the empty one of a row that only serves as a
+// lock, or a digest of an earlier release) matches no password. The slow
+// verification runs once per request for the same arguments, and a client
+// that keeps the PHP session cookie skips it the same way a local account
+// does (see passwordCheckSessionValue()).
+function LDAPCachePasswordMatches ($username, $stored, $password)
+{
+	static $verified = array();
+	if (! is_string ($password) || ! isModernPasswordHash ($stored))
+		return FALSE;
+	$subject = 'ldap:' . $username;
+	if (isPasswordCheckInSession ($subject, $stored, $password))
+		return TRUE;
+	$key = hash_hmac ('sha256', $password, $stored);
+	if (! isset ($verified[$key]))
+		$verified[$key] = password_verify (prepareLDAPCachePassword ($password), $stored);
+	if ($verified[$key])
+		savePasswordCheckInSession ($subject, $stored, $password);
+	return $verified[$key];
+}
+
 // check that LDAP cache row contains correct password and is not expired
 // if check_for_refreshing = TRUE, also checks that cache row does not need refreshing
-function isLDAPCacheValid ($cache_row, $password_hash, $check_for_refreshing = FALSE)
+// The password is checked last, because that is the expensive part.
+function isLDAPCacheValid ($cache_row, $username, $password, $check_for_refreshing = FALSE)
 {
 	global $LDAP_options;
 	return
 		is_array ($cache_row) &&
-		$cache_row['successful_hash'] === $password_hash &&
 		$cache_row['success_age'] < $LDAP_options['cache_expiry'] &&
 		(
 			// There are two confidence levels of cache hits: "certain" and "uncertain". In either case
@@ -416,7 +456,8 @@ function isLDAPCacheValid ($cache_row, $password_hash, $check_for_refreshing = F
 				isset ($cache_row['retry_age']) &&
 				$cache_row['retry_age'] < $LDAP_options['cache_retry']
 			)
-		);
+		) &&
+		LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password);
 }
 
 // Idem, but consider existing data in cache and modify/discard it, when necessary.
@@ -427,17 +468,16 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 	global $LDAP_options, $auto_tags;
 
 	$user_data = array(); // fill auto_tags and ldap_displayname from this array
-	$password_hash = sha1 ($password);
 
 	// first try to get cache row without locking it (quick way)
 	$cache_row = fetchLDAPCacheRow ($username);
-	if (isLDAPCacheValid ($cache_row, $password_hash, TRUE))
+	if (isLDAPCacheValid ($cache_row, $username, $password, TRUE))
 		$user_data = $cache_row; // cache HIT
 	else
 	{
 		// cache miss or expired. Try to lock LDAPCache for $username
 		$cache_row = acquireLDAPCache ($username);
-		if (isLDAPCacheValid ($cache_row, $password_hash, TRUE))
+		if (isLDAPCacheValid ($cache_row, $username, $password, TRUE))
 			$user_data = $cache_row; // cache HIT, but with DB lock
 		else
 		{
@@ -445,6 +485,19 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 			switch ($ldap_answer['result'])
 			{
 			case 'ACK':
+				// Keep the stored hash of an unchanged password, a new one costs
+				// as much as a verification and makes the session forget it.
+				if
+				(
+					LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password) &&
+					! password_needs_rehash ($cache_row['successful_hash'], PASSWORD_DEFAULT)
+				)
+					$password_hash = $cache_row['successful_hash'];
+				else
+				{
+					$password_hash = makeLDAPCacheHash ($password);
+					savePasswordCheckInSession ('ldap:' . $username, $password_hash, $password);
+				}
 				replaceLDAPCacheRecord ($username, $password_hash, $ldap_answer['displayed_name'], $ldap_answer['memberof']);
 				$user_data = $ldap_answer;
 				break;
@@ -453,7 +506,7 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 				deleteLDAPCacheRecord ($username);
 				break;
 			case 'CAN': // LDAP query failed, use old value till next retry
-				if (isLDAPCacheValid ($cache_row, $password_hash, FALSE))
+				if (isLDAPCacheValid ($cache_row, $username, $password, FALSE))
 				{
 					touchLDAPCacheRecord ($username);
 					$user_data = $cache_row;
