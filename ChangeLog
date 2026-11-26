@@ -1,3 +1,5 @@
+0.23.1-community
+	bugfix: ignore an invalid "andor" request argument instead of failing with HTTP 500 on PHP 8
 0.23.0-community 2026-11-25
 	update: first release of the community fork, numbered 0.23.0-community; 0.22.x is left to upstream
 	bugfix: fix installation on MySQL 8.4 (Mantis#2105) (GH #291 by Nuno Tavares)

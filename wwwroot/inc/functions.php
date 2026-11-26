@@ -2046,6 +2046,13 @@ function getCellFilter ()
 	global $pageno;
 	$andor_used = FALSE;
 	startSession();
+	// An unknown value is reported and then ignored as if it was not sent.
+	if (isset ($_REQUEST['andor']) && $_REQUEST['andor'] !== 'and' && $_REQUEST['andor'] !== 'or')
+	{
+		showWarning ('Invalid and/or switch value in submitted form');
+		unset ($_REQUEST['andor']);
+		unset ($sic['andor']);
+	}
 	// On the form submit "andor" appears on the request and means the user is
 	// trying to start a new filter or clear the existing one.
 	if (isset($_REQUEST['andor']))
@@ -2079,21 +2086,12 @@ function getCellFilter ()
 		'urlextra' => '', // Just put text here and let makeHref call urlencode().
 		'is_empty' => TRUE,
 	);
-	switch (TRUE)
-	{
-	case (!isset ($_REQUEST['andor'])):
+	if (isset ($_REQUEST['andor']))
+		$_SESSION[$pageno]['filter']['andor'] = $andor = $_REQUEST['andor'];
+	else
 		$andor = getConfigVar ('FILTER_DEFAULT_ANDOR');
-		break;
-	case ($_REQUEST['andor'] == 'and'):
-	case ($_REQUEST['andor'] == 'or'):
-		$_SESSION[$pageno]['filter']['andor'] = $_REQUEST['andor'];
-		$ret['andor'] = $andor = $_REQUEST['andor'];
-		break;
-	default:
-		showWarning ('Invalid and/or switch value in submitted form');
-		session_commit();
-		return NULL;
-	}
+	// The operator goes into the links whenever the filter text uses it.
+	$ret['andor'] = $andor;
 	// Both tags and predicates that don't exist, should be
 	// handled somehow. Discard them silently for now.
 	global $taglist, $pTable;
