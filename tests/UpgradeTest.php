@@ -170,10 +170,13 @@ ENDOFCODE;
 		// have the password "admin" as an SHA-1 hash in a char(40) column).
 		$this->assertTrue (authenticate_admin ('admin', 'admin'), "upgrader login before upgrading from {$version}");
 		$this->assertFalse (authenticate_admin ('admin', 'wrong password'));
-		// a cache row of an earlier release, with an SHA-1 digest of the password
-		usePreparedInsertBlade ('LDAPCache', array ('presented_username' => 'upgradetest', 'successful_hash' => sha1 ('secret')));
-		// a digest of the LDAP configuration as earlier releases stored it
-		usePreparedInsertBlade ('Script', array ('script_name' => 'LDAPConfigHash', 'script_text' => sha1 ('config')));
+		// What releases before 0.23.1-community left behind: a cache row with an
+		// SHA-1 digest of the password and a digest of the LDAP configuration.
+		if (in_array ('0.23.1-community', getDBUpgradePath ($version, CODE_VERSION)))
+		{
+			usePreparedInsertBlade ('LDAPCache', array ('presented_username' => 'upgradetest', 'successful_hash' => sha1 ('secret')));
+			usePreparedInsertBlade ('Script', array ('script_name' => 'LDAPConfigHash', 'script_text' => sha1 ('config')));
+		}
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
