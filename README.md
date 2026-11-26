@@ -236,6 +236,31 @@ and initialize the application.
 
 ## Release notes
 
+### Upgrading to 0.24.0-community
+Text is now stored as it was typed. Until this release most forms stored
+names, labels, asset tags, comments, descriptions and configuration values
+with the characters `& < > " '` replaced by HTML entities (for example
+`R&amp;D`), while other forms and the data read from devices stored them as
+they are. The upgrade decodes the existing values once. Pages look the same
+as before; the edit forms, the search, sorting and anything that reads the
+database directly now see the real characters.
+
+**If you have plugins, a `local.php` or reports of your own:** text read from
+the database must be escaped where it is printed, for example with
+`stringForLabel()` or `htmlspecialchars()`. Code that printed such values as
+they are was safe only because the values were stored escaped, and is not any
+more. Programs that read the database directly now find `R&D` where `R&amp;D`
+was.
+
+Text that was typed to look like an entity on purpose (the five characters
+`&amp;`) is decoded as well and becomes the character itself. A value is left
+as it is where the decoded form would be a duplicate of another asset tag, or
+of another port name of the same object and type; edit such a value by hand.
+User names and the log records are not converted.
+
+Take a backup of the database before the upgrade: the conversion cannot be
+undone.
+
 ### Upgrading to 0.23.1-community
 With LDAP authentication and its cache enabled, the cache used to keep an
 unsalted SHA-1 digest of the directory password of every cached user. It now
