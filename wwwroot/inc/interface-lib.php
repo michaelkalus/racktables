@@ -1222,20 +1222,6 @@ function stringForTextInputValue ($string, $maxlen = 30)
 	return htmlspecialchars ($string ?? '', ENT_QUOTES, 'UTF-8');
 }
 
-// "<INPUT type=text value='%s'>" for a field that older versions of its form
-// stored HTML-escaped and that is now stored as typed. A value that is exactly
-// what htmlspecialchars() makes of some text is taken for an escaped value and
-// shown as that text, any other value is shown as stored. (Text typed to look
-// like an escaped value, such as "&amp;", is shown decoded.)
-function stringForStoredTextInputValue ($string)
-{
-	$string = $string ?? '';
-	$decoded = htmlspecialchars_decode ($string, ENT_QUOTES);
-	if ($decoded !== $string && htmlspecialchars ($decoded, ENT_QUOTES, 'UTF-8') === $string)
-		$string = $decoded;
-	return stringForTextInputValue ($string, 0);
-}
-
 // "<TEXTAREA>%s</TEXTAREA>"
 function stringForTextarea ($string)
 {

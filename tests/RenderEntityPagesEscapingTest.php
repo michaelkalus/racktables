@@ -792,23 +792,20 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		$pageno = 'ipaddress';
 		$tabno = 'properties';
 		$ip_bin = ip4_parse ('198.51.100.20');
-		// as typed (in-place editor) and HTML-escaped (the form before)
-		foreach (array (self::RAW, htmlspecialchars (self::RAW, ENT_QUOTES, 'UTF-8')) as $stored)
+		updateAddress ($ip_bin, self::RAW, 'no', self::RAW);
+		$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
+		$this->assertEscaped ("name=name id=id_name size=20 value='", "'>", $output);
+		$this->assertEscaped ("name=comment id=id_comment size=20 value='", "'>", $output);
+		// Text that looks like a character reference is the text itself.
+		foreach (array ('&amp; <', '&amp;', '&lt;b&gt;') as $stored)
 		{
-			updateAddress ($ip_bin, $stored, 'no', $stored);
-			$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
-			$this->assertEscaped ("name=name id=id_name size=20 value='", "'>", $output);
-			$this->assertEscaped ("name=comment id=id_comment size=20 value='", "'>", $output);
+			updateAddress ($ip_bin, $stored, 'no', '');
+			$this->assertSame ($stored, $this->addressFormValue (getOutputOf ('renderIPAddressProperties', $ip_bin), 'name'));
 		}
-		// Text with an unescaped special character was not escaped when
-		// stored, so its references are its own text.
-		updateAddress ($ip_bin, '&amp; <', 'no', '');
-		$this->assertSame ('&amp; <', $this->addressFormValue (getOutputOf ('renderIPAddressProperties', $ip_bin), 'name'));
 	}
 
-	// The properties form stores the text as typed. A value stored before
-	// in either form is shown as typed, stored as typed on the first save
-	// and stays unchanged on the next saves.
+	// The properties form shows the stored text and stores the text as typed,
+	// so saving the form any number of times changes nothing.
 	/**
 	 * @group small
 	 */
@@ -820,30 +817,26 @@ class RenderEntityPagesEscapingTest extends RTTestCase
 		(
 			'A & B <c> "d" \'e\' &amp; f',
 			'R&D',
+			'R&amp;D',
 			self::RAW,
+			htmlspecialchars (self::RAW, ENT_QUOTES, 'UTF-8'),
 		);
 		foreach ($cases as $typed)
-			foreach (array ($typed, htmlspecialchars ($typed, ENT_QUOTES, 'UTF-8')) as $stored)
+		{
+			updateAddress ($ip_bin, $typed, 'no', $typed);
+			for ($cycle = 1; $cycle <= 3; $cycle++)
 			{
-				updateAddress ($ip_bin, $stored, 'no', $stored);
-				for ($cycle = 1; $cycle <= 3; $cycle++)
-				{
-					$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
-					$name = $this->addressFormValue ($output, 'name');
-					$comment = $this->addressFormValue ($output, 'comment');
-					$this->assertSame ($typed, $name, "name shown, cycle {$cycle}, stored '{$stored}'");
-					$this->assertSame ($typed, $comment, "comment shown, cycle {$cycle}, stored '{$stored}'");
-					$this->saveAddressForm ($ip, $name, $comment);
-					$address = getIPAddress ($ip_bin);
-					$this->assertSame ($typed, $address['name'], "name stored, cycle {$cycle}, stored '{$stored}'");
-					$this->assertSame ($typed, $address['comment'], "comment stored, cycle {$cycle}, stored '{$stored}'");
-				}
+				$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
+				$name = $this->addressFormValue ($output, 'name');
+				$comment = $this->addressFormValue ($output, 'comment');
+				$this->assertSame ($typed, $name, "name shown, cycle {$cycle}");
+				$this->assertSame ($typed, $comment, "comment shown, cycle {$cycle}");
+				$this->saveAddressForm ($ip, $name, $comment);
+				$address = getIPAddress ($ip_bin);
+				$this->assertSame ($typed, $address['name'], "name stored, cycle {$cycle}");
+				$this->assertSame ($typed, $address['comment'], "comment stored, cycle {$cycle}");
 			}
-		// The one ambiguous case: text that is exactly the escaped form of
-		// another text is shown and saved as that text.
-		updateAddress ($ip_bin, '&amp;', 'no', '');
-		$output = getOutputOf ('renderIPAddressProperties', $ip_bin);
-		$this->assertSame ('&', $this->addressFormValue ($output, 'name'));
+		}
 	}
 
 	// address name and comment in the change log of an address

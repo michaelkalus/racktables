@@ -165,7 +165,7 @@ $.fn.optionTree = function(tree, options) {
             }
 
             if ( text_to_choose !== '' ) {
-              $("<option>").html(text_to_choose).val('').appendTo($select);
+              $("<option>").text(text_to_choose).val('').appendTo($select);
             }
 
             var foundPreselect = false;
@@ -177,7 +177,7 @@ $.fn.optionTree = function(tree, options) {
                 } else {
                     label = value = k;
                 }
-                var o = $("<option>").html(label)
+                var o = $("<option>").text(label)
                     .attr('value', value);
                 var clean = cleanName(name);
                     if (options.leaf_class && typeof value !== 'object') { // this option is a leaf node

@@ -233,6 +233,32 @@ HTTP basic authentication with each request, now spends the time of one
 password verification (a fraction of a second) on every request.
 ENDOFTEXT
 ,
+
+	'0.24.0-community' => <<<'ENDOFTEXT'
+Text is now stored as it was typed. Until this release most forms stored names,
+labels, asset tags, comments, descriptions and configuration values with the
+characters & < > " ' replaced by HTML entities (for example "R&amp;D"), while
+other forms and the data read from devices stored them as they are. This
+upgrade decodes the existing values once. Pages look the same as before; the
+edit forms, the search, sorting and anything that reads the database directly
+now see the real characters.
+
+If you have plugins, a local.php or reports of your own: text read from the
+database must be escaped where it is printed, for example with
+stringForLabel() or htmlspecialchars(). Code that printed such values as they
+are was safe only because the values were stored escaped, and is not any more.
+Programs that read the database directly now find "R&D" where "R&amp;D" was.
+
+Text that was typed to look like an entity on purpose (the five characters
+"&amp;") is decoded as well and becomes the character itself. A value is left
+as it is where the decoded form would be a duplicate of another asset tag, or
+of another port name of the same object and type; edit such a value by hand.
+User names and the log records are not converted.
+
+Take a backup of the database before the upgrade: the conversion cannot be
+undone.
+ENDOFTEXT
+,
 );
 
 // This function currently implements a convention that to upgrade any release R1
@@ -269,6 +295,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.22.1',
 		'0.23.0-community',
 		'0.23.1-community',
+		'0.24.0-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1500,6 +1527,11 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			$query[] = "DELETE FROM Script WHERE script_name = 'LDAPConfigHash'";
 			$query[] = "UPDATE Config SET varvalue = '0.23.1-community' WHERE varname = 'DB_VERSION'";
 			break;
+		case '0.24.0-community':
+			// issue #73: decode the text that the forms used to store HTML-escaped
+			$query = array_merge ($query, getStoredTextDecodingQueries());
+			$query[] = "UPDATE Config SET varvalue = '0.24.0-community' WHERE varname = 'DB_VERSION'";
+			break;
 		case 'dictionary':
 			$query = reloadDictionary();
 			break;
@@ -1730,6 +1762,159 @@ echo '</body></html>';
 function extendPortCompatQuery()
 {
 	return "INSERT INTO PortCompat SELECT pc1.type2, pc1.type1 FROM PortCompat pc1 LEFT JOIN PortCompat pc2 ON pc1.type1 = pc2.type2 AND pc1.type2 = pc2.type1 WHERE pc2.type1 IS NULL";
+}
+
+// Until 0.24.0-community most forms stored text HTML-escaped (the result of
+// htmlspecialchars() with ENT_QUOTES), and some stored it as typed, often in
+// the same column (issue #73). Now every form stores text as typed. Returns the
+// queries that decode the columns the escaping forms wrote to, once.
+//
+// A column cannot tell an escaped value from text that was typed to look like
+// one, so every value is decoded: "&amp;" typed on purpose becomes "&". A row
+// stays as it is where the decoded value would collide with another row on a
+// unique key (Object.asset_no, the name of a port of the same object and type).
+//
+// The forms for Config and UserConfig added another level of escaping to a
+// value with one of these characters on every save, so these values are decoded
+// until nothing changes. They are few, hence one statement per changed value.
+//
+// The 802.1Q tables refer to a port by its name, see
+// get8021QPortNameDecodingQueries().
+//
+// Not converted: the user name columns, which the authentication code still
+// fills in escaped form, and the log tables, which are history.
+function getStoredTextDecodingQueries ()
+{
+	global $dbxlink;
+	$columns = array
+	(
+		'Object' => array ('name', 'label', 'asset_no', 'comment'),
+		'ObjectHistory' => array ('name', 'label', 'asset_no', 'comment'),
+		'Port' => array ('name', 'label'),
+		'Link' => array ('cable'),
+		'IPv4Address' => array ('name', 'comment'),
+		'IPv6Address' => array ('name', 'comment'),
+		'IPv4Allocation' => array ('name'),
+		'IPv6Allocation' => array ('name'),
+		'IPv4NAT' => array ('description'),
+		'IPv4VS' => array ('name'),
+		'IPv4RSPool' => array ('name'),
+		'IPv4LB' => array ('prio'),
+	);
+	$query = array();
+	foreach ($columns as $table => $list)
+		foreach ($list as $column)
+			$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") . " WHERE `{$column}` LIKE '%&%;%'";
+	$query = array_merge ($query, get8021QPortNameDecodingQueries());
+	// The two forms of RackCode can differ only in comments, which are not part
+	// of the parse tree. The cached tree is dropped all the same, init.php
+	// builds it again from the stored text.
+	$query[] = "UPDATE Script SET script_text = " . getHTMLDecodingSQL ('script_text') . " WHERE script_name = 'RackCode' AND script_text LIKE '%&%;%'";
+	$query[] = "DELETE FROM Script WHERE script_name = 'RackCodeCache'";
+	foreach (array ('Config' => array ('varname'), 'UserConfig' => array ('varname', 'user')) as $table => $keys)
+	{
+		$result = $dbxlink->query ('SELECT ' . implode (', ', $keys) . ", varvalue FROM {$table} WHERE varvalue LIKE '%&%;%'");
+		$rows = $result->fetchAll (PDO::FETCH_ASSOC);
+		unset ($result);
+		foreach ($rows as $row)
+		{
+			$decoded = $row['varvalue'];
+			do
+			{
+				$previous = $decoded;
+				$decoded = htmlspecialchars_decode ($previous, ENT_QUOTES);
+			} while ($decoded !== $previous);
+			if ($decoded === $row['varvalue'])
+				continue;
+			$where = array();
+			foreach ($keys as $key)
+				$where[] = "{$key} = " . $dbxlink->quote ($row[$key]);
+			$query[] = "UPDATE {$table} SET varvalue = " . $dbxlink->quote ($decoded) . ' WHERE ' . implode (' AND ', $where);
+		}
+	}
+	return $query;
+}
+
+// The six 802.1Q tables are keyed by object and port name and refer to each
+// other by foreign keys that do not follow a changed key. Most of their rows
+// come from the devices, but a port renamed or selected through one of the
+// escaping forms left its escaped name there. Such a name is decoded together
+// with Port.name: its rows are copied under the decoded name, parents first,
+// and the rows of the old name are deleted, children first by cascade. A name
+// is left alone if the decoded name already has rows for the same object, or
+// if its port keeps the escaped name. If a statement fails, the rows of the
+// old name are still there.
+function get8021QPortNameDecodingQueries ()
+{
+	global $dbxlink;
+	// in the order of their foreign keys, with the columns to copy
+	$tables = array
+	(
+		'CachedPVM' => 'vlan_mode',
+		'CachedPAV' => 'vlan_id',
+		'CachedPNV' => 'vlan_id',
+		'PortVLANMode' => 'vlan_mode',
+		'PortAllowedVLAN' => 'vlan_id',
+		'PortNativeVLAN' => 'vlan_id',
+	);
+	$names = array(); // object_id => (port_name => TRUE)
+	$candidates = array();
+	foreach (array_keys ($tables) as $table)
+	{
+		$result = $dbxlink->query ("SELECT DISTINCT object_id, port_name FROM {$table}");
+		foreach ($result->fetchAll (PDO::FETCH_NUM) as $row)
+		{
+			$names[$row[0]][$row[1]] = TRUE;
+			if ($row[1] !== decodeHTMLOnce ($row[1]))
+				$candidates[$row[0]][$row[1]] = decodeHTMLOnce ($row[1]);
+		}
+		unset ($result);
+	}
+	// A port that keeps its escaped name, because another port of the same
+	// object and type has the decoded one, keeps its 802.1Q rows as well.
+	$decoded = getHTMLDecodingSQL ('a.name');
+	$result = $dbxlink->query
+	(
+		'SELECT a.object_id, a.name FROM Port a INNER JOIN Port b ' .
+		"ON a.object_id = b.object_id AND a.iif_id = b.iif_id AND a.type = b.type AND a.id != b.id AND b.name = {$decoded} " .
+		"WHERE a.name LIKE '%&%;%'"
+	);
+	$kept = array();
+	foreach ($result->fetchAll (PDO::FETCH_NUM) as $row)
+		$kept[$row[0]][$row[1]] = TRUE;
+	unset ($result);
+	$query = array();
+	foreach ($candidates as $object_id => $list)
+		foreach ($list as $old => $new)
+		{
+			if (isset ($names[$object_id][$new]) || isset ($kept[$object_id][$old]))
+				continue;
+			// two names of one object may decode to the same name
+			$names[$object_id][$new] = TRUE;
+			$object_id = intval ($object_id);
+			$where = "object_id = {$object_id} AND port_name = " . $dbxlink->quote ($old);
+			foreach ($tables as $table => $column)
+				$query[] = "INSERT INTO {$table} (object_id, port_name, {$column}) SELECT object_id, " . $dbxlink->quote ($new) . ", {$column} FROM {$table} WHERE {$where}";
+			$query[] = "DELETE FROM PortVLANMode WHERE {$where}";
+			$query[] = "DELETE FROM CachedPVM WHERE {$where}";
+		}
+	return $query;
+}
+
+// What getHTMLDecodingSQL() does, for a PHP string.
+function decodeHTMLOnce ($text)
+{
+	return str_replace (array ('&lt;', '&gt;', '&quot;', '&#039;', '&amp;'), array ('<', '>', '"', "'", '&'), $text);
+}
+
+// An SQL expression that undoes htmlspecialchars() with ENT_QUOTES once for
+// the given SQL expression. The ampersand comes last, so that "&amp;lt;"
+// becomes "&lt;" and not "<".
+function getHTMLDecodingSQL ($expr)
+{
+	foreach (array ('&lt;' => '<', '&gt;' => '>', '&quot;' => '"', '&#039;' => "''", '&amp;' => '&') as $entity => $char)
+		$expr = "REPLACE({$expr}, '{$entity}', '{$char}')";
+	return $expr;
 }
 
 // Older releases created the keys Object.id-tid and TagTree.id-is_assignable as

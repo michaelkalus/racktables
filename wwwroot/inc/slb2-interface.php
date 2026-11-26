@@ -580,12 +580,12 @@ function getPopupSLBConfig ($row)
 	if ($do_vs)
 	{
 		$ret .= '<h1>VS config:</h1>';
-		$ret .= $row['vsconfig'];
+		$ret .= htmlspecialchars ($row['vsconfig'], ENT_QUOTES, 'UTF-8');
 	}
 	if ($do_rs)
 	{
 		$ret .= '<h1>RS config:</h1>';
-		$ret .= $row['rsconfig'];
+		$ret .= htmlspecialchars ($row['rsconfig'], ENT_QUOTES, 'UTF-8');
 	}
 	$ret .= '</div>';
 

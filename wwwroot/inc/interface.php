@@ -589,7 +589,7 @@ function renderLocationRowForEditor ($subtree, $level = 0)
 			FALSE
 		);
 		echo "</td><td class=tdleft>";
-		echo "<input type=text size=48 name=name value='{$locationinfo['name']}'>";
+		echo "<input type=text size=48 name=name value='" . stringForTextInputValue ($locationinfo['name'], 0) . "'>";
 		echo '</td><td>' . getImageHREF ('save', 'Save changes', TRUE) . "</form></td></tr>\n";
 		if ($locationinfo['kidc'])
 			$self ($locationinfo['kids'], $level + 1);
@@ -686,7 +686,7 @@ function renderRackspaceRowEditor ()
 		echo getRowMountsCount ($row_id);
 		echo '</td><td>';
 		renderLocationSelectTree ('location_id', $rowInfo['location_id']);
-		echo "</td><td><input type=text name=name value='{$rowInfo['name']}'></td><td>";
+		echo "</td><td><input type=text name=name value='" . stringForTextInputValue ($rowInfo['name'], 0) . "'></td><td>";
 		printImageHREF ('save', 'Save changes', TRUE);
 		echo "</form></td>";
 		echo '<td>&nbsp;</td>';
@@ -835,7 +835,7 @@ function renderEditRowForm ($row_id)
 	natcasesort ($locations);
 	printSelect ($locations, array ('name' => 'location_id'), $row['location_id']);
 	echo "</td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='{$row['name']}'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='" . stringForTextInputValue ($row['name'], 0) . "'></td></tr>\n";
 	renderEditAttributeTRs ('updateRow', getAttrValuesSorted ($row_id), 1561);
 	if ($row['count'] == 0)
 	{
@@ -1160,9 +1160,9 @@ function renderEditObjectForm()
 	printSelect (getObjectTypeChangeOptions ($object['id']), array ('name' => 'object_type_id'), $object['objtype_id']);
 	echo '</td></tr>';
 	// baseline info
-	echo "<tr><td>&nbsp;</td><th class=tdright>Common name:</th><td class=tdleft><input type=text name=object_name value='{$object['name']}'></td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Visible label:</th><td class=tdleft><input type=text name=object_label value='{$object['label']}'></td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Asset tag:</th><td class=tdleft><input type=text name=object_asset_no value='{$object['asset_no']}'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Common name:</th><td class=tdleft><input type=text name=object_name value='" . stringForTextInputValue ($object['name'], 0) . "'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Visible label:</th><td class=tdleft><input type=text name=object_label value='" . stringForTextInputValue ($object['label'], 0) . "'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Asset tag:</th><td class=tdleft><input type=text name=object_asset_no value='" . stringForTextInputValue ($object['asset_no'], 0) . "'></td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
@@ -1206,7 +1206,7 @@ function renderEditObjectForm()
 	echo "&nbsp;";
 	echo getOpLink (array ('op'=>'resetObject'), '' ,'clear', 'Reset (cleanup) object', 'need-confirmation');
 	echo "</td></tr>\n";
-	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=object_comment rows=10 cols=80>{$object['comment']}</textarea></td></tr>";
+	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=object_comment rows=10 cols=80>" . stringForTextarea ($object['comment']) . "</textarea></td></tr>";
 
 	echo "<tr><th class=submit colspan=3>";
 	printImageHREF ('SAVE', 'Save changes', TRUE);
@@ -1241,9 +1241,9 @@ function renderEditRackForm ($rack_id)
 		$rows = array ('' => '(no row)') + $rows;
 	printSelect ($rows, array ('name' => 'row_id'), $rack['row_id'] === NULL ? '' : $rack['row_id']);
 	echo "</td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='{$rack['name']}'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='" . stringForTextInputValue ($rack['name'], 0) . "'></td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Height (required):</th><td class=tdleft><input type=text name=height value='{$rack['height']}'></td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Asset tag:</th><td class=tdleft><input type=text name=asset_no value='{$rack['asset_no']}'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Asset tag:</th><td class=tdleft><input type=text name=asset_no value='" . stringForTextInputValue ($rack['asset_no'], 0) . "'></td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
@@ -1265,7 +1265,7 @@ function renderEditRackForm ($rack_id)
 		echo "&nbsp;";
 	}
 	echo "</td></tr>\n";
-	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=comment rows=10 cols=80>{$rack['comment']}</textarea></td></tr>";
+	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=comment rows=10 cols=80>" . stringForTextarea ($rack['comment']) . "</textarea></td></tr>";
 	echo "<tr><td class=submit colspan=3>";
 	printImageHREF ('SAVE', 'Save changes', TRUE);
 	echo "</td></tr>\n";
@@ -3422,9 +3422,9 @@ function renderIPAddressProperties ($ip_bin)
 	echo "<table border=0 cellpadding=10 cellpadding=1 align='center'>\n";
 	printOpFormIntro ('editAddress');
 	echo '<tr><td class=tdright><label for=id_name>Name:</label></td>';
-	echo "<td class=tdleft><input type=text name=name id=id_name size=20 value='" . stringForStoredTextInputValue ($address['name']) . "'></tr>";
+	echo "<td class=tdleft><input type=text name=name id=id_name size=20 value='" . stringForTextInputValue ($address['name'], 0) . "'></tr>";
 	echo '<tr><td class=tdright><label for=id_comment>Comment:</label></td>';
-	echo "<td class=tdleft><input type=text name=comment id=id_comment size=20 value='" . stringForStoredTextInputValue ($address['comment']) . "'></tr>";
+	echo "<td class=tdleft><input type=text name=comment id=id_comment size=20 value='" . stringForTextInputValue ($address['comment'], 0) . "'></tr>";
 	echo '<td class=tdright><label for=id_reserved>Reserved:</label></td>';
 	echo "<td class=tdleft><input type=checkbox name=reserved id=id_reserved size=20 ";
 	echo ($address['reserved']=='yes') ? 'checked' : '';
@@ -3607,7 +3607,7 @@ function renderNATv4ForObject ($object_id)
 			)
 		);
 		echo "</td><td class='description'>";
-		echo "<input type='text' name='description' value='{$pf['description']}'></td><td>";
+		echo "<input type='text' name='description' value='" . stringForTextInputValue ($pf['description'], 0) . "'></td><td>";
 		printImageHREF ('save', 'Save changes', TRUE);
 		echo "</td></form></tr>";
 	}
@@ -4176,7 +4176,7 @@ function renderEditLocationForm ($location_id)
 	natcasesort($locations);
 	printSelect ($locations, array ('name' => 'parent_id'), $location['parent_id']);
 	echo "</td></tr>\n";
-	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='{$location['name']}'></td></tr>\n";
+	echo "<tr><td>&nbsp;</td><th class=tdright>Name (required):</th><td class=tdleft><input type=text name=name value='" . stringForTextInputValue ($location['name'], 0) . "'></td></tr>\n";
 	echo "<tr><td>&nbsp;</td><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
@@ -4192,7 +4192,7 @@ function renderEditLocationForm ($location_id)
 		echo getOpLink (array('op'=>'deleteLocation'), '', 'destroy', 'Delete location', 'need-confirmation');
 		echo "&nbsp;</td></tr>\n";
 	}
-	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=comment rows=10 cols=80>{$location['comment']}</textarea></td></tr>";
+	echo "<tr><td colspan=3><b>Comment:</b><br><textarea name=comment rows=10 cols=80>" . stringForTextarea ($location['comment']) . "</textarea></td></tr>";
 	echo "<tr><td class=submit colspan=3>";
 	printImageHREF ('SAVE', 'Save changes', TRUE);
 	echo "</td></tr>\n";
@@ -4258,6 +4258,8 @@ function renderSNMPPortFinder ($object_id)
 	}
 	if ('' == $snmpcomm = getConfigVar ('DEFAULT_SNMP_COMMUNITY'))
 		$snmpcomm = 'public';
+	// It is only used as the initial value of text inputs below.
+	$snmpcomm = stringForTextInputValue ($snmpcomm, 0);
 
 	startPortlet ('SNMPv1');
 	printOpFormIntro ('querySNMPData', array ('ver' => 1));
@@ -4634,7 +4636,7 @@ function renderCellFilterPortlet ($preselect, $realm, $cell_list = array(), $byp
 	{
 		echo $hr;
 		$hr = $ruler;
-		$andor = $preselect['andor'] != '' ? $preselect['andor'] : getConfigVar ('FILTER_DEFAULT_ANDOR');
+		$andor = $preselect['andor'] != '' ? $preselect['andor'] : getDefaultFilterAndor();
 		echo '<tr>';
 		foreach (array ('and', 'or') as $boolop)
 		{
@@ -4706,7 +4708,7 @@ function renderCellFilterPortlet ($preselect, $realm, $cell_list = array(), $byp
 		echo $hr;
 		$hr = $ruler;
 		$class = isset ($preselect['extraclass']) ? 'class=' . $preselect['extraclass'] : '';
-		echo "<tr><td colspan=2><textarea name=cfe {$class}>\n" . $preselect['extratext'];
+		echo "<tr><td colspan=2><textarea name=cfe {$class}>\n" . stringForTextarea ($preselect['extratext']);
 		echo "</textarea></td></tr>\n";
 	}
 	// submit block
@@ -4738,15 +4740,16 @@ function renderCellFilterPortlet ($preselect, $realm, $cell_list = array(), $byp
 			$text .= empty ($preselect['text']) || empty ($preselect['extratext'])
 				? $preselect['extratext']
 				: '(' . $preselect['extratext'] . ')';
-			$text = addslashes ($text);
-			echo " <a href=\"#\" onclick=\"textifyCellFilter(this, '$text'); return false\">";
+			// a JavaScript string literal inside an HTML attribute
+			$text = htmlspecialchars (json_encode ($text), ENT_QUOTES, 'UTF-8');
+			echo " <a href=\"#\" onclick=\"textifyCellFilter(this, {$text}); return false\">";
 			printImageHREF ('COPY', 'Make text expression from current filter');
 			echo '</a>';
 			addJSText (<<<'END'
 function textifyCellFilter(target, text)
 {
 	var portlet = $(target).closest ('.portlet');
-	portlet.find ('textarea[name="cfe"]').html (text);
+	portlet.find ('textarea[name="cfe"]').val (text);
 	portlet.find ('input[type="checkbox"]').attr('checked', '');
 	portlet.find ('input[type="radio"][value="and"]').attr('checked','true');
 }
