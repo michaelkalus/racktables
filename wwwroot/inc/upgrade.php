@@ -269,6 +269,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.22.1',
 		'0.23.0-community',
 		'0.23.1-community',
+		'0.24.0-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1499,6 +1500,9 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			// password of the search account. The next LDAP login stores a new one.
 			$query[] = "DELETE FROM Script WHERE script_name = 'LDAPConfigHash'";
 			$query[] = "UPDATE Config SET varvalue = '0.23.1-community' WHERE varname = 'DB_VERSION'";
+			break;
+		case '0.24.0-community':
+			$query[] = "UPDATE Config SET varvalue = '0.24.0-community' WHERE varname = 'DB_VERSION'";
 			break;
 		case 'dictionary':
 			$query = reloadDictionary();
