@@ -613,7 +613,7 @@ function getAccessPortControlCode ($req_port_name, $vdom, $port_name, $port, &$n
 			if (nativeVlanChangePermitted ($port_name, $from, $to, 'save8021QConfig'))
 				$vlanpermissions[$from][] = $to;
 	}
-	$ret = "<input type=hidden name=pn_{$nports} value='{$port_name}'>";
+	$ret = "<input type=hidden name=pn_{$nports} value='" . stringForTextInputValue ($port_name, 0) . "'>";
 	$ret .= "<input type=hidden name=pm_{$nports} value=access>";
 	$options = array();
 	// Offer only options that are listed in domain and fit into VST.
@@ -1385,7 +1385,7 @@ END
 			echo "<input type=hidden name=rn_{$rownum} value=" . $item['right']['native'] . '>';
 			foreach ($item['right']['allowed'] as $a)
 				echo "<input type=hidden name=ra_{$rownum}[] value={$a}>";
-			echo "<input type=hidden name=pn_{$rownum} value='" . htmlspecialchars ($port_name) . "'>";
+			echo "<input type=hidden name=pn_{$rownum} value='" . stringForTextInputValue ($port_name, 0) . "'>";
 		}
 		$rownum += count ($radio_attrs) ? 1 : 0;
 	}

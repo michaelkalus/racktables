@@ -131,6 +131,8 @@ class StoredTextOutputTest extends RTTestCase
 		(
 			'object rackspace' => array ('object', 'rackspace', array ('object_id' => 'server'), 'renderRackSpaceForObject', array ('server')),
 			'rackspace' => array ('rackspace', 'default', array(), 'renderRackspace', array()),
+			'location editor' => array ('rackspace', 'editlocations', array(), 'renderRackspaceLocationEditor', array()),
+			'row editor' => array ('rackspace', 'editrows', array(), 'renderRackspaceRowEditor', array()),
 			'location breadcrumbs' => array ('location', 'default', array ('location_id' => 'location'), 'showPathAndSearch', array ('=location', '=default')),
 			'row breadcrumbs' => array ('row', 'default', array ('row_id' => 'row'), 'showPathAndSearch', array ('=row', '=default')),
 			'rack breadcrumbs' => array ('rack', 'default', array ('rack_id' => 'rack'), 'showPathAndSearch', array ('=rack', '=default')),

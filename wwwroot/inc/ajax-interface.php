@@ -184,12 +184,14 @@ function verifyCodeAJAX()
 	$tabno = 'edit';
 	fixContext();
 	assertPermission();
-	genericAssertion ('code', 'string');
-	$result = getRackCode (dos2unix ($_REQUEST['code']));
+	$code = genericAssertion ('code', 'string');
+	$result = getRackCode (dos2unix ($code));
 	if ($result['result'] == 'ACK')
 		echo "ACK\n";
 	else
-		echo "NAK\n" . $result['load'];
+		// The parser quotes the text it could not make sense of, and the page
+		// inserts the message as HTML.
+		echo "NAK\n" . htmlspecialchars ($result['load'], ENT_QUOTES, 'UTF-8');
 }
 
 // echoes JSON-encoded text

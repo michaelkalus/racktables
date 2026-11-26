@@ -562,7 +562,7 @@ function renderEditRSPool ($pool_id)
 	$poolinfo = spotEntity ('ipv4rspool', $pool_id);
 	printOpFormIntro ('updIPv4RSP');
 	echo '<table border=0 align=center>';
-	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='" . stringForStoredTextInputValue ($poolinfo['name']) . "'></td></tr>\n";
+	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='" . stringForTextInputValue ($poolinfo['name'], 0) . "'></td></tr>\n";
 	echo "<tr><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
@@ -598,7 +598,7 @@ function renderEditVService ($vsid)
 	global $vs_proto;
 	printSelect ($vs_proto, array ('name' => 'proto'), $vsinfo['proto']);
 	echo "</td></tr>\n";
-	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='{$vsinfo['name']}'></td></tr>\n";
+	echo "<tr><th class=tdright>Name:</th><td class=tdleft><input type=text name=name value='" . stringForTextInputValue ($vsinfo['name'], 0) . "'></td></tr>\n";
 	echo "<tr><th class=tdright>Tags:</th><td class=tdleft>";
 	printTagsPicker ();
 	echo "</td></tr>\n";
@@ -622,6 +622,5 @@ function renderLVSConfig ($object_id)
 	printOpFormIntro ('submitSLBConfig');
 	echo "<center><input type=submit value='Submit for activation'></center>";
 	echo "</form>";
-	// Entity names are stored HTML-escaped by some forms, hence no double encoding.
-	echo '<pre>' . htmlspecialchars (buildLVSConfig ($object_id), ENT_QUOTES, 'UTF-8', FALSE) . '</pre>';
+	echo '<pre>' . htmlspecialchars (buildLVSConfig ($object_id), ENT_QUOTES, 'UTF-8') . '</pre>';
 }
