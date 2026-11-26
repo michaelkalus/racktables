@@ -777,13 +777,12 @@ function get_pseudo_file ($name)
 
 		$query[] = "CREATE TABLE `LDAPCache` (
   `presented_username` char(64) NOT NULL,
-  `successful_hash` char(40) NOT NULL,
+  `successful_hash` varchar(255) NOT NULL,
   `first_success` timestamp NOT NULL default CURRENT_TIMESTAMP,
   `last_retry` timestamp NULL default NULL,
   `displayed_name` char(128) default NULL,
   `memberof` text,
-  UNIQUE KEY `presented_username` (`presented_username`),
-  KEY `scanidx` (`presented_username`,`successful_hash`)
+  UNIQUE KEY `presented_username` (`presented_username`)
 ) ENGINE=InnoDB";
 
 		$query[] = "CREATE TABLE `Link` (

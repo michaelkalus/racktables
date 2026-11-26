@@ -333,6 +333,19 @@ function constructLDAPOptions()
 			$LDAP_options[$option_name] = $option_value;
 }
 
+// A digest of the LDAP configuration, stored in the database to notice a
+// change that makes the cached data stale. The password of the search account
+// is left out: the digest would allow testing guesses of it, and a new
+// password of that account does not change what the directory says about
+// the users.
+function getLDAPConfigHash()
+{
+	global $LDAP_options;
+	$options = $LDAP_options;
+	unset ($options['search_bind_password']);
+	return hash ('sha256', serialize ($options));
+}
+
 // a wrapper for two LDAP auth methods below
 function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 {
@@ -341,10 +354,10 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 	{
 		// Destroy the cache each time config changes.
 		if ($LDAP_options['cache_expiry'] != 0 &&
-			sha1 (serialize ($LDAP_options)) != loadScript ('LDAPConfigHash'))
+			getLDAPConfigHash() !== loadScript ('LDAPConfigHash'))
 		{
 			discardLDAPCache();
-			saveScript ('LDAPConfigHash', sha1 (serialize ($LDAP_options)));
+			saveScript ('LDAPConfigHash', getLDAPConfigHash());
 			deleteScript ('LDAPLastSuccessfulServer');
 		}
 
@@ -397,14 +410,54 @@ function authenticated_via_ldap_nocache ($username, $password, &$ldap_displaynam
 	return FALSE;
 }
 
+// The LDAP cache remembers the password of a successful bind as a password_hash()
+// result, so that a copy of the table does not allow guessing directory passwords
+// at the speed of a plain digest. bcrypt reads only the first 72 bytes of its
+// input and stops at a NUL byte, and a directory password is not limited that
+// way, so the password goes through SHA-256 first.
+function prepareLDAPCachePassword ($password)
+{
+	return base64_encode (hash ('sha256', $password, TRUE));
+}
+
+function makeLDAPCacheHash ($password)
+{
+	$ret = password_hash (prepareLDAPCachePassword ($password), PASSWORD_DEFAULT);
+	if (! isModernPasswordHash ($ret))
+		throw new RackTablesError ('password_hash() failed', RackTablesError::INTERNAL);
+	return $ret;
+}
+
+// TRUE if the password is the one the given LDAPCache.successful_hash was made
+// from. Any other stored value (the empty one of a row that only serves as a
+// lock, or a digest of an earlier release) matches no password. The slow
+// verification runs once per request for the same arguments, and a client
+// that keeps the PHP session cookie skips it the same way a local account
+// does (see passwordCheckSessionValue()).
+function LDAPCachePasswordMatches ($username, $stored, $password)
+{
+	static $verified = array();
+	if (! is_string ($password) || ! isModernPasswordHash ($stored))
+		return FALSE;
+	$subject = 'ldap:' . $username;
+	if (isPasswordCheckInSession ($subject, $stored, $password))
+		return TRUE;
+	$key = hash_hmac ('sha256', $password, $stored);
+	if (! isset ($verified[$key]))
+		$verified[$key] = password_verify (prepareLDAPCachePassword ($password), $stored);
+	if ($verified[$key])
+		savePasswordCheckInSession ($subject, $stored, $password);
+	return $verified[$key];
+}
+
 // check that LDAP cache row contains correct password and is not expired
 // if check_for_refreshing = TRUE, also checks that cache row does not need refreshing
-function isLDAPCacheValid ($cache_row, $password_hash, $check_for_refreshing = FALSE)
+// The password is checked last, because that is the expensive part.
+function isLDAPCacheValid ($cache_row, $username, $password, $check_for_refreshing = FALSE)
 {
 	global $LDAP_options;
 	return
 		is_array ($cache_row) &&
-		$cache_row['successful_hash'] === $password_hash &&
 		$cache_row['success_age'] < $LDAP_options['cache_expiry'] &&
 		(
 			// There are two confidence levels of cache hits: "certain" and "uncertain". In either case
@@ -416,7 +469,28 @@ function isLDAPCacheValid ($cache_row, $password_hash, $check_for_refreshing = F
 				isset ($cache_row['retry_age']) &&
 				$cache_row['retry_age'] < $LDAP_options['cache_retry']
 			)
-		);
+		) &&
+		LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password);
+}
+
+// TRUE for a cache row that is not expired and remembers a password other
+// than the given one. A request that was not authenticated says nothing
+// about such a row, so it stays: otherwise anybody could remove the row of
+// another user with a wrong password, which locks that user out while the
+// directory server cannot be reached. The caller keeps it only when the
+// server refused the given password or could not be reached: when the server
+// does not know the user (any more) or has accepted the given password, the
+// remembered one is obsolete. Any other row (the one that only
+// served as a lock, an expired one, one with the given password that the
+// server has just refused) is of no use after such a request.
+function isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password)
+{
+	global $LDAP_options;
+	return
+		is_array ($cache_row) &&
+		isModernPasswordHash ($cache_row['successful_hash']) &&
+		$cache_row['success_age'] < $LDAP_options['cache_expiry'] &&
+		! LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password);
 }
 
 // Idem, but consider existing data in cache and modify/discard it, when necessary.
@@ -427,17 +501,16 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 	global $LDAP_options, $auto_tags;
 
 	$user_data = array(); // fill auto_tags and ldap_displayname from this array
-	$password_hash = sha1 ($password);
 
 	// first try to get cache row without locking it (quick way)
 	$cache_row = fetchLDAPCacheRow ($username);
-	if (isLDAPCacheValid ($cache_row, $password_hash, TRUE))
+	if (isLDAPCacheValid ($cache_row, $username, $password, TRUE))
 		$user_data = $cache_row; // cache HIT
 	else
 	{
 		// cache miss or expired. Try to lock LDAPCache for $username
 		$cache_row = acquireLDAPCache ($username);
-		if (isLDAPCacheValid ($cache_row, $password_hash, TRUE))
+		if (isLDAPCacheValid ($cache_row, $username, $password, TRUE))
 			$user_data = $cache_row; // cache HIT, but with DB lock
 		else
 		{
@@ -445,20 +518,34 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 			switch ($ldap_answer['result'])
 			{
 			case 'ACK':
+				// Keep the stored hash of an unchanged password, a new one costs
+				// as much as a verification and makes the session forget it.
+				if
+				(
+					LDAPCachePasswordMatches ($username, $cache_row['successful_hash'], $password) &&
+					! password_needs_rehash ($cache_row['successful_hash'], PASSWORD_DEFAULT)
+				)
+					$password_hash = $cache_row['successful_hash'];
+				else
+				{
+					$password_hash = makeLDAPCacheHash ($password);
+					savePasswordCheckInSession ('ldap:' . $username, $password_hash, $password);
+				}
 				replaceLDAPCacheRecord ($username, $password_hash, $ldap_answer['displayed_name'], $ldap_answer['memberof']);
 				$user_data = $ldap_answer;
 				break;
 			case 'NAK': // The record isn't valid any more.
 				// TODO: negative result caching
-				deleteLDAPCacheRecord ($username);
+				if (empty ($ldap_answer['wrong_password']) || ! isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password))
+					deleteLDAPCacheRecord ($username);
 				break;
 			case 'CAN': // LDAP query failed, use old value till next retry
-				if (isLDAPCacheValid ($cache_row, $password_hash, FALSE))
+				if (isLDAPCacheValid ($cache_row, $username, $password, FALSE))
 				{
 					touchLDAPCacheRecord ($username);
 					$user_data = $cache_row;
 				}
-				else
+				elseif (! empty ($ldap_answer['bound']) || ! isLDAPCacheRowOfAnotherPassword ($cache_row, $username, $password))
 					deleteLDAPCacheRecord ($username);
 				break;
 			default:
@@ -487,6 +574,11 @@ function authenticated_via_ldap_cache ($username, $password, &$ldap_displayname)
 // 'result' => 'ACK' : server replied and cleared access, there were no search errors
 // 'displayed_name' : a string built according to LDAP displayname_attrs option
 // 'memberof' => filtered list of all LDAP groups the user belongs to
+//
+// 'wrong_password' => TRUE : with 'NAK', a search has found the user and the
+// server refused the password (any other 'NAK' is, or may be, about the user)
+// 'bound' => TRUE : with 'CAN', the server did accept the password and a later
+// step failed
 //
 function queryLDAPServer ($username, $password)
 {
@@ -556,6 +648,9 @@ function queryLDAPServer ($username, $password)
 
 	// Build the server's version of the user's username for ldap_bind(). This may
 	// involve an anonymous (or a non-anonymous, with another ldap_bind()) LDAP search.
+	// TRUE once a search has found the user. Without the search a refused bind
+	// does not tell a wrong password from a user that does not exist.
+	$user_found = FALSE;
 	if (isset ($LDAP_options['domain']) && $LDAP_options['domain'] != '')
 		$auth_user_name = $username . "@" . $LDAP_options['domain'];
 	elseif
@@ -598,6 +693,7 @@ function queryLDAPServer ($username, $password)
 		$info = @ldap_get_entries ($connect, $results);
 		ldap_free_result ($results);
 		$auth_user_name = $info[0]['dn'];
+		$user_found = TRUE;
 	}
 	else
 		throw new RackTablesError ('LDAP misconfiguration. Cannon build username for authentication.', RackTablesError::MISCONFIGURED);
@@ -606,7 +702,7 @@ function queryLDAPServer ($username, $password)
 		switch (ldap_errno ($connect))
 		{
 		case 49: // LDAP_INVALID_CREDENTIALS
-			return array ('result' => 'NAK');
+			return array ('result' => 'NAK', 'wrong_password' => $user_found);
 		default:
 			return array ('result' => 'CAN');
 		}
@@ -636,7 +732,7 @@ function queryLDAPServer ($username, $password)
 		{
 			error_log ('RackTables: LDAP search for user attributes failed: ' . ldap_error ($connect));
 			@ldap_close ($connect);
-			return array ('result' => 'CAN');
+			return array ('result' => 'CAN', 'bound' => TRUE);
 		}
 		if (@ldap_count_entries ($connect, $results) != 1)
 		{
