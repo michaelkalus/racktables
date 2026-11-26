@@ -103,7 +103,7 @@ function renderInterfaceHTML ($pageno, $tabno, $payload)
 	echo '<div class=maintable>';
 	echo '<div class=mainheader>';
 	echo '<div style="float: right" class=greeting>';
-	echo mkA ($remote_displayname, 'myaccount', NULL, 'default');
+	echo mkA (stringForLabel ($remote_displayname, 0), 'myaccount', NULL, 'default');
 	echo ' [ <a href="';
 	showLogoutURL();
 	echo '">logout</a> ]</div>'; // greeting
@@ -1335,7 +1335,7 @@ function renderRackInfoPortlet ($rackData)
 	if ($rackData['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($rackData['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($rackData['comment'], ENT_QUOTES, 'UTF-8')) . '</div>';
 		finishPortlet ();
 	}
 }
@@ -1511,7 +1511,7 @@ function renderObject ($object_id)
 	if ($info['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($info['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($info['comment'], ENT_QUOTES, 'UTF-8')) . '</div>';
 		finishPortlet ();
 	}
 
@@ -2563,7 +2563,7 @@ function renderRackspaceHistory ()
 		else
 			$class = "row_{$order}";
 		echo "<tr class={$class}><td><a href='".makeHref(array('page'=>$pageno, 'tab'=>$tabno, 'op_id'=>$row['mo_id']))."'>{$row['ctime']}</a></td>";
-		echo "<td>{$row['user_name']}</td><td>";
+		echo '<td>' . stringForLabel ((string) $row['user_name'], 0) . '</td><td>';
 		renderCell (spotEntity ('object', $row['ro_id']));
 		echo '</td><td>' . stringForTD ($row['comment'], 0) . '</td></tr>';
 		$order = $nextorder[$order];
@@ -4135,7 +4135,7 @@ function renderLocationPage ($location_id)
 	if ($locationData['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($locationData['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($locationData['comment'], ENT_QUOTES, 'UTF-8')) . '</div>';
 		finishPortlet ();
 	}
 	renderLogRecordsPortlet ($location_id);
@@ -6187,7 +6187,7 @@ function renderObjectLogEditor ()
 	foreach (getLogRecordsForObject (getBypassValue()) as $row)
 	{
 		echo '<tr valign=top>';
-		echo '<td class=tdleft>' . $row['date'] . '<br>' . $row['user'] . '</td>';
+		echo '<td class=tdleft>' . $row['date'] . '<br>' . stringForLabel ($row['user'], 0) . '</td>';
 		echo '<td class="logentry">' . string_insert_hrefs (htmlspecialchars ($row['content'], ENT_NOQUOTES)) . '</td>';
 		echo "<td class=tdleft>";
 		echo getOpLink (array('op'=>'del', 'log_id'=>$row['id']), '', 'DESTROY', 'Delete log entry');
@@ -6594,7 +6594,7 @@ function renderLogRecordsPortlet ($object_id)
 	foreach (array_slice ($logrecords, 0, $lr_max) as $row)
 	{
 		echo "<tr class=row_{$order} valign=top>";
-		echo '<td class=tdleft>' . $row['date'] . '<br>' . $row['user'] . '</td>';
+		echo '<td class=tdleft>' . $row['date'] . '<br>' . stringForLabel ($row['user'], 0) . '</td>';
 		echo '<td class="logentry">' . string_insert_hrefs (htmlspecialchars ($row['content'], ENT_NOQUOTES)) . '</td>';
 		echo '</tr>';
 		$order = $nextorder[$order];

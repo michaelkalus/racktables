@@ -1147,8 +1147,8 @@ function renderMyAccount ()
 	startPortlet ('Current user info');
 	echo '<div style="text-align: left; display: inline-block;">';
 	echo "<table>";
-	echo "<tr><th>Login:</th><td>{$remote_username}</td></tr>\n";
-	echo "<tr><th>Name:</th><td>{$remote_displayname}</td></tr>\n";
+	echo '<tr><th>Login:</th><td>' . stringForLabel ($remote_username, 0) . "</td></tr>\n";
+	echo '<tr><th>Name:</th><td>' . stringForLabel ($remote_displayname, 0) . "</td></tr>\n";
 	echo "<tr><th>Explicit tags:</th><td>" . serializeTags (getExplicitTagsOnly ($expl_tags)) . "</td></tr>\n";
 	echo "<tr><th>Implicit tags:</th><td>" . serializeTags ($impl_tags) . "</td></tr>\n";
 	echo "<tr><th>Automatic tags:</th><td>" . serializeTags ($auto_tags) . "</td></tr>\n";

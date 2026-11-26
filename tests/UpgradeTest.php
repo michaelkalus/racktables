@@ -186,6 +186,10 @@ ENDOFCODE;
 			usePreparedInsertBlade ('Object', array ('name' => 'upgrade R&D; typed', 'objtype_id' => 4));
 			usePreparedInsertBlade ('Config', array ('varname' => 'UPGRADETEST_73', 'varvalue' => 'a &amp;amp;amp; b &amp;amp;lt; c'));
 		}
+		// A user name as the login and the "add user" form of every release
+		// before 0.24.1-community stored it (issue #152).
+		usePreparedInsertBlade ('UserAccount', array ('user_name' => 'upgrade o&#039;brien &amp; co', 'user_realname' => '&lt;Upgrade&gt;'));
+		usePreparedInsertBlade ('IPv4Log', array ('ip' => 3325256857, 'date' => '2026-01-01 00:00:00', 'user' => 'upgrade o&#039;brien &amp; co', 'message' => 'Binded with R&amp;D, ifname=eth0'));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -281,6 +285,24 @@ ENDOFCODE;
 			$result->closeCursor();
 			usePreparedDeleteBlade ('Config', array ('varname' => 'UPGRADETEST_73'));
 		}
+		// User names are decoded once (issue #152).
+		$result = usePreparedSelectBlade ("SELECT user_name, user_realname FROM UserAccount WHERE user_name LIKE 'upgrade %'");
+		$this->assertSame
+		(
+			array (array ('user_name' => "upgrade o'brien & co", 'user_realname' => '<Upgrade>')),
+			$result->fetchAll (PDO::FETCH_ASSOC),
+			"User account after upgrading from {$version}"
+		);
+		$result->closeCursor();
+		// 198.51.100.153
+		$result = usePreparedSelectBlade ('SELECT user, message FROM IPv4Log WHERE ip = 3325256857');
+		$this->assertSame
+		(
+			array (array ('user' => "upgrade o'brien & co", 'message' => 'Binded with R&D, ifname=eth0')),
+			$result->fetchAll (PDO::FETCH_ASSOC),
+			"IPv4 log record after upgrading from {$version}"
+		);
+		$result->closeCursor();
 		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
 		// references anything but the full column list of a PRIMARY or UNIQUE key.
 		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");

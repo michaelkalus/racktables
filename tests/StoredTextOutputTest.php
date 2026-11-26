@@ -49,7 +49,7 @@ class StoredTextOutputTest extends RTTestCase
 			'RackSpace',
 			array ('rack_id' => $this->rack_id, 'unit_no' => 1, 'atom' => 'front', 'state' => 'T', 'object_id' => $this->server_id)
 		);
-		// the form that another handler stores
+		// text that looks like character references
 		$this->escaped_id = commitAddObject
 		(
 			$this->myString ('a73 &amp; b'),
@@ -106,9 +106,9 @@ class StoredTextOutputTest extends RTTestCase
 	{
 		$this->assertStringNotContainsString (self::MARKER, $output, $what);
 		$this->assertStringContainsString (self::ESCAPED_MARKER, $output, $what);
-		// neither form is escaped a second time
+		// and it is not escaped a second time
 		$this->assertStringNotContainsString ('&amp;lt;i', $output, $what);
-		$this->assertStringNotContainsString ('&amp;amp;', $output, $what);
+		$this->assertStringNotContainsString ('x73 &amp;amp;', $output, $what);
 	}
 
 	public function providerPages ()
@@ -255,23 +255,23 @@ class StoredTextOutputTest extends RTTestCase
 		$this->assertSame ($this->text ('location'), getLocationTrail ($this->location_id, FALSE));
 	}
 
-	// A value that a form stored HTML-escaped looks the same as before.
+	// Text that looks like a character reference is displayed as typed.
 	/**
 	 * @group small
 	 */
-	public function testEscapedFormIsNotEscapedAgain ()
+	public function testEntityLikeTextIsShownAsTyped ()
 	{
 		$output = $this->render ('depot', 'default', array(), 'renderDepot');
 		foreach (array ('a73', 'l73', 't73') as $prefix)
 		{
-			$this->assertStringContainsString ($this->myString ("{$prefix} &amp; b"), $output);
-			$this->assertStringNotContainsString ("{$prefix} &amp;amp; b", $output);
+			$this->assertStringContainsString ($this->myString ("{$prefix} &amp;amp; b"), $output);
+			$this->assertStringNotContainsString ("{$prefix} &amp; b", $output);
 		}
 		$output = $this->render ('object', 'default', array ('object_id' => (string) $this->escaped_id), 'renderObject', array ($this->escaped_id));
 		foreach (array ('a73', 'l73', 't73') as $prefix)
 		{
-			$this->assertStringContainsString ($this->myString ("{$prefix} &amp; b"), $output);
-			$this->assertStringNotContainsString ("{$prefix} &amp;amp; b", $output);
+			$this->assertStringContainsString ($this->myString ("{$prefix} &amp;amp; b"), $output);
+			$this->assertStringNotContainsString ("{$prefix} &amp; b", $output);
 		}
 	}
 
@@ -282,7 +282,7 @@ class StoredTextOutputTest extends RTTestCase
 	{
 		$html = getNiftySelect
 		(
-			array ('group <1> & "x"' => array ("key 'a' <b>" => 'label <i>x73 & y', 2 => 'stored &amp; escaped'), 'second' => array (3 => 'plain')),
+			array ('group <1> & "x"' => array ("key 'a' <b>" => 'label <i>x73 & y', 2 => 'typed &amp; entity'), 'second' => array (3 => 'plain')),
 			array ('name' => 'test'),
 			2
 		);
@@ -290,6 +290,6 @@ class StoredTextOutputTest extends RTTestCase
 		$this->assertStringNotContainsString ('<1>', $html);
 		$this->assertStringContainsString ("<optgroup label='group &lt;1&gt; &amp; &quot;x&quot;'>", $html);
 		$this->assertStringContainsString ("<option value='key &#039;a&#039; &lt;b&gt;'>label &lt;i&gt;x73 &amp; y</option>", $html);
-		$this->assertStringContainsString ("<option value='2' selected>stored &amp; escaped</option>", $html);
+		$this->assertStringContainsString ("<option value='2' selected>typed &amp;amp; entity</option>", $html);
 	}
 }

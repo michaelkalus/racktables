@@ -222,19 +222,21 @@ function isValidVLANID ($x)
 
 function assertUnsignedIntArg ($argname)
 {
+	global $sic;
 	if (! isset ($_REQUEST[$argname]))
 		throw new InvalidRequestArgException ($argname, '', 'parameter is missing');
 	if (! isUnsignedInteger ($_REQUEST[$argname]))
-		throw new InvalidRequestArgException ($argname, $_REQUEST[$argname], 'parameter is not an unsigned integer (or 0)');
+		throw new InvalidRequestArgException ($argname, $sic[$argname], 'parameter is not an unsigned integer (or 0)');
 	return $_REQUEST[$argname];
 }
 
 function assertNaturalNumArg ($argname)
 {
+	global $sic;
 	if (! isset ($_REQUEST[$argname]))
 		throw new InvalidRequestArgException ($argname, '', 'parameter is missing');
 	if (! isNaturalNumber ($_REQUEST[$argname]))
-		throw new InvalidRequestArgException ($argname, $_REQUEST[$argname], 'parameter is not a natural number');
+		throw new InvalidRequestArgException ($argname, $sic[$argname], 'parameter is not a natural number');
 	return $_REQUEST[$argname];
 }
 
@@ -270,20 +272,21 @@ function assertStringArg ($argname, $ok_if_empty = FALSE)
 	if (!isset ($_REQUEST[$argname]))
 		throw new InvalidRequestArgException($argname, '', 'parameter is missing');
 	if (!is_string ($_REQUEST[$argname]))
-		throw new InvalidRequestArgException($argname, $_REQUEST[$argname], 'parameter is not a string');
+		throw new InvalidRequestArgException($argname, $sic[$argname], 'parameter is not a string');
 	if (! $ok_if_empty && $_REQUEST[$argname] == '')
-		throw new InvalidRequestArgException($argname, $_REQUEST[$argname], 'parameter is an empty string');
+		throw new InvalidRequestArgException($argname, $sic[$argname], 'parameter is an empty string');
 	return $sic[$argname];
 }
 
 function assertBoolArg ($argname, $ok_if_empty = FALSE)
 {
+	global $sic;
 	if (!isset ($_REQUEST[$argname]))
 		throw new InvalidRequestArgException($argname, '', 'parameter is missing');
 	if (! is_string ($_REQUEST[$argname]) || $_REQUEST[$argname] != 'on')
-		throw new InvalidRequestArgException($argname, $_REQUEST[$argname], 'parameter is not a string');
+		throw new InvalidRequestArgException($argname, $sic[$argname], 'parameter is not a string');
 	if (! $ok_if_empty && $_REQUEST[$argname] == '')
-		throw new InvalidRequestArgException($argname, $_REQUEST[$argname], 'parameter is an empty string');
+		throw new InvalidRequestArgException($argname, $sic[$argname], 'parameter is an empty string');
 	return $_REQUEST[$argname] == TRUE;
 }
 

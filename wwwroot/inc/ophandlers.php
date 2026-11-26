@@ -1062,15 +1062,15 @@ function editAddress ()
 function createUser ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 5));
-	assertStringArg ('username');
-	assertStringArg ('realname', TRUE);
+	// The name is stored as typed, as updateUser() does and as the login presents it.
+	$username = assertStringArg ('username');
+	$realname = assertStringArg ('realname', TRUE);
 	// Hash the password as received, as the login does (not the HTML-escaped $_REQUEST value).
 	$password = makePasswordHash (assertStringArg ('password'));
-	$username = $_REQUEST['username'];
-	$user_id = commitCreateUserAccount ($username, $_REQUEST['realname'], $password);
+	$user_id = commitCreateUserAccount ($username, $realname, $password);
 	if (isset ($_REQUEST['taglist']))
 		produceTagsForNewRecord ('user', $_REQUEST['taglist'], $user_id);
-	showFuncMessage (__FUNCTION__, 'OK', array ($username));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($username, 0)));
 }
 
 function updateUser ()
@@ -1086,7 +1086,7 @@ function updateUser ()
 		genericAssertion ('realname', 'string0'),
 		$password === '' ? '' : makePasswordHash ($password)
 	);
-	showFuncMessage (__FUNCTION__, 'OK', array ($username));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($username, 0)));
 }
 
 function deleteUser ()
@@ -1095,7 +1095,7 @@ function deleteUser ()
 	$user_id = genericAssertion ('id', 'natural');
 	$userinfo = spotEntity ('user', $user_id);
 	commitDeleteUserAccount ($user_id);
-	showFuncMessage (__FUNCTION__, 'OK', array ($userinfo['user_name']));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($userinfo['user_name'], 0)));
 }
 
 function supplementAttrMap ()
@@ -3350,7 +3350,7 @@ function importDPData()
 			}
 			if (! isset ($params['a_id']) || ! isset ($params['b_id']) ||
 				! intval ($params['a_id']) || ! intval ($params['b_id']))
-				throw new InvalidRequestArgException ("ports_{$i}", $_REQUEST["ports_{$i}"], "can not unpack port ids");
+				throw new InvalidRequestArgException ("ports_{$i}", $sic["ports_{$i}"], "can not unpack port ids");
 
 			$porta = getPortInfo ($params['a_id']);
 			$portb = getPortInfo ($params['b_id']);
@@ -3940,7 +3940,7 @@ function editUserProperties ()
 	$user_id = getBypassValue();
 	rebuildTagChainForEntity ('user', $user_id, buildTagChainFromIds ($taglist), TRUE);
 	$user = spotEntity ('user', $user_id);
-	showFuncMessage (__FUNCTION__, 'OK', array($user['user_name']));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($user['user_name'], 0)));
 }
 
 function renameObjectPorts()

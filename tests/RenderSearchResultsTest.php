@@ -308,12 +308,12 @@ class RenderSearchResultsTest extends RTTestCase
 		$this->assertStringNotContainsString ('<b>', $output);
 	}
 
-	// Values that the request handlers stored HTML-escaped already must be
-	// displayed as typed, not with visible character references.
+	// Text that consists of character references is displayed as typed: the
+	// page shows the references, not the characters they stand for.
 	/**
 	 * @group small
 	 */
-	public function testStoredEscaped ()
+	public function testEntityLikeText ()
 	{
 		$this->row_id = commitAddObject (self::stored ('row'), NULL, 1561, NULL);
 		usePreparedInsertBlade
@@ -347,16 +347,18 @@ class RenderSearchResultsTest extends RTTestCase
 			'row' => array ($this->row_id => spotEntity ('row', $this->row_id)),
 		);
 		$output = getOutputOf ('renderSearchResults', 'x', $summary);
-		foreach (array ('nat', 'name4', 'comment4', 'ipv4vs') as $marker)
-			$this->assertStringContainsString (self::escaped ($marker), $output);
-		$this->assertStringContainsString ('Row ' . self::escaped ('row'), $output);
-		$this->assertStringNotContainsString ('&amp;lt;', $output);
-		$this->assertStringNotContainsString ('&amp;amp;', $output);
-		$this->assertStringNotContainsString ('&amp;quot;', $output);
+		foreach (array ('nat', 'name4', 'comment4') as $marker)
+		{
+			$this->assertStringContainsString (htmlspecialchars (self::stored ($marker), ENT_QUOTES, 'UTF-8'), $output);
+			$this->assertStringNotContainsString (self::stored ($marker), $output);
+		}
+		// the virtual service name is cut short on this page, its title is not
+		$this->assertStringContainsString ("title='" . htmlspecialchars (self::stored ('ipv4vs'), ENT_QUOTES, 'UTF-8') . "'", $output);
+		$this->assertStringContainsString ('Row ' . htmlspecialchars (self::stored ('row'), ENT_QUOTES, 'UTF-8'), $output);
 		$this->assertStringNotContainsString ('<b>', $output);
 	}
 
-	// Return the probe value the way the request handlers store it.
+	// Return the probe value written as character references.
 	protected static function stored ($marker)
 	{
 		return htmlspecialchars (self::probe ($marker), ENT_QUOTES, 'UTF-8');
