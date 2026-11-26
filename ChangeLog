@@ -1,4 +1,5 @@
 0.23.1-community
+	update: leave the password of the LDAP search account out of the stored digest of the LDAP configuration
 	update: store password_hash() results instead of SHA-1 digests in the LDAP cache
 	bugfix: ignore an invalid "andor" request argument instead of failing with HTTP 500 on PHP 8
 0.23.0-community 2026-11-25

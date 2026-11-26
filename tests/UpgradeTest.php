@@ -172,6 +172,8 @@ ENDOFCODE;
 		$this->assertFalse (authenticate_admin ('admin', 'wrong password'));
 		// a cache row of an earlier release, with an SHA-1 digest of the password
 		usePreparedInsertBlade ('LDAPCache', array ('presented_username' => 'upgradetest', 'successful_hash' => sha1 ('secret')));
+		// a digest of the LDAP configuration as earlier releases stored it
+		usePreparedInsertBlade ('Script', array ('script_name' => 'LDAPConfigHash', 'script_text' => sha1 ('config')));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -239,6 +241,7 @@ ENDOFCODE;
 		$result->closeCursor();
 		$this->assertSame ('varchar(255)', $row[0], "LDAPCache.successful_hash type after upgrading from {$version}");
 		$this->assertSame ('NO', $row[1], "LDAPCache.successful_hash nullability after upgrading from {$version}");
+		$this->assertNull (loadScript ('LDAPConfigHash'), "LDAPConfigHash after upgrading from {$version}");
 		// the key that included the hash is gone, as in a fresh install
 		$this->assertNull (self::findLine (self::freshInstallTableSQL ('LDAPCache'), 'KEY `scanidx` '));
 		$this->assertNull (self::findLine (self::showCreateTable ('LDAPCache'), 'KEY `scanidx` '), "LDAPCache.scanidx after upgrading from {$version}");

@@ -333,6 +333,19 @@ function constructLDAPOptions()
 			$LDAP_options[$option_name] = $option_value;
 }
 
+// A digest of the LDAP configuration, stored in the database to notice a
+// change that makes the cached data stale. The password of the search account
+// is left out: the digest would allow testing guesses of it, and a new
+// password of that account does not change what the directory says about
+// the users.
+function getLDAPConfigHash()
+{
+	global $LDAP_options;
+	$options = $LDAP_options;
+	unset ($options['search_bind_password']);
+	return hash ('sha256', serialize ($options));
+}
+
 // a wrapper for two LDAP auth methods below
 function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 {
@@ -341,10 +354,10 @@ function authenticated_via_ldap ($username, $password, &$ldap_displayname)
 	{
 		// Destroy the cache each time config changes.
 		if ($LDAP_options['cache_expiry'] != 0 &&
-			sha1 (serialize ($LDAP_options)) != loadScript ('LDAPConfigHash'))
+			getLDAPConfigHash() !== loadScript ('LDAPConfigHash'))
 		{
 			discardLDAPCache();
-			saveScript ('LDAPConfigHash', sha1 (serialize ($LDAP_options)));
+			saveScript ('LDAPConfigHash', getLDAPConfigHash());
 			deleteScript ('LDAPLastSuccessfulServer');
 		}
 
