@@ -214,6 +214,7 @@ function getPortInfoAJAX()
 	$object_id = genericAssertion ('object_id', 'natural');
 	fixContext (spotEntity ('object', $object_id));
 	assertPermission ('object', 'liveports', $opmap[$_REQUEST['ac']]);
+	sendJSONContentType();
 	echo json_encode ($funcmap[$_REQUEST['ac']] ($object_id));
 }
 
@@ -336,5 +337,14 @@ function getAutocompleteListAJAX()
 	if (count ($rows) > 100 )
 		$rows[] = array ('label' => '...', 'value' => '');
 
+	sendJSONContentType();
 	echo json_encode ($rows);
+}
+
+// A JSON reply must not be taken for an HTML page by a browser that is sent
+// to its URL.
+function sendJSONContentType ()
+{
+	if (! headers_sent())
+		header ('Content-Type: application/json; charset=UTF-8');
 }
