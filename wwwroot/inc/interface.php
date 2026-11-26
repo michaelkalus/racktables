@@ -4708,7 +4708,7 @@ function renderCellFilterPortlet ($preselect, $realm, $cell_list = array(), $byp
 		echo $hr;
 		$hr = $ruler;
 		$class = isset ($preselect['extraclass']) ? 'class=' . $preselect['extraclass'] : '';
-		echo "<tr><td colspan=2><textarea name=cfe {$class}>\n" . $preselect['extratext'];
+		echo "<tr><td colspan=2><textarea name=cfe {$class}>\n" . stringForTextarea ($preselect['extratext']);
 		echo "</textarea></td></tr>\n";
 	}
 	// submit block
@@ -4740,15 +4740,16 @@ function renderCellFilterPortlet ($preselect, $realm, $cell_list = array(), $byp
 			$text .= empty ($preselect['text']) || empty ($preselect['extratext'])
 				? $preselect['extratext']
 				: '(' . $preselect['extratext'] . ')';
-			$text = addslashes ($text);
-			echo " <a href=\"#\" onclick=\"textifyCellFilter(this, '$text'); return false\">";
+			// a JavaScript string literal inside an HTML attribute
+			$text = htmlspecialchars (json_encode ($text), ENT_QUOTES, 'UTF-8');
+			echo " <a href=\"#\" onclick=\"textifyCellFilter(this, {$text}); return false\">";
 			printImageHREF ('COPY', 'Make text expression from current filter');
 			echo '</a>';
 			addJSText (<<<'END'
 function textifyCellFilter(target, text)
 {
 	var portlet = $(target).closest ('.portlet');
-	portlet.find ('textarea[name="cfe"]').html (text);
+	portlet.find ('textarea[name="cfe"]').val (text);
 	portlet.find ('input[type="checkbox"]').attr('checked', '');
 	portlet.find ('input[type="radio"][value="and"]').attr('checked','true');
 }

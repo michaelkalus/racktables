@@ -324,11 +324,11 @@ function portletRSPoolSrv ($pool_id)
 						break;
 					case 'rsconfig':
 						echo "<td class=slbconf>";
-						echo $rs[$field];
+						echo htmlspecialchars ((string) $rs[$field], ENT_QUOTES, 'UTF-8');
 						break;
 					default:
 						echo "<td class=tdleft>";
-						echo $rs[$field];
+						echo htmlspecialchars ((string) $rs[$field], ENT_QUOTES, 'UTF-8');
 						break;
 				}
 				echo '</td>';
