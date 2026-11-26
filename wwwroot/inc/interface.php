@@ -107,7 +107,7 @@ function renderInterfaceHTML ($pageno, $tabno, $payload)
 	echo ' [ <a href="';
 	showLogoutURL();
 	echo '">logout</a> ]</div>'; // greeting
-	echo getConfigVar ('enterprise') . ' RackTables ';
+	echo stringForLabel (getConfigVar ('enterprise'), 0) . ' RackTables ';
 	echo '<a href="https://github.com/michaelkalus/racktables" title="Visit the RackTables community fork">' . CODE_VERSION . '</a>';
 	renderQuickLinks();
 	echo '</div>'; // mainheader
@@ -295,7 +295,7 @@ function renderLocationFilterPortlet ()
 		{
 			echo "<div class=tagbox style='text-align:left; padding-left:" . ($level * 16) . "px;'>";
 			$checked = (! isset ($_SESSION['locationFilter']) || in_array ($location['id'], $_SESSION['locationFilter'])) ? 'checked' : '';
-			echo "<label><input type=checkbox name='location_id[]' class={$level} value='{$location['id']}'{$checked} onClick=checkAll(this)>{$location['name']}";
+			echo "<label><input type=checkbox name='location_id[]' class={$level} value='{$location['id']}'{$checked} onClick=checkAll(this)>" . stringForLabel ($location['name'], 0);
 			echo '</label>';
 			if ($location['kidc'])
 			{
@@ -425,7 +425,7 @@ function getRackThumbLink ($rack, $scale = 1, $object_id = NULL)
 // Link to the row of the given rack, or plain text for a rack that is not linked to any row.
 function mkRackRowA ($rack)
 {
-	return $rack['row_id'] === NULL ? '(no row)' : mkA ($rack['row_name'], 'row', $rack['row_id']);
+	return $rack['row_id'] === NULL ? '(no row)' : mkA (stringForLabel ($rack['row_name'], 0), 'row', $rack['row_id']);
 }
 
 function renderRackspace ()
@@ -468,7 +468,7 @@ function renderRackspace ()
 				$locationTree = sprintf ('%s %s', $parentLocation['name'], $locationTree);
 				$hrefLocationTree = "&raquo; <a href='" .
 					makeHref(array('page'=>'location', 'location_id'=>$parentLocation['id'])) .
-					"{$cellfilter['urlextra']}'>{$parentLocation['name']}</a> " .
+					"{$cellfilter['urlextra']}'>" . stringForLabel ($parentLocation['name'], 0) . "</a> " .
 					$hrefLocationTree;
 				$location_id = $parentLocation['parent_id'];
 				$locationIdx++;
@@ -533,9 +533,9 @@ function renderRackspace ()
 					$rackListIdx = 0;
 					echo "<tr class=row_{$order}><th class=tdleft>{$row['href_location_tree']}</th>";
 					if ($row['row_id'] === NULL)
-						echo "<th class=tdleft>{$row['row_name']}</th>";
+						echo '<th class=tdleft>' . stringForLabel ($row['row_name'], 0) . '</th>';
 					else
-						echo "<th class=tdleft><a href='".makeHref(array('page'=>'row', 'row_id'=>$row['row_id']))."{$cellfilter['urlextra']}'>{$row['row_name']}</a></th>";
+						echo "<th class=tdleft><a href='".makeHref(array('page'=>'row', 'row_id'=>$row['row_id']))."{$cellfilter['urlextra']}'>" . stringForLabel ($row['row_name'], 0) . "</a></th>";
 					echo "<th class=tdleft><table border=0 cellspacing=5><tr>";
 					if (! count ($rackList))
 						echo '<td>(empty row)</td>';
@@ -545,7 +545,7 @@ function renderRackspace ()
 							if ($rackListIdx > 0 && $maxPerRow > 0 && $rackListIdx % $maxPerRow == 0)
 							{
 								echo '</tr></table></th></tr>';
-								echo "<tr class=row_{$order}><th class=tdleft></th><th class=tdleft>{$row['row_name']} (continued)";
+								echo "<tr class=row_{$order}><th class=tdleft></th><th class=tdleft>" . stringForLabel ($row['row_name'], 0) . " (continued)";
 								echo "</th><th class=tdleft><table border=0 cellspacing=5><tr>";
 							}
 							echo '<td align=center valign=bottom>' . getRackThumbLink ($rack);
@@ -606,7 +606,7 @@ function renderLocationSelectTree ($select_name, $selected_id = NULL)
 		echo "<option value={$location['id']} style='font-weight: bold' ";
 		if ($location['id'] == $selected_id )
 		    echo ' selected';
-		echo ">{$location['name']}</option>";
+		echo '>' . stringForOption ($location['name'], 0) . '</option>';
 		printLocationChildrenSelectOptions ($location, $selected_id);
 	}
 	echo '</select>';
@@ -706,9 +706,9 @@ function renderRow ($row_id)
 	$rackList = applyCellFilter ('rack', $cellfilter, $row_id);
 
 	$summary = array ();
-	$summary['Name'] = $rowInfo['name'];
+	$summary['Name'] = stringForLabel ($rowInfo['name'], 0);
 	if ($rowInfo['location_id'])
-		$summary['Location'] = mkA ($rowInfo['location'], 'location', $rowInfo['location_id']);
+		$summary['Location'] = mkA (stringForLabel ($rowInfo['location'], 0), 'location', $rowInfo['location_id']);
 	$summary['Racks'] = $rowInfo['count'];
 	$summary['Units'] = $rowInfo['sum'];
 	$summary['% used'] = getProgressBar (getRSUforRow ($rackList));
@@ -760,7 +760,7 @@ function renderRow ($row_id)
 
 function renderEditAttributeTRs ($update_op, $values, $objtype_id, $skip_ids = array())
 {
-	$datehint = ' (' . datetimeFormatHint (getConfigVar ('DATETIME_FORMAT')) . ')';
+	$datehint = ' (' . stringForLabel (datetimeFormatHint (getConfigVar ('DATETIME_FORMAT')), 0) . ')';
 	$i = 0;
 	foreach ($values as $record)
 	{
@@ -798,7 +798,7 @@ function renderEditAttributeTRs ($update_op, $values, $objtype_id, $skip_ids = a
 			case 'date':
 				$ro_or_rw = $can_update ? "name={$i}_value" : 'disabled';
 				$date_value = $record['value'] ? datetimestrFromTimestamp ($record['value']) : '';
-				echo "<input type=text {$ro_or_rw} value='{$date_value}'>";
+				echo "<input type=text {$ro_or_rw} value='" . stringForTextInputValue ($date_value, 0) . "'>";
 				break;
 			case 'dict':
 				$ro_or_rw = $can_update ? array ('name' => "{$i}_value") : array ('name' => "{$i}_value", 'disabled' => 1);
@@ -859,13 +859,13 @@ function printObjectDetailsForRenderRack ($object_id, $hl_obj_id = 0)
 {
 	$objectData = spotEntity ('object', $object_id);
 	if ($objectData['asset_no'] != '')
-		$prefix = "<div title='{$objectData['asset_no']}";
+		$prefix = "<div title='" . stringForLabel ($objectData['asset_no'], 0);
 	else
 		$prefix = "<div title='no asset tag";
 	// Don't tell about label, if it matches common name.
 	$body = '';
 	if ($objectData['name'] != $objectData['label'] && $objectData['label'] != '')
-		$body = ", visible label is \"{$objectData['label']}\"";
+		$body = ', visible label is &quot;' . stringForLabel ($objectData['label'], 0) . '&quot;';
 	// Display list of child objects, if any
 	$objectChildren = getChildren ($objectData, 'object');
 	$slotRows = $slotCols = $slotInfo = $slotData = $slotTitle = $slotClass = array ();
@@ -875,7 +875,7 @@ function printObjectDetailsForRenderRack ($object_id, $hl_obj_id = 0)
 	{
 		foreach ($objectChildren as $childData)
 		{
-			$childNames[] = $childData['name'];
+			$childNames[] = stringForLabel ((string) $childData['name'], 0);
 			$attrData = getAttrValues ($childData['id']);
 			$numRows = $numCols = 1;
 			if (isset ($attrData[2])) // HW type
@@ -897,11 +897,11 @@ function printObjectDetailsForRenderRack ($object_id, $hl_obj_id = 0)
 				$slotInfo[$slot] = $childData['dname'];
 				$slotData[$slot] = $childData['id'];
 				if ($childData['asset_no'] != '')
-					$slotTitle[$slot] = "<div title='{$childData['asset_no']}";
+					$slotTitle[$slot] = "<div title='" . stringForLabel ($childData['asset_no'], 0);
 				else
 					$slotTitle[$slot] = "<div title='no asset tag";
 				if ($childData['label'] != '' && $childData['label'] != $childData['dname'])
-					$slotTitle[$slot] .= ", visible label is \"{$childData['label']}\"";
+					$slotTitle[$slot] .= ', visible label is &quot;' . stringForLabel ($childData['label'], 0) . '&quot;';
 				$slotTitle[$slot] .= "'>";
 				$slotClass[$slot] = 'state_T';
 				if ($childData['id'] == $hl_obj_id)
@@ -957,14 +957,15 @@ function printObjectDetailsForRenderRack ($object_id, $hl_obj_id = 0)
 								echo " class='{$slotClass[$s]}'>{$slotTitle[$s]}";
 								if ($layout == 'V')
 								{
-									$tmp = mb_substr($slotInfo[$s], 0, 1);
-									for($i = 1; $i < mb_strlen($slotInfo[$s]); $i++)
-									{
-										$tmp .= '<br>' . mb_substr($slotInfo[$s], $i, 1);
-									}
-									$slotInfo[$s] = $tmp;
+									// one character per line, each escaped on its own
+									$tmp = array();
+									for ($i = 0; $i < mb_strlen ($slotInfo[$s]); $i++)
+										$tmp[] = htmlspecialchars (mb_substr ($slotInfo[$s], $i, 1), ENT_QUOTES, 'UTF-8');
+									$slotLabel = implode ('<br>', $tmp);
 								}
-								echo mkA ($slotInfo[$s], 'object', $slotData[$s]);
+								else
+									$slotLabel = stringForLabel ($slotInfo[$s], 0);
+								echo mkA ($slotLabel, 'object', $slotData[$s]);
 								echo '</div></td>';
 							}
 						}
@@ -995,7 +996,7 @@ function renderRack ($rack_id, $hl_obj_id = 0)
 	echo '<td><h2>' . mkRackRowA ($rackData) . ' :</h2></td>';
 	if ($prev_id != NULL)
 		echo '<td>' . mkA (getImageHREF ('prev', 'previous rack'), 'rack', $prev_id) . '</td>';
-	echo '<td><h2>' . mkA ($rackData['name'], 'rack', $rackData['id']) . '</h2></td>';
+	echo '<td><h2>' . mkA (stringForLabel ($rackData['name'], 0), 'rack', $rackData['id']) . '</h2></td>';
 	if ($next_id != NULL)
 		echo '<td>' . mkA (getImageHREF ('next', 'next rack'), 'rack', $next_id) . '</td>';
 	echo "</h2></td></tr></table>\n";
@@ -1109,7 +1110,7 @@ JSTXT;
 	echo "<tr><th>Drag to change order</th></tr>\n";
 	echo "<tr><td class=tdleft><ul class='uflist' id='sortRacks'>\n";
 	foreach (getRacks($row_id) as $rack_id => $rackInfo)
-		echo "<li id=racks_{$rack_id}>{$rackInfo['name']}</li>\n";
+		echo "<li id=racks_{$rack_id}>" . stringForLabel ($rackInfo['name'], 0) . "</li>\n";
 	echo "</ul></td></tr></table>\n";
 	finishPortlet();
 }
@@ -1310,10 +1311,10 @@ function renderRackInfoPortlet ($rackData)
 {
 	$summary = array();
 	$summary['Rack row'] = mkRackRowA ($rackData);
-	$summary['Name'] = $rackData['name'];
+	$summary['Name'] = stringForLabel ($rackData['name'], 0);
 	$summary['Height'] = $rackData['height'];
 	if ($rackData['asset_no'] != '')
-		$summary['Asset tag'] = $rackData['asset_no'];
+		$summary['Asset tag'] = stringForLabel ($rackData['asset_no'], 0);
 	if ($rackData['has_problems'] == 'yes')
 		$summary[] = array ('<tr><td colspan=2 class=msg_error>Has problems</td></tr>');
 	populateRackPower ($rackData, $summary);
@@ -1334,7 +1335,7 @@ function renderRackInfoPortlet ($rackData)
 	if ($rackData['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs ($rackData['comment']) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($rackData['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
 		finishPortlet ();
 	}
 }
@@ -1349,7 +1350,7 @@ function renderGridForm ($rack_id, $filter, $header, $submit, $state1, $state2)
 	// Render the result whatever it is.
 	// Main layout.
 	echo "<table border=0 class=objectview cellspacing=0 cellpadding=0>";
-	echo "<tr><td colspan=2 align=center><h1>{$rackData['name']}</h1></td></tr>\n";
+	echo "<tr><td colspan=2 align=center><h1>" . stringForLabel ($rackData['name'], 0) . "</h1></td></tr>\n";
 
 	// Left column with information portlet.
 	echo "<tr><td class=pcleft height='1%' width='50%'>";
@@ -1445,7 +1446,7 @@ function renderObject ($object_id)
 	// display summary portlet
 	$summary = array();
 	if ($info['name'] != '')
-		$summary['Common name'] = $info['name'];
+		$summary['Common name'] = stringForLabel ($info['name'], 0);
 	elseif (considerConfiguredConstraint ($info, 'NAMEWARN_LISTSRC'))
 		$summary[] = array ('<tr><td colspan=2 class=msg_error>Common name is missing.</td></tr>');
 	$summary['Object type'] = '<a href="' . makeHref (array (
@@ -1454,9 +1455,9 @@ function renderObject ($object_id)
 		'cfe' => '{$typeid_' . $info['objtype_id'] . '}'
 	)) . '">' .  stringForLabel (decodeObjectType ($info['objtype_id']), 0) . '</a>';
 	if ($info['label'] != '')
-		$summary['Visible label'] = $info['label'];
+		$summary['Visible label'] = stringForLabel ($info['label'], 0);
 	if ($info['asset_no'] != '')
-		$summary['Asset tag'] = $info['asset_no'];
+		$summary['Asset tag'] = stringForLabel ($info['asset_no'], 0);
 	elseif (considerConfiguredConstraint ($info, 'ASSETWARN_LISTSRC'))
 		$summary[] = array ('<tr><td colspan=2 class=msg_error>Asset tag is missing.</td></tr>');
 	$parents = getParents ($info, 'object');
@@ -1510,7 +1511,7 @@ function renderObject ($object_id)
 	if ($info['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs ($info['comment']) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($info['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
 		finishPortlet ();
 	}
 
@@ -1618,7 +1619,7 @@ function renderObject ($object_id)
 						echo mkA (stringForLabel ("{$bond['object_name']}({$bond['name']})", 0), 'object', $bond['object_id']) . ' ';
 				elseif ($pf['remote_addr_name'] != '')
 					echo '(' . stringForLabel ($pf['remote_addr_name'], 0) . ')';
-				echo "</td><td class='description tdleft'>{$pf['description']}</td></tr>";
+				echo "</td><td class='description tdleft'>" . stringForLabel ((string) $pf['description'], 0) . '</td></tr>';
 			}
 			echo "</table><br><br>";
 		}
@@ -1633,7 +1634,7 @@ function renderObject ($object_id)
 				echo "<td class=tdleft>{$pf['proto']}/" . getRenderedIPPortPair ($pf['localip'], $pf['localport']) . "</td>";
 				echo '<td class="description tdleft">' . mkA (stringForLabel ($pf['object_name'], 0), 'object', $pf['object_id']);
 				echo "</td><td class=tdleft>" . getRenderedIPPortPair ($pf['remoteip'], $pf['remoteport']) . "</td>";
-				echo "<td class='description tdleft'>{$pf['description']}</td></tr>";
+				echo "<td class='description tdleft'>" . stringForLabel ((string) $pf['description'], 0) . '</td></tr>';
 			}
 			echo "</table><br><br>";
 		}
@@ -1681,13 +1682,13 @@ function renderRackMultiSelect ($sname, $racks, $selected)
 	natsort ($row_names);
 	foreach ($row_names as $optgroup)
 	{
-		echo "<optgroup label='{$optgroup}'>";
+		echo "<optgroup label='" . stringForLabel ($optgroup, 0) . "'>";
 		foreach ($rdata[$optgroup] as $rack_id => $rack_name)
 		{
 			echo "<option value={$rack_id}";
 			if (!(array_search ($rack_id, $selected) === FALSE))
 				echo ' selected';
-			echo">{$rack_name}</option>\n";
+			echo '>' . stringForOption ($rack_name, 0) . "</option>\n";
 		}
 	}
 	echo "</select>\n";
@@ -2305,7 +2306,7 @@ function renderRackSpaceForObject ($object_id)
 		echo '<center><h2 style="margin:0px">';
 		echo mkRackRowA ($rackData);
 		echo ' : ';
-		echo mkA ($rackData['name'], 'rack', $rackData['id']);
+		echo mkA (stringForLabel ($rackData['name'], 0), 'rack', $rackData['id']);
 		echo '</h2>';
 		$read_only_text = $is_ro ? '(read-only)' : '&nbsp;';
 		echo "<p style='color: red; margin-top:0px'>{$read_only_text}</p>\n";
@@ -2365,7 +2366,7 @@ function renderMolecule ($mdata, $object_id)
 	foreach ($rackpack as $rackData)
 	{
 		echo "<table class=molecule cellspacing=0>\n";
-		echo "<caption>{$rackData['name']}</caption>\n";
+		echo '<caption>' . stringForLabel ($rackData['name'], 0) . "</caption>\n";
 		echo "<tr><th width='10%'>&nbsp;</th><th width='20%'>Front</th><th width='50%'>Interior</th><th width='20%'>Back</th></tr>\n";
 		$reverse = considerConfiguredConstraint ($rackData, 'REVERSED_RACKS_LISTSRC');
 		for ($i = $rackData['height']; $i > 0; $i--)
@@ -2422,24 +2423,24 @@ function renderDepot ()
 				setEntityColors ($obj);
 				$class = getCellClass ($obj, 'list_plain');
 
-				echo "<tr class='row_{$order} tdleft {$problem}{$class}' valign=top><td>" . mkA ("<strong>{$obj['dname']}</strong>", 'object', $obj['id']);
+				echo "<tr class='row_{$order} tdleft {$problem}{$class}' valign=top><td>" . mkA ('<strong>' . stringForLabel ($obj['dname'], 0) . '</strong>', 'object', $obj['id']);
 				if (count ($obj['etags']))
 					echo '<br><small>' . serializeTags ($obj['etags'], makeHref(array('page'=>$pageno, 'tab'=>'default')) . '&') . '</small>';
 				echo '</td>';
 				if ($showobjecttype)
 					echo "<td>" . decodeObjectType ($obj['objtype_id']) . "</td>";
-				echo "<td>{$obj['label']}</td>";
-				echo "<td>{$obj['asset_no']}</td>";
+				echo '<td>' . stringForLabel ((string) $obj['label'], 0) . '</td>';
+				echo '<td>' . stringForLabel ((string) $obj['asset_no'], 0) . '</td>';
 				$places = array();
 				if (array_key_exists ($obj['id'], $containerinfo))
 					foreach ($containerinfo[$obj['id']] as $ci)
-						$places[] = mkA ($ci['container_dname'], 'object', $ci['container_id']);
+						$places[] = mkA (stringForLabel ($ci['container_dname'], 0), 'object', $ci['container_id']);
 				if (array_key_exists ($obj['id'], $mountinfo))
 					foreach ($mountinfo[$obj['id']] as $mi)
 					{
 						// a rack that is not linked to any row has no row to link to
-						$row_text = $mi['row_id'] === NULL ? '(no row)' : mkA ($mi['row_name'], 'row', $mi['row_id']);
-						$places[] = $row_text . '/' . mkA ($mi['rack_name'], 'rack', $mi['rack_id']);
+						$row_text = $mi['row_id'] === NULL ? '(no row)' : mkA (stringForLabel ($mi['row_name'], 0), 'row', $mi['row_id']);
+						$places[] = $row_text . '/' . mkA (stringForLabel ($mi['rack_name'], 0), 'rack', $mi['rack_id']);
 					}
 				if (! count ($places))
 					$places[] = 'Unmounted';
@@ -3100,7 +3101,7 @@ function renderIPv4NetworkAddresses ($range)
 		foreach ($addr['vslist'] as $vs_id)
 		{
 			$vs = spotEntity ('ipv4vs', $vs_id);
-			echo $delim . mkA ("{$vs['name']}:{$vs['vport']}/{$vs['proto']}", 'ipv4vs', $vs['id']) . '&rarr;';
+			echo $delim . mkA (stringForLabel ("{$vs['name']}:{$vs['vport']}/{$vs['proto']}", 0), 'ipv4vs', $vs['id']) . '&rarr;';
 			$delim = '<br>';
 		}
 		foreach ($addr['vsglist'] as $vs_id)
@@ -3225,7 +3226,7 @@ function renderIPv6NetworkAddresses ($netinfo)
 		foreach ($addr['vslist'] as $vs_id)
 		{
 			$vs = spotEntity ('ipv4vs', $vs_id);
-			echo $delim . mkA ("{$vs['name']}:{$vs['vport']}/{$vs['proto']}", 'ipv4vs', $vs['id']) . '&rarr;';
+			echo $delim . mkA (stringForLabel ("{$vs['name']}:{$vs['vport']}/{$vs['proto']}", 0), 'ipv4vs', $vs['id']) . '&rarr;';
 			$delim = '<br>';
 		}
 		foreach ($addr['vsglist'] as $vs_id)
@@ -3401,7 +3402,7 @@ function renderIPAddress ($ip_bin)
 				echo "<td>" . $rule['proto'] . "</td>";
 				echo "<td>" . getRenderedIPPortPair ($rule['localip'], $rule['localport']) . "</td>";
 				echo "<td>" . getRenderedIPPortPair ($rule['remoteip'], $rule['remoteport']) . "</td>";
-				echo "<td>" . $rule['description'] . "</td></tr>";
+				echo '<td>' . stringForLabel ((string) $rule['description'], 0) . '</td></tr>';
 				echo "</tr>";
 			}
 			echo "</table>";
@@ -3636,7 +3637,7 @@ function renderNATv4ForObject ($object_id)
 		echo "<td>{$pf['proto']}/" . getRenderedIPPortPair ($pf['localip'], $pf['localport']) . "</td>";
 		echo '<td class="description">' . mkA (stringForLabel ($pf['object_name'], 0), 'object', $pf['object_id']);
 		echo "</td><td>" . getRenderedIPPortPair ($pf['remoteip'], $pf['remoteport']) . "</td>";
-		echo "<td class='description'>{$pf['description']}</td></tr>";
+		echo "<td class='description'>" . stringForLabel ((string) $pf['description'], 0) . '</td></tr>';
 	}
 
 	echo "</table><br><br>";
@@ -4115,9 +4116,9 @@ function renderLocationPage ($location_id)
 	// Left column with information.
 	echo "<td class=pcleft>";
 	$summary = array();
-	$summary['Name'] = $locationData['name'];
+	$summary['Name'] = stringForLabel ($locationData['name'], 0);
 	if (! empty ($locationData['parent_id']))
-		$summary['Parent location'] = mkA ($locationData['parent_name'], 'location', $locationData['parent_id']);
+		$summary['Parent location'] = mkA (stringForLabel ($locationData['parent_name'], 0), 'location', $locationData['parent_id']);
 	$summary['Child locations'] = count($locationData['locations']);
 	$summary['Rows'] = count($locationData['rows']);
 	if ($locationData['has_problems'] == 'yes')
@@ -4134,7 +4135,7 @@ function renderLocationPage ($location_id)
 	if ($locationData['comment'] != '')
 	{
 		startPortlet ('Comment');
-		echo '<div class=commentblock>' . string_insert_hrefs ($locationData['comment']) . '</div>';
+		echo '<div class=commentblock>' . string_insert_hrefs (htmlspecialchars ($locationData['comment'], ENT_QUOTES, 'UTF-8', FALSE)) . '</div>';
 		finishPortlet ();
 	}
 	renderLogRecordsPortlet ($location_id);
@@ -4146,13 +4147,13 @@ function renderLocationPage ($location_id)
 	startPortlet ('Rows ('. count ($locationData['rows']) . ')');
 	echo "<table border=0 cellspacing=0 cellpadding=5 align=center>\n";
 	foreach ($locationData['rows'] as $row_id => $name)
-		echo '<tr><td>' . mkA ($name, 'row', $row_id) . '</td></tr>';
+		echo '<tr><td>' . mkA (stringForLabel ($name, 0), 'row', $row_id) . '</td></tr>';
 	echo "</table>\n";
 	finishPortlet();
 	startPortlet ('Child Locations (' . count ($locationData['locations']) . ')');
 	echo "<table border=0 cellspacing=0 cellpadding=5 align=center>\n";
 	foreach ($locationData['locations'] as $location_id => $name)
-		echo '<tr><td>' . mkA ($name, 'location', $location_id) . '</td></tr>';
+		echo '<tr><td>' . mkA (stringForLabel ($name, 0), 'location', $location_id) . '</td></tr>';
 	echo "</table>\n";
 	finishPortlet();
 	echo '</td>';
@@ -4470,7 +4471,7 @@ function renderAutoPortsForm ($object_id)
 	echo "<caption>The following ports can be quickly added:</caption>";
 	echo "<tr><th>type</th><th>name</th></tr>";
 	foreach (getAutoPorts ($info) as $autoport)
-		echo "<tr><td>" . $ptlist[$autoport['type']] . "</td><td>{$autoport['name']}</td></tr>";
+		echo "<tr><td>" . $ptlist[$autoport['type']] . "</td><td>" . stringForLabel ($autoport['name'], 0) . '</td></tr>';
 	printOpFormIntro ('generate');
 	echo "<tr><td colspan=2 align=center>";
 	echo "<input type=submit value='Generate'>";
@@ -5071,7 +5072,7 @@ function printRoutersTD ($rlist, $as_cell = 'yes')
 		if ($as_cell == 'yes')
 			renderRouterCell ($rtr['ip_bin'], $rtr['iface'], $rinfo);
 		else
-			echo $pfx . '<a href="' . makeHref (array ('page' => 'object', 'object_id' => $rtr['id'], 'tab' => 'default', 'hl_ip' => ip_format ($rtr['ip_bin']))) . '">' . $rinfo['dname'] . '</a>';
+			echo $pfx . '<a href="' . makeHref (array ('page' => 'object', 'object_id' => $rtr['id'], 'tab' => 'default', 'hl_ip' => ip_format ($rtr['ip_bin']))) . '">' . stringForLabel ($rinfo['dname'], 0) . '</a>';
 		$pfx = "<br>\n";
 	}
 	echo '</td>';
@@ -5516,7 +5517,7 @@ function dynamic_title_decoder_throwing ($path_position)
 	case 'index':
 		return array
 		(
-			'name' => '/' . getConfigVar ('enterprise'),
+			'name' => '/' . stringForLabel (getConfigVar ('enterprise'), 0),
 			'params' => array()
 		);
 	case 'chapter':
@@ -5567,7 +5568,7 @@ function dynamic_title_decoder_throwing ($path_position)
 		$location = spotEntity ('location', genericAssertion ('location_id', 'natural'));
 		return array
 		(
-			'name' => $location['name'],
+			'name' => stringForLabel ($location['name'], 0),
 			'params' => array ('location_id' => $location['id'])
 		);
 	case 'row':
@@ -5584,14 +5585,14 @@ function dynamic_title_decoder_throwing ($path_position)
 				);
 			return array
 			(
-				'name' => $rack['row_name'],
+				'name' => stringForLabel ($rack['row_name'], 0),
 				'params' => array ('row_id' => $rack['row_id'], 'location_id' => $rack['location_id'])
 			);
 		case 'row':
 			$row_info = getRowInfo (genericAssertion ('row_id', 'natural'));
 			return array
 			(
-				'name' => $row_info['name'],
+				'name' => stringForLabel ($row_info['name'], 0),
 				'params' => array ('row_id' => $row_info['id'], 'location_id' => $row_info['location_id'])
 			);
 		default:
@@ -5601,7 +5602,7 @@ function dynamic_title_decoder_throwing ($path_position)
 		$rack_info = spotEntity ('rack', genericAssertion ('rack_id', 'natural'));
 		return array
 		(
-			'name' => $rack_info['name'],
+			'name' => stringForLabel ($rack_info['name'], 0),
 			'params' => array ('rack_id' => $rack_info['id'])
 		);
 	case 'search':
@@ -6090,8 +6091,8 @@ function formatAttributeValue ($record, $objtype_id)
 		return sprintf
 		(
 			'<span title="%s">%s</span>',
-			datetimeFormatHint (getConfigVar ('DATETIME_FORMAT')),
-			datetimestrFromTimestamp ($record['value'])
+			stringForLabel (datetimeFormatHint (getConfigVar ('DATETIME_FORMAT')), 0),
+			stringForLabel (datetimestrFromTimestamp ($record['value']), 0)
 		);
 	case 'string':
 		$a_value = stringForLabel ($record['a_value'], 0);
@@ -6102,7 +6103,7 @@ function formatAttributeValue ($record, $objtype_id)
 					if (considerGivenConstraint (NULL, $filter))
 					{
 						$blank = (preg_match ('/^https?$/', $proto) ? 'target=_blank' : '');
-						return "<a $blank title='Open $proto session' class='mgmt-link' href='" . htmlspecialchars ($proto . '://' . $record['a_value'], ENT_QUOTES, 'UTF-8') . "'>{$a_value}</a>";
+						return "<a $blank title='Open " . stringForLabel ($proto, 0) . " session' class='mgmt-link' href='" . htmlspecialchars ($proto . '://' . $record['a_value'], ENT_QUOTES, 'UTF-8') . "'>{$a_value}</a>";
 					}
 				}
 				catch (RackTablesError $e)
@@ -6111,7 +6112,7 @@ function formatAttributeValue ($record, $objtype_id)
 					// FIXME: In the current implementation the exception class is neither RackCodeError
 					// nor RCParserError, which is likely wrong. In the specific case of a syntax error
 					// it would be helpful to display its text in the warning.
-					showWarning ("could not parse '{$filter}' for management protocol '{$proto}' in MGMT_PROTOS");
+					showWarning ("could not parse '" . stringForLabel ($filter, 0) . "' for management protocol '" . stringForLabel ($proto, 0) . "' in MGMT_PROTOS");
 					continue;
 				}
 		return array_key_exists ('href', $record) && isWikiLinkTargetAllowed ($record['href']) ?
@@ -6233,7 +6234,7 @@ function allObjectLogs ()
 		}
 		$rows[] = array
 		(
-			mkA ($text, $entity, $row['object_id'], 'log'),
+			mkA (stringForLabel ($text, 0), $entity, $row['object_id'], 'log'),
 			$row['date'] . '<br>' . stringForLabel ($row['user'], 0),
 			string_insert_hrefs (htmlspecialchars ($row['content'], ENT_NOQUOTES)),
 		);
@@ -6269,7 +6270,7 @@ function renderVirtualResourcesSummary ()
 		{
 			$total_vms = $cluster['cluster_vms'] + $cluster['resource_pool_vms'];
 			echo '<tr valign=top>';
-			echo '<td class="tdleft">' . mkA ("<strong>{$cluster['name']}</strong>", 'object', $cluster['id']) . '</td>';
+			echo '<td class="tdleft">' . mkA ('<strong>' . stringForLabel ($cluster['name'], 0) . '</strong>', 'object', $cluster['id']) . '</td>';
 			echo "<td class='tdleft'>{$cluster['hypervisors']}</td>";
 			echo "<td class='tdleft'>{$cluster['resource_pools']}</td>";
 			echo "<td class='tdleft'>{$cluster['cluster_vms']}</td>";
@@ -6294,10 +6295,10 @@ function renderVirtualResourcesSummary ()
 		foreach ($pools as $pool)
 		{
 			echo '<tr valign=top>';
-			echo '<td class="tdleft">' . mkA ("<strong>{$pool['name']}</strong>", 'object', $pool['id']) . '</td>';
+			echo '<td class="tdleft">' . mkA ('<strong>' . stringForLabel ($pool['name'], 0) . '</strong>', 'object', $pool['id']) . '</td>';
 			echo '<td class="tdleft">';
 			if ($pool['cluster_id'])
-				echo mkA ("<strong>{$pool['cluster_name']}</strong>", 'object', $pool['cluster_id']);
+				echo mkA ('<strong>' . stringForLabel ($pool['cluster_name'], 0) . '</strong>', 'object', $pool['cluster_id']);
 			echo '</td>';
 			echo "<td class='tdleft'>{$pool['VMs']}</td>";
 			echo "</tr>\n";
@@ -6319,10 +6320,10 @@ function renderVirtualResourcesSummary ()
 		foreach ($hypervisors as $hypervisor)
 		{
 			echo '<tr valign=top>';
-			echo '<td class="tdleft">' . mkA ("<strong>{$hypervisor['name']}</strong>", 'object', $hypervisor['id']) . '</td>';
+			echo '<td class="tdleft">' . mkA ('<strong>' . stringForLabel ($hypervisor['name'], 0) . '</strong>', 'object', $hypervisor['id']) . '</td>';
 			echo '<td class="tdleft">';
 			if ($hypervisor['cluster_id'])
-				echo mkA ("<strong>{$hypervisor['cluster_name']}</strong>", 'object', $hypervisor['cluster_id']);
+				echo mkA ('<strong>' . stringForLabel ($hypervisor['cluster_name'], 0) . '</strong>', 'object', $hypervisor['cluster_id']);
 			echo '</td>';
 			echo "<td class='tdleft'>{$hypervisor['VMs']}</td>";
 			echo "</tr>\n";
@@ -6344,7 +6345,7 @@ function renderVirtualResourcesSummary ()
 		foreach ($switches as $switch)
 		{
 			echo '<tr valign=top>';
-			echo '<td class="tdleft">' . mkA ("<strong>{$switch['name']}</strong>", 'object', $switch['id']) . '</td>';
+			echo '<td class="tdleft">' . mkA ('<strong>' . stringForLabel ($switch['name'], 0) . '</strong>', 'object', $switch['id']) . '</td>';
 			echo "</tr>\n";
 		}
 		echo "</table>\n";

@@ -7201,7 +7201,7 @@ function printLocationChildrenSelectOptions ($location, $parent_id, $location_id
 		echo "<option value={$subLocation['id']}";
 		if ($subLocation['id'] == $parent_id)
 			echo ' selected';
-		echo '>' . str_repeat ('&raquo; ', $level) . "{$subLocation['name']}</option>\n";
+		echo '>' . str_repeat ('&raquo; ', $level) . stringForOption ($subLocation['name'], 0) . "</option>\n";
 		if ($subLocation['kidc'] > 0)
 			$self ($subLocation, $parent_id, $location_id, $level);
 	}
@@ -7213,8 +7213,9 @@ function validTagName ($s, $allow_autotag = FALSE)
 		($allow_autotag && preg_match (AUTOTAGNAME_REGEXP, $s));
 }
 
-// returns html string with parent location names
-// link: if each name should be wrapped in an href
+// returns a string with parent location names
+// link: if each name should be wrapped in an href (the result is HTML then,
+// otherwise it is plain text)
 function getLocationTrail ($location_id, $link = TRUE, $spacer = ' : ')
 {
 	// XXX: $location_tree is an array, not a tree
@@ -7235,7 +7236,8 @@ function getLocationTrail ($location_id, $link = TRUE, $spacer = ' : ')
 			break;
 		}
 		$name = $location_tree[$id]['name'];
-		array_unshift ($names, $link ? mkA ($name, 'location', $id) : $name);
+		// The linked form is HTML, the plain form is text for the caller to escape.
+		array_unshift ($names, $link ? mkA (stringForLabel ($name, 0), 'location', $id) : $name);
 		$id = $location_tree[$id]['parent_id'];
 		$locationIdx++;
 	}

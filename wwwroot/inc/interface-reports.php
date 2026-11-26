@@ -257,7 +257,7 @@ function renderExpirations ()
 				echo '<tr class=' . $section['class'] . $order . ' valign=top>';
 				echo "<td class=tdright>{$count}</td>";
 				echo '<td class=tdleft>' . mkCellA ($object) . '</td>';
-				echo "<td class=tdleft>{$object['asset_no']}</td>";
+				echo '<td class=tdleft>' . stringForLabel ((string) $object['asset_no'], 0) . '</td>';
 				echo "<td class=tdleft>{$oem_sn_1}</td>";
 				echo "<td>{$date_value}</td>";
 				echo "</tr>\n";
@@ -325,7 +325,7 @@ function renderDataIntegrityReport ()
 				$parent_name = 'missing from DB';
 			}
 			echo '<tr>';
-			echo "<td>{$realm_name}: {$parent_name}</td>";
+			echo "<td>{$realm_name}: " . stringForLabel ((string) $parent_name, 0) . '</td>';
 			echo "<td>{$orphan['child_entity_type']}</td>";
 			echo "<td class=tdright>{$orphan['child_entity_id']}</td>";
 			echo "</tr>\n";
@@ -369,7 +369,7 @@ function renderDataIntegrityReport ()
 				$child_name = 'missing from DB';
 			}
 			echo '<tr>';
-			echo "<td>{$realm_name}: {$child_name}</td>";
+			echo "<td>{$realm_name}: " . stringForLabel ((string) $child_name, 0) . '</td>';
 			echo "<td>{$orphan['parent_entity_type']}</td>";
 			echo "<td class=tdright>{$orphan['parent_entity_id']}</td>";
 			echo "</tr>\n";
@@ -839,9 +839,9 @@ function renderDataIntegrityReport ()
 		{
 			echo '<tr>';
 			echo "<td class=tdright>{$invalid['id']}</td>";
-			echo "<td>{$invalid['name']}</td>";
+			echo '<td>' . stringForLabel ((string) $invalid['name'], 0) . '</td>';
 			echo "<td class=tdright>{$invalid['parent_id']}</td>";
-			echo "<td>{$invalid['parent_name']}</td>";
+			echo '<td>' . stringForLabel ((string) $invalid['parent_name'], 0) . '</td>';
 			echo "</tr>\n";
 		}
 		echo "</table>\n";

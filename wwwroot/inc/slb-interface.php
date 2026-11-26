@@ -504,12 +504,12 @@ function renderVirtualService ($vsid)
 	$vsinfo = spotEntity ('ipv4vs', $vsid);
 	echo '<table border=0 class=objectview cellspacing=0 cellpadding=0>';
 	if ($vsinfo['name'] != '')
-		echo "<tr><td colspan=2 align=center><h1>{$vsinfo['name']}</h1></td></tr>\n";
+		echo "<tr><td colspan=2 align=center><h1>" . stringForLabel ($vsinfo['name'], 0) . "</h1></td></tr>\n";
 	echo '<tr>';
 
 	echo '<td class=pcleft>';
 	$summary = array();
-	$summary['Name'] = $vsinfo['name'];
+	$summary['Name'] = stringForLabel ((string) $vsinfo['name'], 0);
 	$summary['Protocol'] = $vsinfo['proto'];
 	$summary['Virtual IP address'] = mkA ($vsinfo['vip'], 'ipaddress', $vsinfo['vip']);
 	$summary['Virtual port'] = $vsinfo['vport'];
@@ -622,5 +622,6 @@ function renderLVSConfig ($object_id)
 	printOpFormIntro ('submitSLBConfig');
 	echo "<center><input type=submit value='Submit for activation'></center>";
 	echo "</form>";
-	echo "<pre>" . buildLVSConfig ($object_id) . "</pre>";
+	// Entity names are stored HTML-escaped by some forms, hence no double encoding.
+	echo '<pre>' . htmlspecialchars (buildLVSConfig ($object_id), ENT_QUOTES, 'UTF-8', FALSE) . '</pre>';
 }

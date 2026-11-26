@@ -1162,7 +1162,7 @@ function processGridForm (&$rackData, $unchecked_state, $checked_state, $object_
 					!($state == $unchecked_state && $newstate == $checked_state)
 				)
 				{
-					showError ("{$rack_name}: Rack ID {$rack_id}, unit {$unit_no}, 'atom {$atom}', cannot change state from '{$state}' to '{$newstate}'");
+					showError (stringForLabel ($rack_name, 0) . ": Rack ID {$rack_id}, unit {$unit_no}, 'atom {$atom}', cannot change state from '{$state}' to '{$newstate}'");
 					if ($dbxlink->inTransaction())
 						$dbxlink->rollBack();
 					return FALSE;
@@ -1542,7 +1542,7 @@ function deleteObject ()
 	commitDeleteObject ($oinfo['id']);
 	foreach ($racklist as $rack_id)
 		usePreparedDeleteBlade ('RackThumbnail', array ('rack_id' => $rack_id));
-	showFuncMessage (__FUNCTION__, 'OK', array ($oinfo['dname']));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($oinfo['dname'], 0)));
 	return buildRedirectURL ('depot', 'addmore');
 }
 
@@ -2424,7 +2424,7 @@ function deleteLocation ()
 	amplifyCell ($locationData);
 	if (count ($locationData['locations']) || count ($locationData['rows']))
 	{
-		showFuncMessage (__FUNCTION__, 'ERR1', array ($locationData['name']));
+		showFuncMessage (__FUNCTION__, 'ERR1', array (stringForLabel ($locationData['name'], 0)));
 		return;
 	}
 	$savepoint = beginAtomicChange ('deleteLocation');
@@ -2440,7 +2440,7 @@ function deleteLocation ()
 		endAtomicChange ($savepoint, FALSE);
 		throw $e;
 	}
-	showFuncMessage (__FUNCTION__, 'OK', array ($locationData['name']));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($locationData['name'], 0)));
 	return buildRedirectURL ('rackspace', 'editlocations');
 }
 
@@ -2515,7 +2515,7 @@ function deleteRow ()
 	commitDeleteRow ($row_id);
 	if ($unmounted)
 		showFuncMessage (__FUNCTION__, 'UMOUNT', array ($unmounted));
-	showFuncMessage (__FUNCTION__, 'OK', array ($rowData['name']));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($rowData['name'], 0)));
 	return buildRedirectURL ('rackspace', 'editrows');
 }
 
@@ -2636,7 +2636,7 @@ function deleteRack ()
 		return;
 	}
 	commitDeleteRack ($rackData['id']);
-	showFuncMessage (__FUNCTION__, 'OK', array (formatEntityName ($rackData)));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel (formatEntityName ($rackData), 0)));
 	return buildRedirectURL ('rackspace', 'default');
 }
 
@@ -3570,7 +3570,7 @@ function autoPopulateUCS()
 			break;
 		}
 	} # endfor
-	showSuccess ("Auto-populated UCS Domain '{$oinfo['name']}' with {$done} items");
+	showSuccess ("Auto-populated UCS Domain '" . stringForLabel ($oinfo['name'], 0) . "' with {$done} items");
 }
 
 function cleanupUCS()
@@ -3603,7 +3603,7 @@ function cleanupUCS()
 		commitDeleteObject ($item_id);
 		$done++;
 	}
-	showSuccess ("Removed {$done} items from UCS Domain '{$oinfo['name']}'");
+	showSuccess ("Removed {$done} items from UCS Domain '" . stringForLabel ($oinfo['name'], 0) . "'");
 }
 
 function getOpspec()
@@ -3850,7 +3850,7 @@ function updateFile ()
 		array ('id' => $file_id)
 	);
 	rebuildTagChainForEntity ('file', $file_id, buildTagChainFromIds ($taglist), TRUE);
-	showFuncMessage (__FUNCTION__, 'OK', array ($file_name));
+	showFuncMessage (__FUNCTION__, 'OK', array (stringForLabel ($file_name, 0)));
 }
 
 function editIPv4Net ()
