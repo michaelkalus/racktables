@@ -11,11 +11,12 @@ class UpgradePathTest extends RTTestCase
 	{
 		return array
 		(
-			'upstream 0.22.0' => array ('0.22.0', array ('0.22.1', '0.23.0-community', '0.23.1-community', '0.24.0-community')),
-			'upstream 0.22.1' => array ('0.22.1', array ('0.23.0-community', '0.23.1-community', '0.24.0-community')),
-			'0.23.0-community' => array ('0.23.0-community', array ('0.23.1-community', '0.24.0-community')),
-			'0.23.1-community' => array ('0.23.1-community', array ('0.24.0-community')),
-			'0.24.0-community itself' => array ('0.24.0-community', array()),
+			'upstream 0.22.0' => array ('0.22.0', array ('0.22.1', '0.23.0-community', '0.23.1-community', '0.24.0-community', '0.24.1-community')),
+			'upstream 0.22.1' => array ('0.22.1', array ('0.23.0-community', '0.23.1-community', '0.24.0-community', '0.24.1-community')),
+			'0.23.0-community' => array ('0.23.0-community', array ('0.23.1-community', '0.24.0-community', '0.24.1-community')),
+			'0.23.1-community' => array ('0.23.1-community', array ('0.24.0-community', '0.24.1-community')),
+			'0.24.0-community' => array ('0.24.0-community', array ('0.24.1-community')),
+			'0.24.1-community itself' => array ('0.24.1-community', array()),
 			'unknown 0.22.2' => array ('0.22.2', NULL),
 			'unknown plain 0.23.0' => array ('0.23.0', NULL),
 			'unknown 0.19.0' => array ('0.19.0', NULL),

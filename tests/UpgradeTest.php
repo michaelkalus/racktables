@@ -179,9 +179,17 @@ ENDOFCODE;
 		}
 		// Text as the forms of every release before 0.24.0-community stored it:
 		// HTML-escaped, and with a level per save in the configuration (issue #73).
-		usePreparedInsertBlade ('Object', array ('name' => 'upgrade &lt;test&gt; &amp; &quot;more&quot;', 'label' => 'it&#039;s', 'objtype_id' => 4, 'comment' => "one\n&lt;two&gt;"));
-		usePreparedInsertBlade ('Object', array ('name' => 'upgrade R&D; typed', 'objtype_id' => 4));
-		usePreparedInsertBlade ('Config', array ('varname' => 'UPGRADETEST_73', 'varvalue' => 'a &amp;amp;amp; b &amp;amp;lt; c'));
+		$decodes_text = in_array ('0.24.0-community', getDBUpgradePath ($version, CODE_VERSION));
+		if ($decodes_text)
+		{
+			usePreparedInsertBlade ('Object', array ('name' => 'upgrade &lt;test&gt; &amp; &quot;more&quot;', 'label' => 'it&#039;s', 'objtype_id' => 4, 'comment' => "one\n&lt;two&gt;"));
+			usePreparedInsertBlade ('Object', array ('name' => 'upgrade R&D; typed', 'objtype_id' => 4));
+			usePreparedInsertBlade ('Config', array ('varname' => 'UPGRADETEST_73', 'varvalue' => 'a &amp;amp;amp; b &amp;amp;lt; c'));
+		}
+		// A user name as the login and the "add user" form of every release
+		// before 0.24.1-community stored it (issue #152).
+		usePreparedInsertBlade ('UserAccount', array ('user_name' => 'upgrade o&#039;brien &amp; co', 'user_realname' => '&lt;Upgrade&gt;'));
+		usePreparedInsertBlade ('IPv4Log', array ('ip' => 3325256857, 'date' => '2026-01-01 00:00:00', 'user' => 'upgrade o&#039;brien &amp; co', 'message' => 'Binded with R&amp;D, ifname=eth0'));
 		// some batches depend on the version the upgrade started from
 		$dbver = $version;
 		$path = getDBUpgradePath ($version, CODE_VERSION);
@@ -257,23 +265,44 @@ ENDOFCODE;
 		$this->assertEquals (0, $result->fetchColumn(), "LDAPCache rows after upgrading from {$version}");
 		$result->closeCursor();
 		// Stored text is decoded once, the configuration values completely (issue #73).
-		$result = usePreparedSelectBlade ("SELECT name, label, comment FROM Object WHERE name LIKE 'upgrade %' ORDER BY id");
-		$rows = $result->fetchAll (PDO::FETCH_ASSOC);
-		$result->closeCursor();
+		if ($decodes_text)
+		{
+			$result = usePreparedSelectBlade ("SELECT name, label, comment FROM Object WHERE name LIKE 'upgrade %' ORDER BY id");
+			$rows = $result->fetchAll (PDO::FETCH_ASSOC);
+			$result->closeCursor();
+			$this->assertSame
+			(
+				array
+				(
+					array ('name' => 'upgrade <test> & "more"', 'label' => "it's", 'comment' => "one\n<two>"),
+					array ('name' => 'upgrade R&D; typed', 'label' => NULL, 'comment' => NULL),
+				),
+				$rows,
+				"Object text after upgrading from {$version}"
+			);
+			$result = usePreparedSelectBlade ("SELECT varvalue FROM Config WHERE varname = 'UPGRADETEST_73'");
+			$this->assertSame ('a & b < c', $result->fetchColumn(), "Config value after upgrading from {$version}");
+			$result->closeCursor();
+			usePreparedDeleteBlade ('Config', array ('varname' => 'UPGRADETEST_73'));
+		}
+		// User names are decoded once (issue #152).
+		$result = usePreparedSelectBlade ("SELECT user_name, user_realname FROM UserAccount WHERE user_name LIKE 'upgrade %'");
 		$this->assertSame
 		(
-			array
-			(
-				array ('name' => 'upgrade <test> & "more"', 'label' => "it's", 'comment' => "one\n<two>"),
-				array ('name' => 'upgrade R&D; typed', 'label' => NULL, 'comment' => NULL),
-			),
-			$rows,
-			"Object text after upgrading from {$version}"
+			array (array ('user_name' => "upgrade o'brien & co", 'user_realname' => '<Upgrade>')),
+			$result->fetchAll (PDO::FETCH_ASSOC),
+			"User account after upgrading from {$version}"
 		);
-		$result = usePreparedSelectBlade ("SELECT varvalue FROM Config WHERE varname = 'UPGRADETEST_73'");
-		$this->assertSame ('a & b < c', $result->fetchColumn(), "Config value after upgrading from {$version}");
 		$result->closeCursor();
-		usePreparedDeleteBlade ('Config', array ('varname' => 'UPGRADETEST_73'));
+		// 198.51.100.153
+		$result = usePreparedSelectBlade ('SELECT user, message FROM IPv4Log WHERE ip = 3325256857');
+		$this->assertSame
+		(
+			array (array ('user' => "upgrade o'brien & co", 'message' => 'Binded with R&D, ifname=eth0')),
+			$result->fetchAll (PDO::FETCH_ASSOC),
+			"IPv4 log record after upgrading from {$version}"
+		);
+		$result->closeCursor();
 		// MySQL 8.4 refuses to rebuild a table or to restore a dump in which a foreign key
 		// references anything but the full column list of a PRIMARY or UNIQUE key.
 		$this->assertSame (array(), self::foreignKeysOnNonUniqueKeys(), "Foreign keys onto non-unique keys after upgrading from {$version}");

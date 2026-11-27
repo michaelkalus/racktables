@@ -18,4 +18,4 @@ leaves 0.22.x to upstream. Its schema changes are collected on the branch
 merged to master as a whole when the release is made.
 */
 
-define ('CODE_VERSION', '0.24.0-community');
+define ('CODE_VERSION', '0.24.1-community');

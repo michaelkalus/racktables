@@ -237,7 +237,7 @@ ENDOFTEXT
 	'0.24.0-community' => <<<'ENDOFTEXT'
 Text is now stored as it was typed. Until this release most forms stored names,
 labels, asset tags, comments, descriptions and configuration values with the
-characters & < > " ' replaced by HTML entities (for example "R&amp;D"), while
+characters &amp; &lt; &gt; " ' replaced by HTML entities (for example "R&amp;amp;D"), while
 other forms and the data read from devices stored them as they are. This
 upgrade decodes the existing values once. Pages look the same as before; the
 edit forms, the search, sorting and anything that reads the database directly
@@ -247,13 +247,43 @@ If you have plugins, a local.php or reports of your own: text read from the
 database must be escaped where it is printed, for example with
 stringForLabel() or htmlspecialchars(). Code that printed such values as they
 are was safe only because the values were stored escaped, and is not any more.
-Programs that read the database directly now find "R&D" where "R&amp;D" was.
+Programs that read the database directly now find "R&amp;D" where "R&amp;amp;D" was.
 
 Text that was typed to look like an entity on purpose (the five characters
-"&amp;") is decoded as well and becomes the character itself. A value is left
+"&amp;amp;") is decoded as well and becomes the character itself. A value is left
 as it is where the decoded form would be a duplicate of another asset tag, or
 of another port name of the same object and type; edit such a value by hand.
 User names and the log records are not converted.
+
+Take a backup of the database before the upgrade: the conversion cannot be
+undone.
+ENDOFTEXT
+,
+
+	'0.24.1-community' => <<<'ENDOFTEXT'
+User names are now used and stored as they are typed. Until this release the
+login name of HTTP basic, LDAP and httpd authentication had the characters
+&amp; &lt; &gt; " ' replaced by HTML entities before it was looked up, sent to
+the LDAP server and recorded with each change, and the "add user" form stored
+account names the same way. This upgrade decodes the names of the accounts, of
+the user preferences and of the change records once, and the generated
+messages of the port and IP address logs (as a whole, including text typed to
+look like an entity). Names without these characters, which is nearly all of
+them, are not affected. An account whose decoded name belongs to another
+account keeps its name, preferences and records as they are. With SAML
+authentication, which always used the name as it is, only the account names
+are decoded. The LDAP cache is emptied, every LDAP user is verified against
+the server on the next request.
+
+The 0.24.0-community upgrade set the time of each object history record it
+decoded to the time of the upgrade. This is fixed for databases upgraded from
+now on; a database that went through 0.24.0-community already keeps the wrong
+time in those records (the records themselves are intact).
+
+stringForLabel(), stringForTD() and stringForOption() escape every ampersand
+again. Text that was typed to look like an entity (the five characters
+"&amp;amp;") is displayed as typed. Code of your own that passes already
+escaped text to these functions now shows the entity; pass the text as it is.
 
 Take a backup of the database before the upgrade: the conversion cannot be
 undone.
@@ -296,6 +326,7 @@ function getDBUpgradePath ($v1, $v2)
 		'0.23.0-community',
 		'0.23.1-community',
 		'0.24.0-community',
+		'0.24.1-community',
 	);
 	if (! in_array ($v1, $versionhistory) || ! in_array ($v2, $versionhistory))
 		return NULL;
@@ -1532,6 +1563,10 @@ CREATE OR REPLACE VIEW `Rack` AS SELECT O.id, O.name AS name, O.asset_no, O.has_
 			$query = array_merge ($query, getStoredTextDecodingQueries());
 			$query[] = "UPDATE Config SET varvalue = '0.24.0-community' WHERE varname = 'DB_VERSION'";
 			break;
+		case '0.24.1-community':
+			$query = array_merge ($query, getUserNameDecodingQueries());
+			$query[] = "UPDATE Config SET varvalue = '0.24.1-community' WHERE varname = 'DB_VERSION'";
+			break;
 		case 'dictionary':
 			$query = reloadDictionary();
 			break;
@@ -1781,8 +1816,8 @@ function extendPortCompatQuery()
 // The 802.1Q tables refer to a port by its name, see
 // get8021QPortNameDecodingQueries().
 //
-// Not converted: the user name columns, which the authentication code still
-// fills in escaped form, and the log tables, which are history.
+// Not converted here: the user name columns and the generated log messages,
+// see getUserNameDecodingQueries().
 function getStoredTextDecodingQueries ()
 {
 	global $dbxlink;
@@ -1804,7 +1839,8 @@ function getStoredTextDecodingQueries ()
 	$query = array();
 	foreach ($columns as $table => $list)
 		foreach ($list as $column)
-			$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") . " WHERE `{$column}` LIKE '%&%;%'";
+			$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") .
+				getKeepTimestampSQL ($table) . " WHERE `{$column}` LIKE '%&%;%'";
 	$query = array_merge ($query, get8021QPortNameDecodingQueries());
 	// The two forms of RackCode can differ only in comments, which are not part
 	// of the parse tree. The cached tree is dropped all the same, init.php
@@ -1832,6 +1868,70 @@ function getStoredTextDecodingQueries ()
 			$query[] = "UPDATE {$table} SET varvalue = " . $dbxlink->quote ($decoded) . ' WHERE ' . implode (' AND ', $where);
 		}
 	}
+	return $query;
+}
+
+// The time of a history record is a TIMESTAMP column that the server sets to
+// the current time whenever the row changes, unless the statement assigns
+// the column itself. Returns the assignment that keeps the recorded time, to
+// append to the SET clause of an UPDATE of the given table.
+function getKeepTimestampSQL ($table)
+{
+	return in_array ($table, array ('ObjectHistory', 'MountOperation')) ? ', ctime = ctime' : '';
+}
+
+// Until 0.24.1-community the login name of HTTP basic, LDAP and httpd
+// authentication was HTML-escaped before use, and so were the names of the
+// accounts made with the "add user" form. In that form the name was recorded
+// with every change. This batch decodes the names once, with the expression
+// of the 0.24.0-community batch.
+//
+// The "edit user" form stored names as typed all along, so a stored name does
+// not tell which form wrote it. A name that looks escaped is taken for escaped:
+// with HTTP basic, LDAP and httpd authentication an account whose typed name
+// held an entity could not be used anyway, the login looked it up escaped
+// once more.
+//
+// An account keeps its escaped name if the decoded name belongs to another
+// account. Its preferences and change records then keep the escaped name too,
+// so that they are not taken for those of the other account. The LDAP cache is
+// emptied instead of converted, the next login of each user fills it again.
+//
+// The messages of the port, IPv4 and IPv6 address logs are generated from
+// names that were stored escaped until 0.24.0-community, they are decoded as
+// a whole: the escaped part of a message cannot be told from text typed to
+// look like an entity. Object log records were always stored as typed.
+function getUserNameDecodingQueries ()
+{
+	$name_columns = array
+	(
+		'UserConfig' => 'user',
+		'ObjectLog' => 'user',
+		'PortLog' => 'user',
+		'IPv4Log' => 'user',
+		'IPv6Log' => 'user',
+		'PatchCableHeapLog' => 'user',
+		'TagStorage' => 'user',
+		'MountOperation' => 'user_name',
+		'ObjectHistory' => 'user_name',
+		'VLANSwitchTemplate' => 'saved_by',
+	);
+	$query = array();
+	foreach (array ('user_name', 'user_realname') as $column)
+		$query[] = "UPDATE IGNORE UserAccount SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") . " WHERE `{$column}` LIKE '%&%;%'";
+	// SAML authentication always supplied the name as it is, there is nothing
+	// to decode in what it recorded.
+	global $user_auth_src;
+	if (isset ($user_auth_src) && $user_auth_src == 'saml')
+		$name_columns = array();
+	// after UserAccount, to see which accounts kept their names
+	foreach ($name_columns as $table => $column)
+		$query[] = "UPDATE IGNORE `{$table}` SET `{$column}` = " . getHTMLDecodingSQL ("`{$column}`") .
+			getKeepTimestampSQL ($table) .
+			" WHERE `{$column}` LIKE '%&%;%' AND `{$column}` NOT IN (SELECT user_name FROM UserAccount)";
+	foreach (array ('PortLog', 'IPv4Log', 'IPv6Log') as $table)
+		$query[] = "UPDATE `{$table}` SET message = " . getHTMLDecodingSQL ('message') . " WHERE message LIKE '%&%;%'";
+	$query[] = 'DELETE FROM LDAPCache';
 	return $query;
 }
 
