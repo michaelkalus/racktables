@@ -613,20 +613,27 @@ function setFuncMessages ($funcname, $messages)
 		$msgcode[$funcname][$symbol] = $code;
 }
 
+// Returns the local and the remote port of a NAT rule from the request. A rule
+// of all protocols has no ports, it is stored with 0 for both, whatever the
+// request carries in these fields. In the form that adds a rule the remote
+// port may be left empty to mean the same port as the local one.
+function getNATv4RulePortsFromRequest ($proto, $remote_defaults_to_local = FALSE)
+{
+	if ($proto == 'ALL')
+		return array (0, 0);
+	$localport = genericAssertion ('localport', 'natural');
+	if ($remote_defaults_to_local && (! isset ($_REQUEST['remoteport']) || $_REQUEST['remoteport'] === ''))
+		return array ($localport, $localport);
+	return array ($localport, genericAssertion ('remoteport', 'natural'));
+}
+
 function addPortForwarding ()
 {
 	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 48));
 	$proto = genericAssertion ('proto', 'enum/natv4proto');
-	if ($proto != 'ALL')
-	{
-		genericAssertion ('localport', 'natural');
-		genericAssertion ('remoteport', 'natural');
-	}
+	list ($localport, $remoteport) = getNATv4RulePortsFromRequest ($proto, TRUE);
 	assertStringArg ('description', TRUE);
-	$remoteport = isset ($_REQUEST['remoteport']) ? $_REQUEST['remoteport'] : '';
-	if ($remoteport == '')
-		$remoteport = $_REQUEST['localport'];
 
 	try
 	{
@@ -634,7 +641,7 @@ function addPortForwarding ()
 		(
 			getBypassValue(),
 			genericAssertion ('localip', 'inet4'),
-			$_REQUEST['localport'],
+			$localport,
 			genericAssertion ('remoteip', 'inet4'),
 			$remoteport,
 			$proto,
@@ -652,19 +659,15 @@ function delPortForwarding ()
 {
 	setFuncMessages (__FUNCTION__, array ('OK' => 49));
 	$proto = genericAssertion ('proto', 'enum/natv4proto');
-	if ($proto != 'ALL')
-	{
-		genericAssertion ('localport', 'natural');
-		genericAssertion ('remoteport', 'natural');
-	}
+	list ($localport, $remoteport) = getNATv4RulePortsFromRequest ($proto);
 
 	deletePortForwarding
 	(
 		getBypassValue(),
 		genericAssertion ('localip', 'inet4'),
-		$_REQUEST['localport'],
+		$localport,
 		genericAssertion ('remoteip', 'inet4'),
-		$_REQUEST['remoteport'],
+		$remoteport,
 		$proto
 	);
 	showFuncMessage (__FUNCTION__, 'OK');
@@ -675,20 +678,16 @@ function updPortForwarding ()
 	global $sic;
 	setFuncMessages (__FUNCTION__, array ('OK' => 51));
 	$proto = genericAssertion ('proto', 'enum/natv4proto');
-	if ($proto != 'ALL')
-	{
-		genericAssertion ('localport', 'natural');
-		genericAssertion ('remoteport', 'natural');
-	}
+	list ($localport, $remoteport) = getNATv4RulePortsFromRequest ($proto);
 	assertStringArg ('description', TRUE);
 
 	updatePortForwarding
 	(
 		getBypassValue(),
 		genericAssertion ('localip', 'inet4'),
-		$_REQUEST['localport'],
+		$localport,
 		genericAssertion ('remoteip', 'inet4'),
-		$_REQUEST['remoteport'],
+		$remoteport,
 		$proto,
 		$sic['description']
 	);

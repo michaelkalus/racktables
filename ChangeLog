@@ -1,3 +1,6 @@
+0.24.2-community
+	bugfix: the NAT rule forms take the ports of a rule of all protocols as 0, whatever the request carries, when the rule is updated or deleted
+	bugfix: a NAT rule can be added with the remote port left empty, which means the local port
 0.24.1-community 2026-11-27
 	bugfix: the conversion of stored text keeps the time of the object history records it decodes (0.24.0-community set it to the time of the upgrade)
 	bugfix: use the login name as typed with HTTP basic, LDAP and httpd authentication, store user names as typed in the "add user" form and decode the existing HTML-escaped names once (accounts, preferences, change records)
